@@ -172,7 +172,7 @@ export function genUpsertStatement(tbl: ITable, data: Object = null): string {
 
 export function genTypescriptType(tbl: ITable): string {
   let lns = tbl.rowType.heading.map( c => {
-    return "\n  readonly "+ c.name + (c.notNull ? '' : '?') + ": "+ c.type.name + (c.multiValued ? '[]' : '') 
+    return "\n  readonly "+ c.name + ": "+ c.type.name + (c.multiValued ? '[]' : '') + (c.notNull ? '' : ' | null')  
   });
   return "export interface "+tbl.rowType.name+" {" +  lns.join() + "\n};";
 }
@@ -181,10 +181,10 @@ export function genCreateTableStatement(tbl: ITable): string {
   let cols = tbl.rowType.heading.map( c => {
     return colnm(c) + " " + c.type.sqlType + (c.multiValued ? '[]' : '') + (c.notNull ? ' NOT NULL' : '');
   });
-  let stmt =  "CREATE TABLE "+tbl.name+"\n(  " +  cols.join(",\n  ");
+  let stmt =  "CREATE TABLE "+tbl.name+" (\n  " +  cols.join(",\n  ");
   stmt += ",\n  PRIMARY KEY (" + tbl.primaryKey.map(cnm).join(",")+")";
   tbl.foreignKeys.forEach(fk => {
-    stmt += ",\n  FOREIGN KEY (" + fk.columns.map(cnm).join(",")+")"
+    stmt += ",\n "+ (fk.name ? "CONSTRAINT" + fk.name : "") +" FOREIGN KEY (" + fk.columns.map(cnm).join(",")+")"
           +  "\n    REFERENCES " + fk.ref 
           +  "\n    ON UPDATE " + (fk.onUpdate || "NO ACTION")
           +  "\n    ON DELETE " + (fk.onDelete || "NO ACTION")

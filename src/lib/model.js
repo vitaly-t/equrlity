@@ -3,11 +3,19 @@ export default {
     "authId": {
       "sqlType": "varchar(128)"
     },
+    "binary": {
+      "tsType": "ArrayBuffer",
+      "sqlType": "bytea"
+    },
     "boolean": {
       "tsType": "boolean",
       "sqlType": "boolean"
     },
     "contentId": {
+      "tsType": "number",
+      "sqlType": "integer"
+    },
+    "contentCryptId": {
       "tsType": "ArrayBuffer",
       "sqlType": "bytea"
     },
@@ -82,11 +90,12 @@ export default {
       }
     ],
     "Content": [
-      { "name": "id", "type": "contentId" },
+      { "name": "contentId", "type": "contentId" },
+      { "name": "cryptHash", "type": "binary" },
       { "name": "amplifierId", "type": "userId" },
       { "name": "content", "type": "text" }
     ],
-    "Links": [
+    "Link": [
       { "name": "linkId", "type": "linkId" },
       { "name": "amplifierId", "type": "userId" },
       { "name": "contentId", "type": "contentId" },
@@ -122,14 +131,14 @@ export default {
         }
       ]
     },
-    "content": {
+    "contents": {
       "rowType": "Content",
       "primaryKey": [
         "id"
       ]
     },
     "links": {
-      "rowType": "Links",
+      "rowType": "Link",
       "primaryKey": [
         "linkId"
       ],

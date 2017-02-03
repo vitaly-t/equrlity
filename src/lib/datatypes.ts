@@ -2,7 +2,9 @@
 
 
 export type authId = string;
-export type contentId = ArrayBuffer;
+export type binary = ArrayBuffer;
+export type contentId = number;
+export type contentCryptId = ArrayBuffer;
 export type contentType = "url" | "yt_video" | "text" | "mp3";
 export type date = Date;
 export type integer = number;
@@ -17,32 +19,33 @@ export type userName = string;
 export type uuid = string;
 
 export interface Auth {
-  readonly authId?: authId,
-  readonly userId?: userId,
-  readonly created?: timestamp,
-  readonly updated?: timestamp
+  readonly authId: authId | null,
+  readonly userId: userId | null,
+  readonly created: timestamp | null,
+  readonly updated: timestamp | null
 };
 
 export interface Content {
-  readonly id?: contentId,
-  readonly amplifierId?: userId,
-  readonly content?: text
+  readonly contentId: contentId | null,
+  readonly cryptHash: binary | null,
+  readonly amplifierId: userId | null,
+  readonly content: text | null
 };
 
-export interface Links {
-  readonly linkId?: linkId,
-  readonly amplifierId?: userId,
-  readonly contentId?: contentId,
-  readonly prevLink?: linkId,
-  readonly hitCount?: integer
+export interface Link {
+  readonly linkId: linkId | null,
+  readonly amplifierId: userId | null,
+  readonly contentId: contentId | null,
+  readonly prevLink: linkId | null,
+  readonly hitCount: integer | null
 };
 
 export interface User {
-  readonly userId?: userId,
-  readonly created?: timestamp,
-  readonly updated?: timestamp,
-  readonly userName?: userName,
-  readonly groups?: userGroup[]
+  readonly userId: userId | null,
+  readonly created: timestamp | null,
+  readonly updated: timestamp | null,
+  readonly userName: userName | null,
+  readonly groups: userGroup[] | null
 };
 
 // end of generated types

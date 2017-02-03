@@ -2,8 +2,6 @@ import {promisify} from '../lib/promisify';
 
 import * as fs from "fs"
 
-//const readFileAsync = promisify(fs.readFile);
-
 import * as pg from './pgsql';
 pg.init();
 
@@ -58,7 +56,6 @@ function readFileAsync(src: string): Promise<string> {
     });
   });
 }
-
 
 let createUser = async function (ctx) {
     let o = pg.users;

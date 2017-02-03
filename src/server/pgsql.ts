@@ -45,9 +45,12 @@ const oxb: OxiGen.IDbSchema = OxiGen.dbSchema;
 
 //pgp.pg.types.setTypeParser(1114, str => moment.utc(str).format());
 
+// ahem ... cache the whole db in memory 
 export const db: IDatabase<any> = pgp('postgres:'+curl);
 export const users = new Map<Dbt.userId, Dbt.User>();
 export const auths = new Map<Dbt.authId, Dbt.Auth>();
+export const contents = new Map<Dbt.contentId, Dbt.Content>();
+export const links = new Map<Dbt.linkId, Dbt.Link>();
 
 export async function init() {
   let userRows: Array<Dbt.User> = await db.any("select * from users;");
@@ -55,6 +58,12 @@ export async function init() {
 
   let authRows: Array<Dbt.Auth> = await db.any("select * from auths");
   authRows.forEach(r => auths.set(r.authId, r));
+
+  let contentRows: Array<Dbt.Content> = await db.any("select * from contents");
+  contentRows.forEach(r => contents.set(r.contentId, r));
+
+  let linkRows: Array<Dbt.Link> = await db.any("select * from links");
+  linkRows.forEach(r => links.set(r.linkId, r));
 }
 
 export function query(cqry) {
