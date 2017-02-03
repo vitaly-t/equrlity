@@ -101,6 +101,7 @@ export default {
       { "name": "contentId", "type": "contentId" },
       { "name": "prevLink", "type": "linkId" },
       { "name": "hitCount", "type": "integer" },
+      { "name": "amount", "type": "integer" },
     ],
     "User": [
       "userId",

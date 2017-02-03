@@ -37,7 +37,8 @@ export interface Link {
   readonly amplifierId: userId | null,
   readonly contentId: contentId | null,
   readonly prevLink: linkId | null,
-  readonly hitCount: integer | null
+  readonly hitCount: integer | null,
+  readonly amount: integer | null
 };
 
 export interface User {
