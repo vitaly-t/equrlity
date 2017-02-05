@@ -92,13 +92,24 @@ export function loadModel(model): IDbSchema {
 
   let tbls = model.tables;
   Object.keys(tbls).forEach((k: string) => {
-    let v = tbls[k];
-    let tup = tupleTypes.get(v.rowType);
-    if (!tup) throw new Error("missing tuple type : "+v.rowType);
-    if (!v.foreignKeys) v.foreignKeys = [];
-    tables.set(k, { ...v, name: k, rowType: tup});
+    let tbl = tbls[k];
+    let tup = tupleTypes.get(tbl.rowType);
+    if (!tup) throw new Error("missing tuple type : "+tbl.rowType);
+    if (!tbl.foreignKeys) tbl.foreignKeys = [];
+    let pk = tbl.primaryKey;
+    if (!pk) throw new Error("Table missing primary key : " + k);
+    pk.forEach(c => {
+      if (tup.heading.findIndex(col => col.name === c ) < 0) throw new Error("Malformed PK : "+ c);
+    })
+    tables.set(k, { ...tbl, name: k, rowType: tup});
   });
 
+  tables.forEach(t => {
+     t.foreignKeys.forEach(fk => {
+       if (!tables.has(fk.ref)) throw new Error("Invalid Foreign Key ref: " + fk.ref + " on table: "+t.name);
+       // should also check arity of keys etc.
+     });
+  });
   return { tables, dataTypes };
 }
 
@@ -189,7 +200,7 @@ export function genCreateTableStatement(tbl: ITable): string {
           +  "\n    ON UPDATE " + (fk.onUpdate || "NO ACTION")
           +  "\n    ON DELETE " + (fk.onDelete || "NO ACTION")
   });
-  stmt += "\n)";
+  stmt += "\n);\n";
   return stmt;
 }
 
@@ -213,12 +224,12 @@ export function writeTypescriptTypesToFile(db: IDbSchema, fname: string): void {
 
 export function writeTableCreateStatementsToFile(db: IDbSchema, fname: string): void {
   let strm = fs.createWriteStream(fname, {flags: 'w', encoding: 'utf8'});
-  strm.write("// This file is generated - it should not be edited\n\n");
+  strm.write("-- This file is generated - it (probably) should not be edited\n\n");
   strm.on('finish', () => strm.close() );
   db.tables.forEach(t => {
-    strm.write( genCreateTableStatement(t)+"\n\n" );                     
+    strm.write( genCreateTableStatement(t)+"\n" );                     
   })
-  strm.end("// end of generated text");
+  strm.end("-- end of generated text");
 }
 
 export function defaultValue(typ: IScalarType): any {

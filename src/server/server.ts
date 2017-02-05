@@ -1,26 +1,23 @@
+
 import { promisify } from '../lib/promisify';
-
 import * as fs from "fs"
-
 import * as pg from './pgsql';
-pg.init();
-
+import * as Dbt from '../lib/datatypes'
 import * as Koa from "koa";
 import * as bodyParser from 'koa-bodyparser';
 import * as session from 'koa-session';
 import * as Router from 'koa-router';
-
 import * as OxiDate from '../lib/oxidate.js';
-
 import * as uuid from '../lib/uuid.js';
 import * as jwt from '../lib/jwt';
-
-import passport from './auth';
-
-const jwt_secret = process.env.JWT_SECRET_KEY;
-
+//import passport from './auth';
 import koastatic from './koa-static';
 import clientIP from './clientIP.js';
+
+const cache = pg.DbCache;
+const jwt_secret = process.env.JWT_SECRET_KEY;
+
+cache.init();
 
 const app = new Koa();
 const router = new Router();
@@ -34,17 +31,17 @@ let strToDate = function (cdt: string): Date {
   return OxiDate.parse(cdt, 'yyyyMMdd');
 };
 
-let getUser = function (id) {
-  return pg.users[id];
+function getUser(id: number): Dbt.User {
+  return cache.users[id];
 };
 
 let getUserCount = function () {
-  return pg.users.size;
+  return cache.users.size;
 };
 
 let checkMonikerUsed = function (newName) {
-  return Object.keys(pg.users).some(function (id) {
-    return pg.users[id].userName === newName;
+  return Object.keys(cache.users).some(function (id) {
+    return cache.users[id].userName === newName;
   });
 };
 
@@ -58,7 +55,7 @@ function readFileAsync(src: string): Promise<string> {
 }
 
 let createUser = async function (ctx) {
-  let o = pg.users;
+  let o = cache.users;
   //console.log("user count : "+o.count);
   //console.log(JSON.stringify(userId));
   let i = o.size;
@@ -76,7 +73,7 @@ let createUser = async function (ctx) {
   ctx.userId = rslt;
   ctx.user = user;
   let tok = jwt.sign(rslt, jwt_secret); //{expiresInMinutes: 60*24*14});
-  ctx.cookies.set('psq_user', tok);
+  ctx.cookies.set('syn_user', tok);
   return rslt;
 };
 
@@ -111,7 +108,7 @@ let authent = async function (ctx, prov, authId) {
     else ctx.userId.auth = prov + ':' + authId;
 
     let tok = jwt.sign(ctx.userId, jwt_secret); //{expiresInMinutes: 60*24*14});
-    ctx.cookies.set('psq_user', tok);
+    ctx.cookies.set('syn_user', tok);
     await ctx.login(user);
     //ctx.body = {ok: true};
     //ctx.redirect('/');
@@ -125,51 +122,65 @@ let serve = koastatic("./assets", { defer: true });
 app.use(serve); ///public"));
 
 app.use(bodyParser());
-app.use(session(app));
+//app.use(session(app));
 
-app.use(passport.initialize());
-app.use(passport.session());
+//app.use(passport.initialize());
+//app.use(passport.session());
 //app.use(flash());
 
-app.use(jwt.jwt({ secret: jwt_secret, cookie: 'amp_user', ignoreExpiration: true, passthrough: true, key: 'userId' }));
+app.use(jwt.jwt({ secret: jwt_secret, cookie: 'syn_user', ignoreExpiration: true, passthrough: true, key: 'userId' }));
 
-app.use(async function (ctxt, next) {
+app.use(async function (ctx, next) {
   //console.log(ctx.path + " requested");
 
-  let userId = ctxt['userId'];
+  let userId = ctx['userId'];
   if (!userId) {
-    let ip = clientIP(ctxt.req);
-    await authent(ctxt, 'ip', ip);
-    userId = ctxt['userId'];
+    let ip = clientIP(ctx.req);
+    await authent(ctx, 'ip', ip);
+    userId = ctx['userId'];
   }
-  else ctxt['user'] = getUser(userId.id);
 
   await next();
   //console.log("setting moniker : "+ ctx.user.userName);
-  ctxt.set('X-psq-moniker', ctxt.user ? ctxt.user.userName : 'anonymous');
+  let user = getUser(userId.id)
+  ctx.set('X-syn-moniker', user ? user.userName : 'anonymous');
   if (userId.auth) {
     let auth = userId.auth;
     let prov = auth.slice(0, auth.indexOf(':'));
-    let grps = ctxt.user.groups || '';
+    let grps = ctx.user.groups || '';
     //console.log("setting provider : "+ prov);
-    ctxt.set('X-psq-authprov', prov);
+    ctx.set('X-syn-authprov', prov);
     //console.log("setting groups : "+ grps);
-    ctxt.set('X-psq-groups', grps);
+    ctx.set('X-syn-groups', grps);
     pg.touch_user(userId.id);
   }
 });
 
+router.get('/link/:id', async (ctx, next) => {
+  let linkId = ctx.params.id;
+  let url = cache.getContentFromLink(linkId);
+  ctx.body = `
+<h2>CALL TO ACTION - JOIN SYNEREO - YOU KNOW YOU WANT TO - WHAT COULD GO WRONG???</h2>
+<p>You have followed a Synereo link.  If you can see this message (for more than a second or so)
+it probably means you do not have the Synereo browser plugin installed.
+</p>` 
+  + url ? `<p>This is the <a href="${url}">content link</a>you may have <i>thought</i> you were following ;-).</p>` 
+        : ``;
+})
+
 export type Method = "addContent" | "amplify"
 
-function handleAddContent({publicKey, content, signature}): string {
-  return "dummy"
+async function handleAddContent(userId, {publicKey, content, signature}): Promise<string | Error> {
+  if (cache.isContentKnown(content)) return new Error("content already registered");
+  let link = await pg.insert_content(userId, content);   // need to handle errors properly here.
+  return cache.linkToUri(link.linkId);
 }
 
 function handleAmplify({publicKey, content, signature}): string {
   return "dummy"
 }
 
-router.post('/rpc', async function (ctx, next) {
+router.post('/rpc', async function (ctx) {
   let {jsonrpc, method, params, id} = ctx.request.body;  // from bodyparser 
   if (jsonrpc != "2.0") {
     if (id) ctx.body = {id, error: {code: -32600, message: "Invalid version"}};
@@ -177,13 +188,13 @@ router.post('/rpc', async function (ctx, next) {
   }
   switch (method as Method) {
     case "addContent": {  
-      let result = handleAddContent(params)
+      let result = await handleAddContent(ctx.user.userId, params)
       ctx.body = {id, result}
       break;
     }
     case "amplify": {
-      let result = handleAddContent(params)
-      ctx.body = {id, result}
+      let result = handleAmplify(params)
+      //ctx.body = {id, result}
       break;
     }
     default:
@@ -192,23 +203,24 @@ router.post('/rpc', async function (ctx, next) {
 
 });
 
-router.post('/newMoniker', async function (ctx, next) {
+router.post('/newMoniker', async (ctx, next) => {
   let newName = ctx.request.body.userName;  // from bodyparser 
   console.log("setting new Moniker : " + newName);
   console.log("for user " + JSON.stringify(ctx.user));
   let id = ctx['userId'].id;
   if (checkMonikerUsed(newName)) ctx.body = { ok: false, msg: "taken" };
   else {
-    let prv = pg.users[id];
+    let prv = cache.users[id];
     let usr = { ...prv, userName: newName };
     console.log("updating user : " + JSON.stringify(usr));
     let updt = await pg.upsert_user(usr);
     console.log("user updated : " + JSON.stringify(updt));
-    pg.users.set(id, usr);
+    cache.users.set(id, usr);
     ctx.body = { ok: true };
   }
 });
 
+/*
 router.get('/auth/facebook', function (ctx, next) {
   passport.authenticate('facebook')
 });
@@ -218,18 +230,6 @@ router.get('/auth/facebook/callback', async function (ctx, next) {
     await authent(ctx, 'facebook', authId);
     ctx.body = { ok: true };
   })(ctx, next);
-});
-
-/*
-router.get('/auth/facebook', async function (ctx, next) {
-    console.log("/auth/facebook called");
-    yield passport.authenticate('facebook', function*(err, authId, info) {
-        console.log("facebook called back");
-        if (err) throw err
-        if (info) console.log("info : "+info);
-        yield authent(ctx, 'facebook', authId);
-        ctx.redirect('/#/refresh');
-    }).call(this);
 });
 
 app.use(router.get('/auth/google', function *() {

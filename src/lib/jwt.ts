@@ -5,13 +5,13 @@ import * as Koa from 'koa';
 // Export JWT methods as a convenience
 export { sign, verify, decode } from 'jsonwebtoken';
 
-export function jwt(opts): (cxt: Koa.Context, next?: () => Promise<any>) => any {
+export function jwt(opts): (cxt: Koa.Context, next: () => Promise<any>) => any {
   opts = opts || {};
   opts.key = opts.key || 'user';
 
   assert(opts.secret, '"secret" option is required');
 
-  return async function (ctx: Koa.Context, next?: () => Promise<any>) {
+  return async function (ctx: Koa.Context, next: () => Promise<any>) {
     var token, msg, user, parts, scheme, credentials, ignoreExp;
 
     if (opts.cookie) {

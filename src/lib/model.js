@@ -49,6 +49,10 @@ export default {
       "max": 100,
       "min": 0
     },
+    "publicKey": {
+      "sqlType": "bytea",
+      "tsType": "ArrayBuffer"
+    },
     "text": {
       "tsType": "string",
       "sqlType": "text"
@@ -66,8 +70,8 @@ export default {
       ]
     },
     "userId": {
-      "sqlType": "bytea",
-      "tsType": "ArrayBuffer"
+      "sqlType": "integer",
+      "tsType": "number"
     },
     "userName": {
       "sqlType": "varchar(72)"
@@ -90,53 +94,49 @@ export default {
       }
     ],
     "Content": [
-      { "name": "contentId", "type": "contentId" },
+      "contentId", 
+      "contentType",
+      "userId",
       { "name": "cryptHash", "type": "binary" },
-      { "name": "amplifierId", "type": "userId" },
       { "name": "content", "type": "text" }
     ],
     "Link": [
-      { "name": "linkId", "type": "linkId" },
-      { "name": "amplifierId", "type": "userId" },
-      { "name": "contentId", "type": "contentId" },
+      "linkId",
+      "userId",
+      "contentId",
       { "name": "prevLink", "type": "linkId" },
       { "name": "hitCount", "type": "integer" },
       { "name": "amount", "type": "integer" },
     ],
     "User": [
       "userId",
-      {
-        "name": "created",
-        "type": "timestamp"
-      },
-      {
-        "name": "updated",
-        "type": "timestamp"
-      },
+      "publicKey",
       "userName",
+      { "name": "created", "type": "timestamp" },
+      { "name": "updated", "type": "timestamp" },
       { "name": "groups", "type": "userGroup", "multiValued": true }
     ]
   },
   "tables": {
+    "users": {
+      "rowType": "User",
+      "primaryKey": [ "userId" ],
+      "autoIncrement": "userId",
+    },
     "auths": {
       "rowType": "Auth",
-      "primaryKey": [
-        "authId"
-      ],
+      "primaryKey": [ "authId" ],
       "foreignKeys": [
-        {
-          "ref": "users",
-          "columns": [
-            "userId"
-          ]
-        }
+        { "ref": "users", "columns": [ "userId" ] }
       ]
     },
     "contents": {
       "rowType": "Content",
-      "primaryKey": [
-        "id"
-      ]
+      "primaryKey": [ "contentId" ],
+      "uniques": [ [ "content" ] ],
+      "foreignKeys": [
+        { "ref": "users", "columns": [ "userId" ]  },
+      ],
     },
     "links": {
       "rowType": "Link",
@@ -145,25 +145,10 @@ export default {
       ],
       "autoIncrement": "linkId",
       "foreignKeys": [
-        {
-          "ref": "content",
-          "columns": [
-            "contentId"
-          ]
-        },
-        {
-          "ref": "links",
-          "columns": [
-            "prevLink"
-          ]
-        }
+        { "ref": "users", "columns": [ "userId" ]  },
+        { "ref": "contents", "columns": [ "contentId" ]  },
+        { "ref": "links", "columns": [ "prevLink" ] },
       ],
     },
-    "users": {
-      "rowType": "User",
-      "primaryKey": [
-        "userId"
-      ]
-    }
   }
 }
