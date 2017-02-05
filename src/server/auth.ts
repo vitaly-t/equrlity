@@ -2,6 +2,7 @@
 
 import * as passport from 'koa-passport';
 import * as pg from './pgsql';
+const cache = pg.DbCache;
 //import { Strategy as GitHubStrategy } from 'passport-github';
 import { Strategy as TwitterStrategy } from 'passport-twitter';
 import { Strategy as LocalStrategy } from 'passport-local';
@@ -18,7 +19,7 @@ passport.serializeUser(function (user, done) {
 });
 
 passport.deserializeUser(function (id, done) {
-  let user = pg.users.get(id);
+  let user = cache.users.get(id);
   //console.log('deserialize : ' + id + ', user : ' +JSON.stringify(user));
   done(null, user);
 });
