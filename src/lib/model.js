@@ -69,16 +69,15 @@ export default {
         "member"
       ]
     },
-    "userId": {
-      "sqlType": "integer",
-      "tsType": "number"
-    },
     "userName": {
       "sqlType": "varchar(72)"
     },
     "uuid": {
       "sqlType": "varchar(36)"
     }
+  },
+  "typeAliases": { 
+    "userId": "uuid",
   },
   "tupleTypes": {
     "Auth": [
@@ -121,7 +120,6 @@ export default {
     "users": {
       "rowType": "User",
       "primaryKey": [ "userId" ],
-      "autoIncrement": "userId",
     },
     "auths": {
       "rowType": "Auth",
@@ -133,6 +131,7 @@ export default {
     "contents": {
       "rowType": "Content",
       "primaryKey": [ "contentId" ],
+      "autoIncrement": "contentId",
       "uniques": [ [ "content" ] ],
       "foreignKeys": [
         { "ref": "users", "columns": [ "userId" ]  },

@@ -15,9 +15,9 @@ export type publicKey = ArrayBuffer;
 export type text = string;
 export type timestamp = Date;
 export type userGroup = "admin" | "author" | "member";
-export type userId = number;
 export type userName = string;
 export type uuid = string;
+export type userId = string;
 
 export interface User {
   readonly userId: userId | null,

@@ -62,7 +62,15 @@ export function loadModel(model): IDbSchema {
   Object.keys(typs).forEach((k: string) => {
     let v: IScalarType = {name: k, tsType: "string", ...typs[k]};
     dataTypes.set(k, v);
-  })
+  });
+
+  let als = model.typeAliases;
+  Object.keys(als).forEach((k: string) => {
+    let t = dataTypes.get( als[k]);
+    if (!t) throw new Error("Missing type for alias: "+k);
+    let v: IScalarType = {...t, name: k};
+    dataTypes.set(k, v);
+  });
 
   let tups = model.tupleTypes;
   Object.keys(tups).forEach((k: string) => {
@@ -140,6 +148,7 @@ export function columnSets(tbl: ITable, data: Object = null): string[] {
 }
 
 export function genInsertColumns(tbl: ITable, data: Object = null): string {
+  //if (tbl.autoIncrement) data[tbl.autoIncrement] = 0; 
   let cols = filterCols(tbl, data);
   if (tbl.autoIncrement) {
     let i = cols.findIndex(c => c.name === tbl.autoIncrement);
@@ -190,7 +199,8 @@ export function genTypescriptType(tbl: ITable): string {
 
 export function genCreateTableStatement(tbl: ITable): string {
   let cols = tbl.rowType.heading.map( c => {
-    return colnm(c) + " " + c.type.sqlType + (c.multiValued ? '[]' : '') + (c.notNull ? ' NOT NULL' : '');
+    return colnm(c) + " " + 
+        (c.name === tbl.autoIncrement ? 'SERIAL' : c.type.sqlType + (c.multiValued ? '[]' : '') + (c.notNull ? ' NOT NULL' : '') );
   });
   let stmt =  "CREATE TABLE "+tbl.name+" (\n  " +  cols.join(",\n  ");
   stmt += ",\n  PRIMARY KEY (" + tbl.primaryKey.map(cnm).join(",")+")";

@@ -162,13 +162,15 @@ export function emptyLink(): Dbt.Link {
 export async function insert_content(userId: Dbt.userId, content: string, contentType: Dbt.contentType = "url"): Promise<Dbt.Link> {
   let cont: Dbt.Content = { ...emptyContent(), userId, content, contentType };
   let contents = oxb.tables.get("contents");
-  let rslt1 = await db.one(OxiGen.genInsertStatement(contents, cont));
-  let contentId = rslt1.id; // or something ...
+  let stmt = OxiGen.genInsertStatement(contents, cont);
+  console.log(stmt);
+  let rslt1 = await db.one(stmt,cont);
+  let {contentId} = rslt1; 
 
   let links = oxb.tables.get("links");
   let link: Dbt.Link = { ...emptyLink(), userId, contentId };
-  let rslt2 = await db.one(OxiGen.genInsertStatement(links, link));
-  let linkId = rslt2.id;  // or something
+  let rslt2 = await db.one(OxiGen.genInsertStatement(links, link), link);
+  let {linkId} = rslt2; 
   let rslt = { ...link, linkId };
   DbCache.contents.set(contentId, {...cont, contentId});
   DbCache.links.set(linkId, rslt);

@@ -31,8 +31,8 @@ let strToDate = function (cdt: string): Date {
   return OxiDate.parse(cdt, 'yyyyMMdd');
 };
 
-function getUser(id: number): Dbt.User {
-  return cache.users[id];
+function getUser(id: Dbt.userId): Dbt.User {
+  return cache.users.get(id);
 };
 
 let getUserCount = function () {
@@ -109,9 +109,7 @@ let authent = async function (ctx, prov, authId) {
 
     let tok = jwt.sign(ctx.userId, jwt_secret); //{expiresInMinutes: 60*24*14});
     ctx.cookies.set('syn_user', tok);
-    await ctx.login(user);
-    //ctx.body = {ok: true};
-    //ctx.redirect('/');
+    //await ctx.login(user);   // for when passport is enabled
 
   }
 };
@@ -134,15 +132,16 @@ app.use(async function (ctx, next) {
   //console.log(ctx.path + " requested");
 
   let userId = ctx['userId'];
-  if (!userId) {
+  let user = getUser(userId.id);
+  if (!userId || !user ) {
     let ip = clientIP(ctx.req);
     await authent(ctx, 'ip', ip);
     userId = ctx['userId'];
+    user = getUser(userId.id);
   }
-
+ 
   await next();
   //console.log("setting moniker : "+ ctx.user.userName);
-  let user = getUser(userId.id)
   ctx.set('X-syn-moniker', user ? user.userName : 'anonymous');
   if (userId.auth) {
     let auth = userId.auth;
@@ -180,7 +179,7 @@ function handleAmplify({publicKey, content, signature}): string {
   return "dummy"
 }
 
-router.post('/rpc', async function (ctx) {
+router.post('/rpc', async function (ctx: any) {
   let {jsonrpc, method, params, id} = ctx.request.body;  // from bodyparser 
   if (jsonrpc != "2.0") {
     if (id) ctx.body = {id, error: {code: -32600, message: "Invalid version"}};
@@ -188,7 +187,7 @@ router.post('/rpc', async function (ctx) {
   }
   switch (method as Method) {
     case "addContent": {  
-      let result = await handleAddContent(ctx.user.userId, params)
+      let result = await handleAddContent(ctx.userId.id, params)
       ctx.body = {id, result}
       break;
     }
