@@ -23,6 +23,7 @@ export interface User {
   readonly userId: userId | null,
   readonly publicKey: publicKey | null,
   readonly userName: userName | null,
+  readonly ampCredits: integer | null,
   readonly created: timestamp | null,
   readonly updated: timestamp | null,
   readonly groups: userGroup[] | null

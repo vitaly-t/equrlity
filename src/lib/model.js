@@ -111,6 +111,7 @@ export default {
       "userId",
       "publicKey",
       "userName",
+      { "name": "ampCredits", "type": "integer" },
       { "name": "created", "type": "timestamp" },
       { "name": "updated", "type": "timestamp" },
       { "name": "groups", "type": "userGroup", "multiValued": true }

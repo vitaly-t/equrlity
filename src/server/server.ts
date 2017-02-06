@@ -13,6 +13,7 @@ import * as jwt from '../lib/jwt';
 //import passport from './auth';
 import koastatic from './koa-static';
 import clientIP from './clientIP.js';
+import { Url, parse } from 'url';
 
 const cache = pg.DbCache;
 const jwt_secret = process.env.JWT_SECRET_KEY;
@@ -129,20 +130,20 @@ app.use(bodyParser());
 app.use(jwt.jwt({ secret: jwt_secret, cookie: 'syn_user', ignoreExpiration: true, passthrough: true, key: 'userId' }));
 
 app.use(async function (ctx, next) {
-  //console.log(ctx.path + " requested");
 
   let userId = ctx['userId'];
   let user = getUser(userId.id);
-  if (!userId || !user ) {
+  if (!userId || !user) {
     let ip = clientIP(ctx.req);
     await authent(ctx, 'ip', ip);
     userId = ctx['userId'];
     user = getUser(userId.id);
   }
- 
+
   await next();
   //console.log("setting moniker : "+ ctx.user.userName);
-  ctx.set('X-syn-moniker', user ? user.userName : 'anonymous');
+  ctx.set('X-syn-moniker', user.userName );
+  ctx.set('X-syn-credits', user.ampCredits.toString() );
   if (userId.auth) {
     let auth = userId.auth;
     let prov = auth.slice(0, auth.indexOf(':'));
@@ -151,8 +152,8 @@ app.use(async function (ctx, next) {
     ctx.set('X-syn-authprov', prov);
     //console.log("setting groups : "+ grps);
     ctx.set('X-syn-groups', grps);
-    pg.touch_user(userId.id);
   }
+  pg.touch_user(userId.id);
 });
 
 router.get('/link/:id', async (ctx, next) => {
@@ -162,62 +163,70 @@ router.get('/link/:id', async (ctx, next) => {
 <h2>CALL TO ACTION - JOIN SYNEREO - YOU KNOW YOU WANT TO - WHAT COULD GO WRONG???</h2>
 <p>You have followed a Synereo link.  If you can see this message (for more than a second or so)
 it probably means you do not have the Synereo browser plugin installed.
-</p>` 
-  + url ? `<p>This is the <a href="${url}">content link</a>you may have <i>thought</i> you were following ;-).</p>` 
-        : ``;
+</p>`
+    + url ? `<p>This is the <a href="${url}">content link</a>you may have <i>thought</i> you were following ;-).</p>`
+    : ``;
 })
 
-export type Method = "addContent" | "amplify"
+export type Method = "addContent" | "initialize" | "changeMoniker"
 
-async function handleAddContent(userId, {publicKey, content, signature}): Promise<string | Error> {
+async function handleAddContent(userId, {publicKey, content, signature, amount}): Promise<string | Error> {
   if (cache.isContentKnown(content)) return new Error("content already registered");
-  let link = await pg.insert_content(userId, content);   // need to handle errors properly here.
+  let link = await pg.insert_content(userId, content, amount);   // need to handle errors properly here.
   return cache.linkToUri(link.linkId);
 }
 
-function handleAmplify({publicKey, content, signature}): string {
-  return "dummy"
+async function handleAmplify(userId, {publicKey, content, signature, amount}): Promise<string | Error> {
+  let link = await pg.amplify_content(userId, content, amount);   // need to handle errors properly here.
+  return cache.linkToUri(link.linkId);
 }
 
 router.post('/rpc', async function (ctx: any) {
   let {jsonrpc, method, params, id} = ctx.request.body;  // from bodyparser 
   if (jsonrpc != "2.0") {
-    if (id) ctx.body = {id, error: {code: -32600, message: "Invalid version"}};
+    if (id) ctx.body = { id, error: { code: -32600, message: "Invalid version" } };
     return;
   }
   switch (method as Method) {
-    case "addContent": {  
-      let result = await handleAddContent(ctx.userId.id, params)
-      ctx.body = {id, result}
+    case "addContent": {
+      let url = parse(params.content);
+      if (cache.isSynereo(url)) {
+        let result = await handleAmplify(ctx.userId.id, params)
+        ctx.body = { id, result }
+      }
+      else {
+        let result = await handleAddContent(ctx.userId.id, params)
+        ctx.body = { id, result }
+      }
       break;
     }
-    case "amplify": {
-      let result = handleAmplify(params)
-      //ctx.body = {id, result}
+    case "initialize": {
+      // data goes back through the headers.
+      ctx.body = {id, ok: true};
       break;
+    }
+    case "changeMoniker": {
+      let newName = ctx.body.userName;  // from bodyparser 
+      console.log("setting new Moniker : " + newName);
+      console.log("for user " + JSON.stringify(ctx.user));
+      let id = ctx['userId'].id;
+      if (checkMonikerUsed(newName)) ctx.body = { ok: false, msg: "taken" };
+      else {
+        let prv = cache.users[id];
+        let usr = { ...prv, userName: newName };
+        console.log("updating user : " + JSON.stringify(usr));
+        let updt = await pg.upsert_user(usr);
+        console.log("user updated : " + JSON.stringify(updt));
+        cache.users.set(id, usr);
+        ctx.body = { ok: true };
+      }
     }
     default:
-      if (id) ctx.body = {id, error: {code: -32601, message: "Invalid method"}};
+      if (id) ctx.body = { id, error: { code: -32601, message: "Invalid method" } };
   }
 
 });
 
-router.post('/newMoniker', async (ctx, next) => {
-  let newName = ctx.request.body.userName;  // from bodyparser 
-  console.log("setting new Moniker : " + newName);
-  console.log("for user " + JSON.stringify(ctx.user));
-  let id = ctx['userId'].id;
-  if (checkMonikerUsed(newName)) ctx.body = { ok: false, msg: "taken" };
-  else {
-    let prv = cache.users[id];
-    let usr = { ...prv, userName: newName };
-    console.log("updating user : " + JSON.stringify(usr));
-    let updt = await pg.upsert_user(usr);
-    console.log("user updated : " + JSON.stringify(updt));
-    cache.users.set(id, usr);
-    ctx.body = { ok: true };
-  }
-});
 
 /*
 router.get('/auth/facebook', function (ctx, next) {
