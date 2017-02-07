@@ -18,6 +18,7 @@ export type userGroup = "admin" | "author" | "member";
 export type userName = string;
 export type uuid = string;
 export type userId = string;
+export type content = string;
 
 export interface User {
   readonly userId: userId | null,
@@ -40,8 +41,8 @@ export interface Content {
   readonly contentId: contentId | null,
   readonly contentType: contentType | null,
   readonly userId: userId | null,
-  readonly cryptHash: binary | null,
-  readonly content: text | null
+  readonly content: content | null,
+  readonly cryptHash: binary | null
 };
 
 export interface Link {

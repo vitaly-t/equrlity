@@ -53,7 +53,7 @@ export namespace DbCache {
   export const auths = new Map<Dbt.authId, Dbt.Auth>();
   export const contents = new Map<Dbt.contentId, Dbt.Content>();
   export const links = new Map<Dbt.linkId, Dbt.Link>();
-
+  export let linkRows: Array<Dbt.Link> = []; 
   export const domain = isDev() ? 'http://localhost:8080/' : 'http://www.synereo.com/';
   export function isSynereo(url: Url): boolean {
     return url.host === domain;
@@ -69,10 +69,27 @@ export namespace DbCache {
     let contentRows: Array<Dbt.Content> = await db.any("select * from contents");
     contentRows.forEach(r => contents.set(r.contentId, r));
 
-    let linkRows: Array<Dbt.Link> = await db.any("select * from links");
+    linkRows = await db.any("select * from links order by \"linkId\" desc");
     linkRows.forEach(r => links.set(r.linkId, r));
   }
 
+  export function getChainFromLinkId(linkId: Dbt.linkId): Array<Dbt.Link> {
+    let link = links.get(linkId);
+    let rslt = [link]
+    while (link.prevLink) {
+      link = links.get(link.prevLink);
+      rslt.push(link);
+    }
+    return rslt;
+  }
+
+  export function getChainFromContent(content: Dbt.content): Array<Dbt.Link> {
+    let id = contentIdFromContent(content);
+    if (!id) return [];
+    let link = linkRows.find(l => l.contentId == id);
+    if (!link) return [];
+    return getChainFromLinkId(link.linkId);
+  }
   export function getContentFromLink(linkId: Dbt.linkId): string | null {
     let link = links.get(linkId);
     if (!link) return null;
@@ -81,15 +98,27 @@ export namespace DbCache {
     return content.content;
   }
 
-  export function isContentKnown(content: string): boolean {
-    let result = false;
-    for( const [_,v] of contents) {
+  export function getLinkFromContent(content: string): Dbt.Link | null {
+    let id = contentIdFromContent(content);
+    if (!id) return null;
+    let link = linkRows.find(l => l.contentId == id);
+    if (!link) return null;
+    return link;
+  }
+
+  export function contentIdFromContent(content: string): Dbt.contentId | null {
+    let result = null;
+    for( const [k,v] of contents) {
       if (v.content === content) {
-        result = true;
+        result = k;
         break;
       }
     }
     return result;
+  }
+
+  export function isContentKnown(content: string): boolean {
+    return contentIdFromContent != null ;
   }
 
   export function linkToUri(linkId: Dbt.linkId): string {
@@ -97,7 +126,7 @@ export namespace DbCache {
     return domain + "/link/" + linkId.toString() + "#" + content
   }
 
-  export function linkFromUri(url: Url): Dbt.linkId {
+  export function linkIdFromUri(url: Url): Dbt.linkId {
     if (!isSynereo(url)) throw new Error("Not a synero url");
     let linkId = parseInt(url.path);
     return linkId;
@@ -197,7 +226,7 @@ export async function insert_content(userId: Dbt.userId, content: string, amount
 }
 
 export async function amplify_content(userId: Dbt.userId, content: string, amount: Dbt.integer, contentType: Dbt.contentType = "url"): Promise<Dbt.Link> {
-  let prevLink = DbCache.linkFromUri( parse(content));
+  let prevLink = DbCache.linkIdFromUri( parse(content));
   let prv = DbCache.links.get(prevLink);
   let links = oxb.tables.get("links");
   let link: Dbt.Link = { ...prv, userId, prevLink, amount };

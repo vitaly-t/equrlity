@@ -78,6 +78,7 @@ export default {
   },
   "typeAliases": { 
     "userId": "uuid",
+    "content": "text",
   },
   "tupleTypes": {
     "Auth": [
@@ -96,8 +97,8 @@ export default {
       "contentId", 
       "contentType",
       "userId",
+      "content",
       { "name": "cryptHash", "type": "binary" },
-      { "name": "content", "type": "text" }
     ],
     "Link": [
       "linkId",

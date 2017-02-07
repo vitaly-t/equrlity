@@ -33,17 +33,13 @@ export interface IForeignKey {
   onUpdate: FK_Action
 }
 
-export interface IUniqueColumnSet {
-  columns: string[]
-}
-
 export interface ITable {
   name: string,
   rowType: TupleType,
   primaryKey: string[],
   autoIncrement?: string,
   foreignKeys: IForeignKey[],
-  uniques: IUniqueColumnSet[]
+  uniques: string[][],
 }
 
 export interface IDbSchema {
@@ -104,6 +100,7 @@ export function loadModel(model): IDbSchema {
     let tup = tupleTypes.get(tbl.rowType);
     if (!tup) throw new Error("missing tuple type : "+tbl.rowType);
     if (!tbl.foreignKeys) tbl.foreignKeys = [];
+    if (!tbl.uniques) tbl.uniques = [];
     let pk = tbl.primaryKey;
     if (!pk) throw new Error("Table missing primary key : " + k);
     pk.forEach(c => {
@@ -209,6 +206,9 @@ export function genCreateTableStatement(tbl: ITable): string {
           +  "\n    REFERENCES " + fk.ref 
           +  "\n    ON UPDATE " + (fk.onUpdate || "NO ACTION")
           +  "\n    ON DELETE " + (fk.onDelete || "NO ACTION")
+  });
+  tbl.uniques.forEach(unq => {
+    stmt += ",\n UNIQUE (" + unq.map(cnm).join(",")+")"
   });
   stmt += "\n);\n";
   return stmt;

@@ -170,10 +170,11 @@ it probably means you do not have the Synereo browser plugin installed.
 
 export type Method = "addContent" | "initialize" | "changeMoniker";
 
-async function handleAddContent(userId, {publicKey, content, signature, amount}): Promise<string | Error> {
-  if (cache.isContentKnown(content)) return new Error("content already registered");
-  let link = await pg.insert_content(userId, content, amount);
-  return cache.linkToUri(link.linkId);
+async function handleAddContent(userId, {publicKey, content, signature, amount}): Promise<any> {
+  let link = cache.getLinkFromContent(content);
+  if (link) return {prevLink: cache.linkToUri(link.linkId), message: "content already registered"};
+  link = await pg.insert_content(userId, content, amount);
+  return {link: cache.linkToUri(link.linkId)};
 }
 
 async function handleAmplify(userId, {publicKey, content, signature, amount}): Promise<string | Error> {
@@ -198,7 +199,7 @@ router.post('/rpc', async function (ctx: any) {
         else {
           result = await handleAddContent(ctx.userId.id, params)
         }
-        ctx.body = (result instanceof Error) ? { id, error: { message: result.message } } : { id, result }
+        ctx.body = { id, result }
         break;
       }
       case "initialize": {
