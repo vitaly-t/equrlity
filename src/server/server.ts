@@ -142,16 +142,16 @@ app.use(async function (ctx, next) {
 
   await next();
   //console.log("setting moniker : "+ ctx.user.userName);
-  ctx.set('X-syn-moniker', user.userName );
-  ctx.set('X-syn-credits', user.ampCredits.toString() );
+  ctx.set('x-syn-moniker', user.userName);
+  ctx.set('x-syn-credits', user.ampCredits.toString());
   if (userId.auth) {
     let auth = userId.auth;
     let prov = auth.slice(0, auth.indexOf(':'));
     let grps = ctx.user.groups || '';
     //console.log("setting provider : "+ prov);
-    ctx.set('X-syn-authprov', prov);
+    ctx.set('x-syn-authprov', prov);
     //console.log("setting groups : "+ grps);
-    ctx.set('X-syn-groups', grps);
+    ctx.set('x-syn-groups', grps);
   }
   pg.touch_user(userId.id);
 });
@@ -168,11 +168,11 @@ it probably means you do not have the Synereo browser plugin installed.
     : ``;
 })
 
-export type Method = "addContent" | "initialize" | "changeMoniker"
+export type Method = "addContent" | "initialize" | "changeMoniker";
 
 async function handleAddContent(userId, {publicKey, content, signature, amount}): Promise<string | Error> {
   if (cache.isContentKnown(content)) return new Error("content already registered");
-  let link = await pg.insert_content(userId, content, amount);   // need to handle errors properly here.
+  let link = await pg.insert_content(userId, content, amount);
   return cache.linkToUri(link.linkId);
 }
 
@@ -187,42 +187,47 @@ router.post('/rpc', async function (ctx: any) {
     if (id) ctx.body = { id, error: { code: -32600, message: "Invalid version" } };
     return;
   }
-  switch (method as Method) {
-    case "addContent": {
-      let url = parse(params.content);
-      if (cache.isSynereo(url)) {
-        let result = await handleAmplify(ctx.userId.id, params)
-        ctx.body = { id, result }
+  try {
+    switch (method as Method) {
+      case "addContent": {
+        let url = parse(params.content);
+        let result = null;
+        if (cache.isSynereo(url)) {
+          result = await handleAmplify(ctx.userId.id, params)
+        }
+        else {
+          result = await handleAddContent(ctx.userId.id, params)
+        }
+        ctx.body = (result instanceof Error) ? { id, error: { message: result.message } } : { id, result }
+        break;
       }
-      else {
-        let result = await handleAddContent(ctx.userId.id, params)
-        ctx.body = { id, result }
+      case "initialize": {
+        // data goes back through the headers.
+        ctx.body = { id, ok: true };
+        break;
       }
-      break;
-    }
-    case "initialize": {
-      // data goes back through the headers.
-      ctx.body = {id, ok: true};
-      break;
-    }
-    case "changeMoniker": {
-      let newName = ctx.body.userName;  // from bodyparser 
-      console.log("setting new Moniker : " + newName);
-      console.log("for user " + JSON.stringify(ctx.user));
-      let id = ctx['userId'].id;
-      if (checkMonikerUsed(newName)) ctx.body = { ok: false, msg: "taken" };
-      else {
-        let prv = cache.users[id];
-        let usr = { ...prv, userName: newName };
-        console.log("updating user : " + JSON.stringify(usr));
-        let updt = await pg.upsert_user(usr);
-        console.log("user updated : " + JSON.stringify(updt));
-        cache.users.set(id, usr);
-        ctx.body = { ok: true };
+      case "changeMoniker": {
+        let newName = ctx.body.userName;  // from bodyparser 
+        console.log("setting new Moniker : " + newName);
+        console.log("for user " + JSON.stringify(ctx.user));
+        let id = ctx['userId'].id;
+        if (checkMonikerUsed(newName)) ctx.body = { ok: false, msg: "taken" };
+        else {
+          let prv = cache.users[id];
+          let usr = { ...prv, userName: newName };
+          console.log("updating user : " + JSON.stringify(usr));
+          let updt = await pg.upsert_user(usr);
+          console.log("user updated : " + JSON.stringify(updt));
+          cache.users.set(id, usr);
+          ctx.body = { id, result: { ok: true } };
+        }
       }
+      default:
+        if (id) ctx.body = { id, error: { code: -32601, message: "Invalid method" } };
     }
-    default:
-      if (id) ctx.body = { id, error: { code: -32601, message: "Invalid method" } };
+  }
+  catch (e) {
+    ctx.body = { id, error: { message: e.message } };
   }
 
 });

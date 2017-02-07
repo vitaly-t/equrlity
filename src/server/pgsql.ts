@@ -111,7 +111,7 @@ export function query(cqry) {
 
 export function emptyUser(): Dbt.User {
   let rec = OxiGen.emptyRec<Dbt.User>(oxb.tables.get("users"));
-  return {...rec, ampCredits: 0};
+  return {...rec, ampCredits: 100};
 }
 
 const upsert_user_sql = OxiGen.genUpsertStatement(oxb.tables.get("users"));
