@@ -1,7 +1,7 @@
 "use strict";
 
 import { isDev } from "../lib/utils.js";
-import{Url, parse } from 'url';
+import { Url, parse } from 'url';
 
 const curl = isDev() ? process.env.DEV_AMPLITUDE_URL : process.env.AMPLITUDE_URL;
 
@@ -53,24 +53,30 @@ export namespace DbCache {
   export const auths = new Map<Dbt.authId, Dbt.Auth>();
   export const contents = new Map<Dbt.contentId, Dbt.Content>();
   export const links = new Map<Dbt.linkId, Dbt.Link>();
-  export let linkRows: Array<Dbt.Link> = []; 
-  export const domain = isDev() ? 'http://localhost:8080/' : 'http://www.synereo.com/';
+  export let linkRows: Array<Dbt.Link> = [];
+  export const domain = isDev() ? 'localhost:8080' : 'www.synereo.com';
   export function isSynereo(url: Url): boolean {
     return url.host === domain;
   }
 
   export async function init() {
+
     let userRows: Array<Dbt.User> = await db.any("select * from users;");
+    users.clear();
     userRows.forEach(r => users.set(r.userId, r));
 
     let authRows: Array<Dbt.Auth> = await db.any("select * from auths");
+    auths.clear();
     authRows.forEach(r => auths.set(r.authId, r));
 
     let contentRows: Array<Dbt.Content> = await db.any("select * from contents");
+    contents.clear();
     contentRows.forEach(r => contents.set(r.contentId, r));
 
     linkRows = await db.any("select * from links order by \"linkId\" desc");
+    links.clear();
     linkRows.forEach(r => links.set(r.linkId, r));
+
   }
 
   export function getChainFromLinkId(linkId: Dbt.linkId): Array<Dbt.Link> {
@@ -108,7 +114,7 @@ export namespace DbCache {
 
   export function contentIdFromContent(content: string): Dbt.contentId | null {
     let result = null;
-    for( const [k,v] of contents) {
+    for (const [k, v] of contents) {
       if (v.content === content) {
         result = k;
         break;
@@ -118,17 +124,18 @@ export namespace DbCache {
   }
 
   export function isContentKnown(content: string): boolean {
-    return contentIdFromContent != null ;
+    return contentIdFromContent != null;
   }
 
   export function linkToUri(linkId: Dbt.linkId): string {
     let content = getContentFromLink(linkId);
-    return domain + "/link/" + linkId.toString() + "#" + content
+    return "http://" + domain + "/link/" + linkId.toString() + "#" + content
   }
 
   export function linkIdFromUri(url: Url): Dbt.linkId {
     if (!isSynereo(url)) throw new Error("Not a synero url");
-    let linkId = parseInt(url.path);
+    if (!url.path.startsWith("/link/")) throw new Error("Malformed link path");
+    let linkId = parseInt(url.path.substring(6));
     return linkId;
   }
 
@@ -140,7 +147,7 @@ export function query(cqry) {
 
 export function emptyUser(): Dbt.User {
   let rec = OxiGen.emptyRec<Dbt.User>(oxb.tables.get("users"));
-  return {...rec, ampCredits: 100};
+  return { ...rec, ampCredits: 100 };
 }
 
 const upsert_user_sql = OxiGen.genUpsertStatement(oxb.tables.get("users"));
@@ -157,7 +164,7 @@ export async function upsert_user(usr: Dbt.User) {
 export async function adjust_user_balance(usr: Dbt.User, adj: Dbt.integer) {
   let tbl = oxb.tables.get("users");
   let ampCredits = usr.ampCredits + adj;
-  let newusr = {...usr, ampCredits }
+  let newusr = { ...usr, ampCredits }
   let stmt = OxiGen.genUpdateStatement(tbl, newusr);
   await db.none(stmt, newusr);
   DbCache.users.set(usr.userId, newusr);
@@ -211,28 +218,54 @@ export async function insert_content(userId: Dbt.userId, content: string, amount
   let cont: Dbt.Content = { ...emptyContent(), userId, content, contentType, amount };
   let contents = oxb.tables.get("contents");
   let stmt = OxiGen.genInsertStatement(contents, cont);
-  let rslt1 = await db.one(stmt,cont);
-  let {contentId} = rslt1; 
+  let rslt1 = await db.one(stmt, cont);
+  let {contentId} = rslt1;
 
   let links = oxb.tables.get("links");
   let link: Dbt.Link = { ...emptyLink(), userId, contentId, amount };
   let rslt2 = await db.one(OxiGen.genInsertStatement(links, link), link);
-  let {linkId} = rslt2; 
+  let {linkId} = rslt2;
   let rslt = { ...link, linkId };
-  DbCache.contents.set(contentId, {...cont, contentId});
+  DbCache.contents.set(contentId, { ...cont, contentId });
+  DbCache.linkRows.push(rslt);
   DbCache.links.set(linkId, rslt);
   await adjust_user_balance(DbCache.users.get(userId), -amount);
   return rslt;
 }
 
 export async function amplify_content(userId: Dbt.userId, content: string, amount: Dbt.integer, contentType: Dbt.contentType = "url"): Promise<Dbt.Link> {
-  let prevLink = DbCache.linkIdFromUri( parse(content));
+  let prevLink = DbCache.linkIdFromUri(parse(content));
   let prv = DbCache.links.get(prevLink);
   let links = oxb.tables.get("links");
   let link: Dbt.Link = { ...prv, userId, prevLink, amount };
   let {linkId} = await db.one(OxiGen.genInsertStatement(links, link), link);
   let rslt = { ...link, linkId };
+  DbCache.linkRows.push(rslt);
   DbCache.links.set(linkId, rslt);
   await adjust_user_balance(DbCache.users.get(userId), -amount);
   return rslt;
 }
+
+export async function recreateDatabase() {   //  careful with that axe, Eugene!
+  let tbls = Array.from(oxb.tables.values())
+  let drops = tbls.map(t => "DROP TABLE " + t.name + ";\n");
+  drops.reverse();
+  let dropall = drops.join("\n");
+  await db.none(dropall);
+  for (const t of tbls) {
+    let stmt = OxiGen.genCreateTableStatement(t);
+    await db.none(stmt);
+  };
+  DbCache.init();
+}
+
+export async function resetDatabase() {   //  careful with that axe, Eugene!
+  let tbls = Array.from(oxb.tables.values()).reverse()
+  for (const t of tbls) {
+    let stmt = "DELETE FROM " + t.name + ";\n";
+    await db.none(stmt);
+  };
+  DbCache.init();
+}
+
+

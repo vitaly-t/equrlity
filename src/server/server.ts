@@ -19,6 +19,7 @@ const cache = pg.DbCache;
 const jwt_secret = process.env.JWT_SECRET_KEY;
 
 cache.init();
+//pg.resetDatabase();
 
 const app = new Koa();
 const router = new Router();
@@ -142,6 +143,7 @@ app.use(async function (ctx, next) {
 
   await next();
   //console.log("setting moniker : "+ ctx.user.userName);
+  user = getUser(userId.id);
   ctx.set('x-syn-moniker', user.userName);
   ctx.set('x-syn-credits', user.ampCredits.toString());
   if (userId.auth) {
@@ -168,7 +170,7 @@ it probably means you do not have the Synereo browser plugin installed.
     : ``;
 })
 
-export type Method = "addContent" | "initialize" | "changeMoniker";
+export type RpcMethod = "addContent" | "initialize" | "changeMoniker" | "loadLinks" ;
 
 async function handleAddContent(userId, {publicKey, content, signature, amount}): Promise<any> {
   let link = cache.getLinkFromContent(content);
@@ -177,9 +179,9 @@ async function handleAddContent(userId, {publicKey, content, signature, amount})
   return {link: cache.linkToUri(link.linkId)};
 }
 
-async function handleAmplify(userId, {publicKey, content, signature, amount}): Promise<string | Error> {
+async function handleAmplify(userId, {publicKey, content, signature, amount}): Promise<any> {
   let link = await pg.amplify_content(userId, content, amount);   // need to handle errors properly here.
-  return cache.linkToUri(link.linkId);
+  return  {link: cache.linkToUri(link.linkId)};
 }
 
 router.post('/rpc', async function (ctx: any) {
@@ -189,7 +191,7 @@ router.post('/rpc', async function (ctx: any) {
     return;
   }
   try {
-    switch (method as Method) {
+    switch (method as RpcMethod) {
       case "addContent": {
         let url = parse(params.content);
         let result = null;
@@ -222,9 +224,19 @@ router.post('/rpc', async function (ctx: any) {
           cache.users.set(id, usr);
           ctx.body = { id, result: { ok: true } };
         }
+        break;
+      }
+      case "loadLinks": {
+        let links = cache.getChainFromContent(params.url);
+        let result = links.map(lnk => {
+          let url = cache.linkToUri(lnk.linkId)
+          return {url, hitCount: lnk.hitCount, amount: lnk.amount }
+        });
+        ctx.body = {id, result };
+        break;
       }
       default:
-        if (id) ctx.body = { id, error: { code: -32601, message: "Invalid method" } };
+        if (id) ctx.body = { id, error: { code: -32601, message: "Invalid method: "+method } };
     }
   }
   catch (e) {

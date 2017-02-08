@@ -6,6 +6,8 @@
   "scripts": {
     "clean": "rimraf /dist",
     "mklib": "cd src/lib && tsc",
+    "gen": "npm run mklib && node src/scripts/gentypes.js",
+    "resetdb": "node src/scripts/resetdb.js",
     "mksrv": "cd src/server && tsc",
     "mktest": "cd src/spec && tsc",
     "build": "npm run mklib && npm run mksrv",
