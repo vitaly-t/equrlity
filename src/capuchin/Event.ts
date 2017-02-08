@@ -2,6 +2,7 @@ import { AppState, initState, setLink, expandedUrl, isSeen, setLoading, getRedir
 import * as Comms from './Comms';
 import { Url, parse, format } from 'url';
 import { AxiosResponse } from 'axios';
+import * as Rpc from '../lib/rpc';
 
 export interface Save {
   eventType: "Save";
@@ -85,13 +86,13 @@ export namespace AsyncHandlers {
     let url = expandedUrl(state, src);
     let response = await Comms.sendAddContent(state.privateKey, state.publicKey, url, amount)
     let thunk = (st: AppState) => {
-      if (response.data.error) throw new Error("Server returned error: " + response.data.error.message);
-      let rslt = response.data.result;
+      let rsp: Rpc.Response = response.data;
+      if (rsp.error) throw new Error("Server returned error: " + rsp.error.message);
+      let rslt: Rpc.RecvAddContentResponse = rsp.result;
       if (rslt.prevLink) {
-        let msg = rslt.message;
-        console.log("rendering message :" + msg);
-        chrome.runtime.sendMessage({ eventType: 'RenderMessage', msg });
+        chrome.runtime.sendMessage({ eventType: 'RenderMessage', msg: "Content already registered." });
         // very naughty state mutation here ... so sue me!!
+        // this is to prevent triggering an immediate render instantaneously wiping out the above message.
         st.links[url] = parse(rslt.prevLink);
         return st;
       }
@@ -116,9 +117,10 @@ export namespace AsyncHandlers {
     if (tgt || isSeen(state, curl)) return (st => { return { ...st, activeUrl: curl }; });
     let response = await Comms.sendLoadLinks(state.publicKey, curl);
     let thunk = (st: AppState) => {
-      if (response.data.error) throw new Error("Server returned error: " + response.data.error.message);
+      let rsp : Rpc.Response = response.data;
+      if (rsp.error) throw new Error("Server returned error: " + rsp.error.message);
       st = { ...st, activeUrl: curl };
-      let rslt: Array<any> = response.data.result;  // array of {url, amount, hitCount}
+      let rslt: Rpc.LoadLinksResponse = rsp.result;  
       if (rslt.length > 0) {
         st = setLink(st, curl, rslt[0].url);
       }
@@ -126,7 +128,6 @@ export namespace AsyncHandlers {
     };
     return thunk;
   }
-
 }
 
 export namespace Handlers {
@@ -139,51 +140,3 @@ export namespace Handlers {
   }
 
 }
-/*
-    amplify: function(tab, req) {
-        let self = this;
-        let dao = self.userDAO;
-        let user = dao.user();
-
-        this.clientLog(" ---- ampVideo ----");
-
-        if (user.balance < req.ampBy) {
-            this.sendMsgUI({status:"No amps"});
-            this.clientLog("Insufficient amps");
-            return;
-        }
-
-        //build push data
-        let videoData = {
-            userIP: self.config.userIP,
-            Timestamp: Date.now(),
-            Username: user.username,
-            Value: req.ampBy,
-            Version: self.getVersion()
-        };
-        let urlInfo = self.parseTabUrl(tab.url);
-        //first get sharing link from the sniply api
-        this.getShareLink(tab.url, function (shareData){
-            if (shareData && shareData.href) {
-                urlInfo.shareLink = shareData.href;
-                videoData.shareLink = urlInfo.shareLink;
-                videoData.clkURL = urlInfo.origin;
-                dao.createAmplification(urlInfo.shareLink, urlInfo.refLink, urlInfo.origin, req.ampBy, self.getVersion(),
-                    function(err, res){
-                        //send message to page, to mark the video as amplified
-                        self.sendMsgUI({status:"Amplified",videoData: videoData});
-                        self.clientLog("you amplified this asset by "+ req.ampBy +" amps");
-                    });
-            } else {
-                self.clientLog(JSON.stringify(data));
-                console.log("Something wrong when creating share link. please try again later or contact us");
-            }
-
-        }, function (data){
-            self.clientLog(JSON.stringify(data));
-            console.log("Something wrong when creating share link. please try again later or contact us");
-        });
-    },
-
-
-*/

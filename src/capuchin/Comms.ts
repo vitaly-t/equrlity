@@ -2,6 +2,7 @@ import * as UTF8 from './codec/UTF8';
 import * as Crypto from './Crypto';
 import { Url, parse } from 'url';
 import axios, { AxiosResponse, AxiosError } from 'axios';
+import * as Rpc from '../lib/rpc';
 
 export function isDev(): boolean {
   // return process.env.NODE_ENV === "development"
@@ -34,34 +35,28 @@ function apiRequest() {
   });
 }
 
-type RpcMethod = "addContent" | "loadLinks" |"initialize";
-export interface RpcResponse {
-  id: number;
-  error: any;
-  result: any;
-}
-
 
 let id = 0;
-export async function sendApiRequest(method: RpcMethod, params: any) {
+export async function sendApiRequest(method: Rpc.Method, params: any): Promise<AxiosResponse> {
   let xhr = apiRequest();
   id += 1;
-  let data = { jsonrpc: "2.0", method, params, id };
+  let data: Rpc.Request = { jsonrpc: "2.0", method, params, id };
   return await xhr.post(serverUrl, data );
 }
 
-export async function sendAddContent(priv: JsonWebKey, pub: JsonWebKey, url: string, amount: number): Promise<any> {
+export async function sendAddContent(priv: JsonWebKey, pub: JsonWebKey, url: string, amount: number): Promise<AxiosResponse> {
   const privateCryptoKey: CryptoKey = await Crypto.importPrivateKeyfromJWK(priv);
   const signature: ArrayBuffer = await Crypto.signData(privateCryptoKey, UTF8.stringToUtf8ByteArray(url).buffer);
   const uint8ArraySignature = new Uint8Array(signature);
   const sig = printBase64Binary(new Uint8Array(signature));
-  return await sendApiRequest("addContent", { publicKey: pub, content: url, signature: sig, amount });
+  let req: Rpc.AddContentRequest =  { publicKey: pub, content: url, signature: sig, amount };
+  return await sendApiRequest("addContent", req );
 }
 
-export async function sendInitialize(pub: JsonWebKey): Promise<any> {
+export async function sendInitialize(pub: JsonWebKey): Promise<AxiosResponse> {
   return await sendApiRequest("initialize", { publicKey: pub });
 }
 
-export async function sendLoadLinks(publicKey: JsonWebKey, url: string): Promise<any> {
+export async function sendLoadLinks(publicKey: JsonWebKey, url: string): Promise<AxiosResponse> {
   return await sendApiRequest("loadLinks", { publicKey, url });
 }

@@ -14,6 +14,7 @@ import * as jwt from '../lib/jwt';
 import koastatic from './koa-static';
 import clientIP from './clientIP.js';
 import { Url, parse } from 'url';
+import * as Rpc from '../lib/rpc';
 
 const cache = pg.DbCache;
 const jwt_secret = process.env.JWT_SECRET_KEY;
@@ -170,16 +171,16 @@ it probably means you do not have the Synereo browser plugin installed.
     : ``;
 })
 
-export type RpcMethod = "addContent" | "initialize" | "changeMoniker" | "loadLinks" ;
-
-async function handleAddContent(userId, {publicKey, content, signature, amount}): Promise<any> {
+async function handleAddContent(userId, {publicKey, content, signature, amount}): Promise<Rpc.SendAddContentResponse> {
   let link = cache.getLinkFromContent(content);
-  if (link) return {prevLink: cache.linkToUri(link.linkId), message: "content already registered"};
+  if (link) {
+     return {prevLink: cache.linkToUri(link.linkId)} as Rpc.AddContentAlreadyRegistered;
+  }
   link = await pg.insert_content(userId, content, amount);
-  return {link: cache.linkToUri(link.linkId)};
+  return {link: cache.linkToUri(link.linkId)} as Rpc.AddContentOk;
 }
 
-async function handleAmplify(userId, {publicKey, content, signature, amount}): Promise<any> {
+async function handleAmplify(userId, {publicKey, content, signature, amount}): Promise<Rpc.AddContentOk> {
   let link = await pg.amplify_content(userId, content, amount);   // need to handle errors properly here.
   return  {link: cache.linkToUri(link.linkId)};
 }
@@ -191,7 +192,7 @@ router.post('/rpc', async function (ctx: any) {
     return;
   }
   try {
-    switch (method as RpcMethod) {
+    switch (method as Rpc.Method) {
       case "addContent": {
         let url = parse(params.content);
         let result = null;
@@ -228,9 +229,10 @@ router.post('/rpc', async function (ctx: any) {
       }
       case "loadLinks": {
         let links = cache.getChainFromContent(params.url);
-        let result = links.map(lnk => {
+        let result: Rpc.LoadLinksResponse = links.map(lnk => {
           let url = cache.linkToUri(lnk.linkId)
-          return {url, hitCount: lnk.hitCount, amount: lnk.amount }
+          let item: Rpc.LoadLinksResponseItem = {url, hitCount: lnk.hitCount, amount: lnk.amount } 
+          return item;
         });
         ctx.body = {id, result };
         break;
