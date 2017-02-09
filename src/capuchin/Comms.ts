@@ -60,3 +60,7 @@ export async function sendInitialize(pub: JsonWebKey): Promise<AxiosResponse> {
 export async function sendLoadLinks(publicKey: JsonWebKey, url: string): Promise<AxiosResponse> {
   return await sendApiRequest("loadLinks", { publicKey, url });
 }
+
+export async function sendGetRedirect(linkUrl: string): Promise<AxiosResponse> {
+  return await sendApiRequest("getRedirect", { linkUrl });
+}

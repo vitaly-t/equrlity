@@ -44,17 +44,16 @@ export function expandedUrl(state: AppState, curl_: string = state.activeUrl): s
   return rslt;
 }
 
-function isSynereoLink(url: Url): boolean {
+export function isSynereoLink(url: Url): boolean {
   let srch = process.env.NODE_ENV == "development" ? "localhost:8080" : "synereo.com";
   return (url.host.toLowerCase().indexOf(srch) >= 0)
     && (url.path.startsWith("/link/"))
 }
 
-export async function getRedirectUrl(state: AppState, curl_: string): Promise<string | null> {
+export function getRedirectUrl(state: AppState, curl_: string): string | null {
   let curl = prepareUrl(curl_)
   let i = Object.keys(state.redirects).indexOf(curl);
   if (i >= 0) return state.redirects[curl];
-  //if (isSynereoLink(parse(curl)))
   return null;
 }
 
@@ -88,7 +87,7 @@ export function isWaiting(state: AppState, curl_: string): boolean {
 export function prepareUrl(curl: string): string | null {
   let url = parse(curl, false, false);  // parse query string???
   if (!url) return null;
-  if (url.auth === "chrome") return null;
+  if (url.protocol === "chrome:") return null;
   url.query = "";
   url.search = "";
   url.hash = '';

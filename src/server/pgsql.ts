@@ -96,7 +96,7 @@ export namespace DbCache {
     if (!link) return [];
     return getChainFromLinkId(link.linkId);
   }
-  export function getContentFromLink(linkId: Dbt.linkId): string | null {
+  export function getContentFromLinkId(linkId: Dbt.linkId): string | null {
     let link = links.get(linkId);
     if (!link) return null;
     let content = contents.get(link.contentId);
@@ -128,11 +128,11 @@ export namespace DbCache {
   }
 
   export function linkToUri(linkId: Dbt.linkId): string {
-    let content = getContentFromLink(linkId);
+    let content = getContentFromLinkId(linkId);
     return "http://" + domain + "/link/" + linkId.toString() + "#" + content
   }
 
-  export function linkIdFromUri(url: Url): Dbt.linkId {
+  export function getLinkIdFromUrl(url: Url): Dbt.linkId {
     if (!isSynereo(url)) throw new Error("Not a synero url");
     if (!url.path.startsWith("/link/")) throw new Error("Malformed link path");
     let linkId = parseInt(url.path.substring(6));
@@ -234,7 +234,7 @@ export async function insert_content(userId: Dbt.userId, content: string, amount
 }
 
 export async function amplify_content(userId: Dbt.userId, content: string, amount: Dbt.integer, contentType: Dbt.contentType = "url"): Promise<Dbt.Link> {
-  let prevLink = DbCache.linkIdFromUri(parse(content));
+  let prevLink = DbCache.getLinkIdFromUrl(parse(content));
   let prv = DbCache.links.get(prevLink);
   let links = oxb.tables.get("links");
   let link: Dbt.Link = { ...prv, userId, prevLink, amount };

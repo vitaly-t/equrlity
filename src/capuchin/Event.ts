@@ -1,4 +1,4 @@
-import { AppState, initState, setLink, expandedUrl, isSeen, setLoading, getRedirectUrl, prepareUrl } from './AppState';
+import { AppState, initState, setLink, expandedUrl, isSeen, setLoading, getRedirectUrl, prepareUrl, isSynereoLink } from './AppState';
 import * as Comms from './Comms';
 import { Url, parse, format } from 'url';
 import { AxiosResponse } from 'axios';
@@ -105,16 +105,34 @@ export namespace AsyncHandlers {
     return thunk;
   }
 
+  export async function GetRedirect(state: AppState, curl: string): Promise<(st: AppState) => AppState> {
+    let response = await Comms.sendGetRedirect(curl);
+    let tab = await currentTab();
+    return (st: AppState) => {
+      let rsp : Rpc.Response = response.data;
+      if (rsp.error) throw new Error("Server returned error: " + rsp.error.message);
+      let rslt: Rpc.GetRedirectResponse = rsp.result;  
+      if (rslt.contentUrl) {
+        st = setLink(st, rslt.contentUrl, curl);
+        st = { ...st, activeUrl: rslt.contentUrl };
+        console.log("redirecting to: " + rslt.contentUrl);
+        chrome.tabs.update(tab.id, { url: rslt.contentUrl });
+      }
+      return st;
+    };
+  }
+
   export async function Load(state: AppState, curl_: string): Promise<(st: AppState) => AppState> {
     let curl = prepareUrl(curl_);
-    if (!curl) return (() => state);
-    let tgt = await getRedirectUrl(state, curl)
+    if (!curl) return (st => { return { ...st, activeUrl: null }; });
+    let tgt =  getRedirectUrl(state, curl)
     if (tgt) {
       let tab = await currentTab();
       console.log("redirecting to: " + tgt);
       chrome.tabs.update(tab.id, { url: tgt });
     }
-    if (tgt || isSeen(state, curl)) return (st => { return { ...st, activeUrl: curl }; });
+    if (isSeen(state, curl)) return (st => { return { ...st, activeUrl: curl }; });
+    if (isSynereoLink(parse(curl))) return GetRedirect(state,curl)
     let response = await Comms.sendLoadLinks(state.publicKey, curl);
     let thunk = (st: AppState) => {
       let rsp : Rpc.Response = response.data;
@@ -128,6 +146,7 @@ export namespace AsyncHandlers {
     };
     return thunk;
   }
+  
 }
 
 export namespace Handlers {

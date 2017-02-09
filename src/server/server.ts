@@ -11,7 +11,7 @@ import * as OxiDate from '../lib/oxidate.js';
 import * as uuid from '../lib/uuid.js';
 import * as jwt from '../lib/jwt';
 //import passport from './auth';
-import koastatic from './koa-static';
+import * as koastatic from 'koa2-static-files';
 import clientIP from './clientIP.js';
 import { Url, parse } from 'url';
 import * as Rpc from '../lib/rpc';
@@ -119,8 +119,8 @@ let authent = async function (ctx, prov, authId) {
 
 app.keys = ['foo'];
 
-let serve = koastatic("./assets", { defer: true });
-app.use(serve); ///public"));
+//let serve = koastatic("./assets", { defer: true });
+app.use(koastatic.static(__dirname + '/assets')); 
 
 app.use(bodyParser());
 //app.use(session(app));
@@ -160,15 +160,15 @@ app.use(async function (ctx, next) {
 });
 
 router.get('/link/:id', async (ctx, next) => {
-  let linkId = ctx.params.id;
-  let url = cache.getContentFromLink(linkId);
-  ctx.body = `
+  let linkId: Dbt.linkId = parseInt(ctx.params.id);
+  let url = cache.getContentFromLinkId(linkId);
+  let body = `
 <h2>CALL TO ACTION - JOIN SYNEREO - YOU KNOW YOU WANT TO - WHAT COULD GO WRONG???</h2>
 <p>You have followed a Synereo link.  If you can see this message (for more than a second or so)
 it probably means you do not have the Synereo browser plugin installed.
 </p>`
-    + url ? `<p>This is the <a href="${url}">content link</a>you may have <i>thought</i> you were following ;-).</p>`
-    : ``;
+ if (url) body += `<p>This is the link you were (probably) after: <a href="${url}">${url}</a></p>`
+ ctx.body = body;
 })
 
 async function handleAddContent(userId, {publicKey, content, signature, amount}): Promise<Rpc.SendAddContentResponse> {
@@ -236,6 +236,17 @@ router.post('/rpc', async function (ctx: any) {
         });
         ctx.body = {id, result };
         break;
+      }
+      case "getRedirect": {
+        let contentUrl = null;
+        let url = parse(params.linkUrl);
+        if (cache.isSynereo(url)) {
+          let linkId = cache.getLinkIdFromUrl(url);
+          if (linkId) contentUrl = cache.getContentFromLinkId(linkId);
+        }
+        ctx.body = contentUrl ? {id, result: {contentUrl}}
+                              : {id, error: {message: "invalid link"}}
+        break;                              
       }
       default:
         if (id) ctx.body = { id, error: { code: -32601, message: "Invalid method: "+method } };
