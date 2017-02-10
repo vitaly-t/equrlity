@@ -14,7 +14,8 @@
     "resetdb": "node src/scripts/resetdb.js",
     "test": "npm run mktest && cd src/dist/spec && jasmine *.spec.js",
     "webpack": "webpack",
-    "webpack_watch": "webpack --watch"
+    "webpack_watch": "webpack --watch",
+    "mkzip": "powershell src/scripts/zipapp.ps1"
   },
   "keywords": [],
   "author": "Gary Stephenson",

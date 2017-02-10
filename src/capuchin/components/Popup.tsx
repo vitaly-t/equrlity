@@ -29,6 +29,7 @@ export const PopupPanel = (props: PopupPanelProps) => {
       <p>Investment amount: {amount} </p>
       <p>Target : {tgt}</p>
       <SaveButton action={action} label={lbl} />
+      <p>Download latest version of the <a href="Capuchin.zip">Synereo Plugin</a></p>
     </div>);
   }
   return <div>

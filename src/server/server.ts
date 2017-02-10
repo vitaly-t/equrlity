@@ -166,7 +166,13 @@ router.get('/link/:id', async (ctx, next) => {
 <h2>CALL TO ACTION - JOIN SYNEREO - YOU KNOW YOU WANT TO - WHAT COULD GO WRONG???</h2>
 <p>You have followed a Synereo link.  If you can see this message (for more than a second or so)
 it probably means you do not have the Synereo browser plugin installed.
-</p>`
+</p>
+<p>You can download the latest release of our Chrome plugin by clicking this link: 
+      <a href="capuchin.zip" download="SynereoPlugin.zip">Synereo Plug-in</a></p>
+<p>To install it you will have to unzip the file into a directory, then go in to your
+Chrome extensions page, and select "Load unpacked extension".  You may also have to tick the
+Developer Mode tick-box to allow for the loading of unpacked extensions.         
+`
  if (url) body += `<p>This is the link you were (probably) after: <a href="${url}">${url}</a></p>`
  ctx.body = body;
 })
