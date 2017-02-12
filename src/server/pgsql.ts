@@ -3,7 +3,7 @@
 import { isDev } from "../lib/utils.js";
 import { Url, parse } from 'url';
 
-const curl = isDev() ? process.env.DEV_AMPLITUDE_URL : process.env.AMPLITUDE_URL;
+let connectUrl: string = isDev() ? process.env.DEV_AMPLITUDE_URL : process.env.AMPLITUDE_URL;
 
 import * as OxiDate from '../lib/oxidate';
 
@@ -45,7 +45,9 @@ const oxb: OxiGen.IDbSchema = OxiGen.dbSchema;
 
 //pgp.pg.types.setTypeParser(1114, str => moment.utc(str).format());
 
-export const db: IDatabase<any> = pgp('postgres:' + curl);
+if (!connectUrl.startsWith('postgres:')) connectUrl = 'postgres:' + connectUrl;
+
+export const db: IDatabase<any> = pgp(connectUrl);
 
 export namespace DbCache {
   // ahem ... cache the whole db in memory 
@@ -54,12 +56,18 @@ export namespace DbCache {
   export const contents = new Map<Dbt.contentId, Dbt.Content>();
   export const links = new Map<Dbt.linkId, Dbt.Link>();
   export let linkRows: Array<Dbt.Link> = [];
-  export const domain = isDev() ? 'localhost:8080' : 'www.synereo.com';
+  export const domain = isDev() ? 'localhost:8080' : process.env.AMPLITUDE_DOMAIN;
   export function isSynereo(url: Url): boolean {
     return url.host === domain;
   }
 
   export async function init() {
+    let tbls: Array<any> = await db.any("select table_name from information_schema.tables where table_schema = 'public'");
+    if (tbls.length == 0) {
+      console.log("Creating data tables");
+      await createDataTables();
+      console.log(" ... finished creating data tables");
+    }
 
     let userRows: Array<Dbt.User> = await db.any("select * from users;");
     users.clear();
@@ -246,12 +254,8 @@ export async function amplify_content(userId: Dbt.userId, content: string, amoun
   return rslt;
 }
 
-export async function recreateDatabase() {   //  careful with that axe, Eugene!
+export async function createDataTables() {   //  careful with that axe, Eugene!
   let tbls = Array.from(oxb.tables.values())
-  let drops = tbls.map(t => "DROP TABLE " + t.name + ";\n");
-  drops.reverse();
-  let dropall = drops.join("\n");
-  await db.none(dropall);
   for (const t of tbls) {
     let stmt = OxiGen.genCreateTableStatement(t);
     await db.none(stmt);
@@ -259,7 +263,17 @@ export async function recreateDatabase() {   //  careful with that axe, Eugene!
   DbCache.init();
 }
 
-export async function resetDatabase() {   //  careful with that axe, Eugene!
+export async function recreateDataTables() {   //  careful with that axe, Eugene!
+  let tbls = Array.from(oxb.tables.values())
+  let drops = tbls.map(t => "DROP TABLE " + t.name + ";\n");
+  drops.reverse();
+  let dropall = drops.join("\n");
+  await db.none(dropall);
+  await createDataTables();
+  DbCache.init();
+}
+
+export async function resetDataTables() {   //  careful with that axe, Eugene!
   let tbls = Array.from(oxb.tables.values()).reverse()
   for (const t of tbls) {
     let stmt = "DELETE FROM " + t.name + ";\n";

@@ -1,3 +1,3 @@
 "use strict";
 const pg = require("../../dist/server/pgsql.js");
-pg.recreateDatabase();
+pg.recreateDataTables();

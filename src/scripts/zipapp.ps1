@@ -1,6 +1,6 @@
 $source = "./dist/capuchin"
 
-$destination = "./assets/capuchin.zip"
+$destination = "./assets/synereo-plugin.zip"
 
  If(Test-path $destination) {Remove-item $destination}
 

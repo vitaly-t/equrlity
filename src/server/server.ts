@@ -7,17 +7,19 @@ import * as Koa from "koa";
 import * as bodyParser from 'koa-bodyparser';
 import * as session from 'koa-session';
 import * as Router from 'koa-router';
-import * as OxiDate from '../lib/oxidate.js';
+import * as OxiDate from '../lib/oxidate';
 import * as uuid from '../lib/uuid.js';
 import * as jwt from '../lib/jwt';
 //import passport from './auth';
-import * as koastatic from 'koa2-static-files';
+//import * as koastatic from 'koa2-static-files';
+import serve from './koa-static';
+import * as send from 'koa-send';
 import clientIP from './clientIP.js';
 import { Url, parse } from 'url';
 import * as Rpc from '../lib/rpc';
 
 const cache = pg.DbCache;
-const jwt_secret = process.env.JWT_SECRET_KEY;
+const jwt_secret = process.env.JWT_AMPLITUDE_KEY;
 
 cache.init();
 //pg.resetDatabase();
@@ -120,7 +122,9 @@ let authent = async function (ctx, prov, authId) {
 app.keys = ['foo'];
 
 //let serve = koastatic("./assets", { defer: true });
-app.use(koastatic.static(__dirname + '/assets')); 
+//app.use(koastatic.static(__dirname + '/assets')); 
+//console.log("__dirname: "+__dirname);
+//app.use(serve("assets", "./assets"));
 
 app.use(bodyParser());
 //app.use(session(app));
@@ -134,7 +138,8 @@ app.use(jwt.jwt({ secret: jwt_secret, cookie: 'syn_user', ignoreExpiration: true
 app.use(async function (ctx, next) {
 
   let userId = ctx['userId'];
-  let user = getUser(userId.id);
+  let user = null;
+  if (userId) user = getUser(userId.id);
   if (!userId || !user) {
     let ip = clientIP(ctx.req);
     await authent(ctx, 'ip', ip);
@@ -159,6 +164,27 @@ app.use(async function (ctx, next) {
   pg.touch_user(userId.id);
 });
 
+/* @@GS - Wasted an entire weekend trying to get the download thing to work.  Still no idea why it fails
+let pluginClause = ` 
+<p>You can download the latest release of our Chrome plugin by clicking either of these links:</p> 
+   <p><a href="assets/synereo-plugin.zip" download >Zip file (Windows)</a></p>
+   <p><a href="assets/synereo-plugin.tar.gz" download >Tar.gz file (Linux  / Mac)</a></p>
+<p>To install it you will have to unzip/untar the file into a directory, then go in to your
+Chrome extensions page, and select "Load unpacked extension".</p>
+<p>You may need to first tick the "Developer Mode" tick-box (top right) to allow unpacked extensions to load.</p>         
+`;
+*/
+
+let pluginClause = ` 
+<p>You can download the latest release of our Chrome plugin by clicking either of these links:</p> 
+   <p><a href="/synereo.zip" download >Zip file (Windows)</a></p>
+   <p><a href="/synereo.tar.gz" download >Tar.gz file (Linux  / Mac)</a></p>
+<p>To install it you will have to unzip/untar the file into a directory, then go in to your
+Chrome extensions page, and select "Load unpacked extension".</p>
+<p>You may need to first tick the "Developer Mode" tick-box (top right) to allow unpacked extensions to load.</p>         
+<p>To upgrade an existing install, simply overwrite the old install with the new, and select "Reload" in the extensions page.</p>         
+`;
+
 router.get('/link/:id', async (ctx, next) => {
   let linkId: Dbt.linkId = parseInt(ctx.params.id);
   let url = cache.getContentFromLinkId(linkId);
@@ -167,12 +193,8 @@ router.get('/link/:id', async (ctx, next) => {
 <p>You have followed a Synereo link.  If you can see this message (for more than a second or so)
 it probably means you do not have the Synereo browser plugin installed.
 </p>
-<p>You can download the latest release of our Chrome plugin by clicking this link: 
-      <a href="capuchin.zip" download="SynereoPlugin.zip">Synereo Plug-in</a></p>
-<p>To install it you will have to unzip the file into a directory, then go in to your
-Chrome extensions page, and select "Load unpacked extension".  You may also have to tick the
-Developer Mode tick-box to allow for the loading of unpacked extensions.         
-`
+`;
+ body += pluginClause;
  if (url) body += `<p>This is the link you were (probably) after: <a href="${url}">${url}</a></p>`
  ctx.body = body;
 })
@@ -264,6 +286,14 @@ router.post('/rpc', async function (ctx: any) {
 
 });
 
+// No idea why these are necessary, but I couldn't make it work any other way ...
+router.get('/synereo.zip', async function (ctx, next) {
+  await send(ctx, './assets/synereo-plugin.zip');
+});
+
+router.get('/synereo.tar.gz', async function (ctx, next) {
+  await send(ctx, './assets/synereo-plugin.tar.gz');
+});
 
 /*
 router.get('/auth/facebook', function (ctx, next) {
@@ -310,8 +340,19 @@ app.use(router.get('/auth/twitter', function *() {
 
 */
 
+router.all('*', async (ctx, next) => {
+  let body = `
+<h2>CALL TO ACTION - JOIN SYNEREO - YOU KNOW YOU WANT TO - WHAT COULD GO WRONG???</h2>
+<p>You have landed on the home page of Synereo Chrome plugin extension.</p>
+<p>(This page is currently in serious contention for the world's ugliest webpage!  Support our bid, vote for us!!! ... )</p>
+`
+ body += pluginClause;
+ ctx.body = body;
+})
+
 app.use(router.routes())
 app.use(router.allowedMethods());
+
 
 const port = parseInt(process.env.PORT, 10) || 8080;
 
