@@ -1,4 +1,4 @@
-$source = "./dist/capuchin"
+$source = "./dist/capuchin_rel"
 
 $destination = "./assets/synereo-plugin.zip"
 

@@ -1,4 +1,4 @@
-$source = "./dist/capuchin"
+$source = "./dist/capuchin_rel"
 $destination = "./assets/synereo-plugin.tar.gz"
 
 set-alias sz "D:\dev\tools\7za.exe"  

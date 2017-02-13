@@ -1,7 +1,11 @@
 $tgtdir = '../amplitude_heroku'
 
+$env:NODE_ENV = "production"
+npm run mkapp
+
 $ScriptPath = Split-Path $MyInvocation.InvocationName
 & "$ScriptPath\zipapp.ps1"
+& "$ScriptPath\tgzapp.ps1"
 
 # NB - the assets, dist, dist/server, dist/lib directories are all assumed to exist
 Copy-Item package.json -Destination $tgtdir -Force

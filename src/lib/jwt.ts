@@ -16,8 +16,10 @@ export function jwt(opts): (cxt: Koa.Context, next: () => Promise<any>) => any {
 
     if (opts.cookie) {
       token = ctx.cookies.get(opts.cookie);
-      if (!token && !opts.passthrough) this.throw(401, "Missing cookie");
-    } else if (ctx.header.authorization) {
+      console.log("missing cookie");
+      if (!token && !opts.passthrough) ctx.throw(401, "Missing cookie");
+    } 
+    if (!token && ctx.header.authorization) {
       parts = ctx.header.authorization.split(' ');
       if (parts.length == 2) {
         scheme = parts[0];
@@ -40,6 +42,7 @@ export function jwt(opts): (cxt: Koa.Context, next: () => Promise<any>) => any {
       ctx[opts.key] = user;
       await next();
     } else {
+      console.log("jwt error: "+msg);
       ctx.throw(401, msg);
     }
   };

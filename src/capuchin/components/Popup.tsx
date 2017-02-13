@@ -2,6 +2,7 @@ import * as React from 'react';
 import { AppState, expandedUrl, isWaiting, isLinked } from "../AppState";
 import { Url, format } from 'url';
 import { SaveButton } from "./SaveButton";
+import { serverUrl } from '../Comms';
 
 export interface PopupPanelProps { appState?: AppState; serverMessage?: string };
 
@@ -29,7 +30,7 @@ export const PopupPanel = (props: PopupPanelProps) => {
       <p>Investment amount: {amount} </p>
       <p>Target : {tgt}</p>
       <SaveButton action={action} label={lbl} />
-      <p>Download latest version of the <a href="Capuchin.zip">Synereo Plugin</a></p>
+      <p>Using Server Url: {serverUrl} </p>
     </div>);
   }
   return <div>

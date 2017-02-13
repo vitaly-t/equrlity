@@ -5,11 +5,11 @@ import axios, { AxiosResponse, AxiosError } from 'axios';
 import * as Rpc from '../lib/rpc';
 
 export function isDev(): boolean {
-  // return process.env.NODE_ENV === "development"
-  return true;
+  return process.env.NODE_ENV === "development"
 }
 
-const serverUrl = isDev() ? "http://localhost:8080/rpc" : "http://168.62.214.211:6146/rpc";
+export const serverUrl = isDev() ? "http://localhost:8080/rpc" 
+                          : "https://synereo-amplitude.herokuapp.com/rpc";
 
 export function printBase64Binary(byteArray: Uint8Array): string {
   return btoa(String.fromCharCode(...byteArray));
@@ -23,10 +23,24 @@ export function printHexBinary(byteArray: Uint8Array): string {
   return outChars.join('');
 }
 
-function apiRequest() {
+async function getCookie() {
+  return new Promise( (resolve, reject) => {
+    chrome.cookies.get({url: serverUrl,  name: "syn_user" }, c => {
+      if (c) resolve(c);
+      else {
+        console.log("unable to locate cookie");
+        reject("unable to find cookie");
+      }
+    });
+  });
+}
+
+async function apiRequest() {
+  let cookie = await getCookie();
   return axios.create({
     timeout: 10000,
-    headers: { 'content-type': 'application/json', 'Accept': 'application/json' },
+    withCredentials: true,
+    headers: { 'content-type': 'application/json', 'Accept': 'application/json', 'Cookie': cookie },
     responseType: 'json',
     //transformRequest: (data) => {
     // Do whatever you want to transform the data
@@ -38,7 +52,7 @@ function apiRequest() {
 
 let id = 0;
 export async function sendApiRequest(method: Rpc.Method, params: any): Promise<AxiosResponse> {
-  let xhr = apiRequest();
+  let xhr = await apiRequest();
   id += 1;
   let data: Rpc.Request = { jsonrpc: "2.0", method, params, id };
   return await xhr.post(serverUrl, data );

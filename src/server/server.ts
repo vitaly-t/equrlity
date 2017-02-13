@@ -77,24 +77,22 @@ let createUser = async function (ctx) {
   let rslt = { id: userId };
   ctx.userId = rslt;
   ctx.user = user;
-  let tok = jwt.sign(rslt, jwt_secret); //{expiresInMinutes: 60*24*14});
-  ctx.cookies.set('syn_user', tok);
   return rslt;
 };
 
 let authent = async function (ctx, prov, authId) {
-  console.log("authId : " + authId);
+  console.log("authent call with authId : " + authId);
   if (!authId) {
     ctx.status = 401
   } else {
-    console.log("callback authenticated " + prov);
+    console.log("authenticating for provider: " + prov);
     let user = pg.get_user_from_auth(prov, authId);
     if (user) {
       ctx.user = user;
       ctx.userId = { id: user.userId };
       if (prov !== 'ip') {
         let ip = clientIP(ctx.req);
-        console.log("uuid : " + ctx.userId.id);
+        //console.log("uuid : " + ctx.userId.id);
         let auth = { ...pg.emptyAuth(), authId: 'ip:' + ip, userId: ctx.userId.id };
         await pg.upsert_auth(auth);
       }
@@ -113,6 +111,7 @@ let authent = async function (ctx, prov, authId) {
     else ctx.userId.auth = prov + ':' + authId;
 
     let tok = jwt.sign(ctx.userId, jwt_secret); //{expiresInMinutes: 60*24*14});
+    console.log("setting cookie");
     ctx.cookies.set('syn_user', tok);
     //await ctx.login(user);   // for when passport is enabled
 
@@ -138,8 +137,9 @@ app.use(jwt.jwt({ secret: jwt_secret, cookie: 'syn_user', ignoreExpiration: true
 app.use(async function (ctx, next) {
 
   let userId = ctx['userId'];
-  let user = null;
-  if (userId) user = getUser(userId.id);
+  if (!userId) console.log("jwt returned no key");
+  let user = userId ? getUser(userId.id) : null;
+  if (userId && !user) console.log("unable to locate user for : "+userId.id);
   if (!userId || !user) {
     let ip = clientIP(ctx.req);
     await authent(ctx, 'ip', ip);
@@ -148,6 +148,10 @@ app.use(async function (ctx, next) {
   }
 
   await next();
+  ctx.set("Access-Control-Allow-Origin", "*");
+  ctx.set("Access-Control-Allow-Headers", ["X-Requested-With", "Content-Type"]);
+  ctx.set("Access-Control-Expose-Headers", ["Setx-syn-moniker", "x-syn-credits", "x-syn-authprov", "x-syn-groups"]);
+  ctx.set("Access-Control-Allow-Methods", "PUT, GET, POST, DELETE, OPTIONS");
   //console.log("setting moniker : "+ ctx.user.userName);
   user = getUser(userId.id);
   ctx.set('x-syn-moniker', user.userName);
@@ -177,8 +181,8 @@ Chrome extensions page, and select "Load unpacked extension".</p>
 
 let pluginClause = ` 
 <p>You can download the latest release of our Chrome plugin by clicking either of these links:</p> 
-   <p><a href="/synereo.zip" download >Zip file (Windows)</a></p>
-   <p><a href="/synereo.tar.gz" download >Tar.gz file (Linux  / Mac)</a></p>
+   <p><a href="/download/synereo.zip" download >Zip file (Windows)</a></p>
+   <p><a href="/download/synereo.tar.gz" download >Tar.gz file (Linux  / Mac)</a></p>
 <p>To install it you will have to unzip/untar the file into a directory, then go in to your
 Chrome extensions page, and select "Load unpacked extension".</p>
 <p>You may need to first tick the "Developer Mode" tick-box (top right) to allow unpacked extensions to load.</p>         
@@ -287,11 +291,11 @@ router.post('/rpc', async function (ctx: any) {
 });
 
 // No idea why these are necessary, but I couldn't make it work any other way ...
-router.get('/synereo.zip', async function (ctx, next) {
+router.get('/download/synereo.zip', async function (ctx, next) {
   await send(ctx, './assets/synereo-plugin.zip');
 });
 
-router.get('/synereo.tar.gz', async function (ctx, next) {
+router.get('/download/synereo.tar.gz', async function (ctx, next) {
   await send(ctx, './assets/synereo-plugin.tar.gz');
 });
 

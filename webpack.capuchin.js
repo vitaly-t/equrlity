@@ -1,6 +1,7 @@
 const webpack = require('webpack');
 const path = require('path');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
+const tgtdir = process.env.NODE_ENV === 'development' ? 'dist/capuchin_dev' : 'dist/capuchin_rel'
 
 module.exports = function (env) {
     return {
@@ -9,7 +10,7 @@ module.exports = function (env) {
             background: './src/capuchin/background.ts'
         },
         output: {
-            path: path.resolve(__dirname, 'dist/capuchin'),
+            path: path.resolve(__dirname, tgtdir),
             filename: '[name].js'
         },
         resolve: {
