@@ -9,7 +9,6 @@
   },
   "permissions": [
     "tabs",
-    "cookies",
     "https://synereo-amplitude.heroku.com/*",
     "http://localhost:8080/*",
     "webNavigation"

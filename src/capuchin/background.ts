@@ -15,6 +15,7 @@ export function currentState() {
 
 async function createKeyPairIf(keys: string[]): Promise<void> {
   if (!Crypto.checkForKeyPair(keys)) {
+    console.log("creating key pair");
     const keyPair: CryptoKeyPair = await Crypto.generateKeyPair();
     const publicKey: JsonWebKey = await Crypto.getPublicKeyJWK(keyPair);
     const privateKey: JsonWebKey = await Crypto.getPrivateKeyJWK(keyPair);
@@ -25,13 +26,21 @@ async function createKeyPairIf(keys: string[]): Promise<void> {
 
 async function initialize(): Promise<AppState> {
   console.log("initializing...");
-  let st = currentState;
+  let state = currentState();
   localForage.config({ name: 'synereo-capuchin' })
   const keys: string[] = await localForage.keys();
   await createKeyPairIf(keys);
   const publicKey = await localForage.getItem<JsonWebKey>('publicKey');
   const privateKey = await localForage.getItem<JsonWebKey>('privateKey');
-  return await handleMessage({ eventType: "Initialize", publicKey, privateKey });
+  const jwt = await localForage.getItem<string>('jwt');
+  if (!jwt) console.log("No JWT found");
+  state = {...state, publicKey, privateKey, jwt};
+  let st = await handleMessage({ eventType: "Initialize", state });
+  if (!jwt) {
+    if (!st.jwt) throw new Error("Server failed to deliver token");
+    localForage.setItem<string>('jwt', st.jwt);
+  }
+  return st;
 }
 
 chrome.runtime.onStartup.addListener(initialize);
@@ -115,7 +124,7 @@ export async function handleMessage(event: Message, async: boolean = false): Pro
         st = event.fn(st);
         break;
       case "Initialize":
-        st = await Handlers.Initialize(st, event.publicKey, event.privateKey);
+        st = await Handlers.Initialize(st, event.state);
         break;
       case "GetState":
         break;

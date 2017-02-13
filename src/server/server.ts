@@ -113,6 +113,13 @@ let authent = async function (ctx, prov, authId) {
     let tok = jwt.sign(ctx.userId, jwt_secret); //{expiresInMinutes: 60*24*14});
     console.log("setting cookie");
     ctx.cookies.set('syn_user', tok);
+
+    //@@GS - I was unable to get the plugin popup to use cookies properly
+    // so instead we send the token both as a cookie and also as a header.
+    // on receipt we will either get an Authorization: Bearer header from rpc calls, 
+    // or a normal cookie from webpages.  (Hopefully that will also work with the imminent 'Settings' page.)
+    ctx.set('x-syn-token', tok);
+
     //await ctx.login(user);   // for when passport is enabled
 
   }
@@ -132,37 +139,34 @@ app.use(bodyParser());
 //app.use(passport.session());
 //app.use(flash());
 
-app.use(jwt.jwt({ secret: jwt_secret, cookie: 'syn_user', ignoreExpiration: true, passthrough: true, key: 'userId' }));
+app.use(jwt.jwt({ secret: jwt_secret, cookie: 'syn_user', ignoreExpiration: true, key: 'userId' }));
 
 app.use(async function (ctx, next) {
 
   let userId = ctx['userId'];
   if (!userId) console.log("jwt returned no key");
   let user = userId ? getUser(userId.id) : null;
-  if (userId && !user) console.log("unable to locate user for : "+userId.id);
+  if (userId && !user) console.log("unable to locate user for : " + userId.id);
   if (!userId || !user) {
     let ip = clientIP(ctx.req);
     await authent(ctx, 'ip', ip);
-    userId = ctx['userId'];
-    user = getUser(userId.id);
   }
 
   await next();
-  ctx.set("Access-Control-Allow-Origin", "*");
-  ctx.set("Access-Control-Allow-Headers", ["X-Requested-With", "Content-Type"]);
-  ctx.set("Access-Control-Expose-Headers", ["Setx-syn-moniker", "x-syn-credits", "x-syn-authprov", "x-syn-groups"]);
-  ctx.set("Access-Control-Allow-Methods", "PUT, GET, POST, DELETE, OPTIONS");
-  //console.log("setting moniker : "+ ctx.user.userName);
+  userId = ctx['userId'];
   user = getUser(userId.id);
-  ctx.set('x-syn-moniker', user.userName);
+  ctx.set("Access-Control-Allow-Origin", "*");
+  ctx.set("Access-Control-Allow-Headers", ["X-Requested-With", "Content-Type", "Authorization"]);
+  ctx.set("Access-Control-Expose-Headers", ["x-syn-moniker", "x-syn-credits", "x-syn-token", "x-syn-authprov", "x-syn-groups"]);
+  ctx.set("Access-Control-Allow-Methods", "HEAD, PUT, GET, POST, DELETE, OPTIONS");
   ctx.set('x-syn-credits', user.ampCredits.toString());
+  ctx.set('x-syn-moniker', user.userName);
+
   if (userId.auth) {
     let auth = userId.auth;
     let prov = auth.slice(0, auth.indexOf(':'));
     let grps = ctx.user.groups || '';
-    //console.log("setting provider : "+ prov);
     ctx.set('x-syn-authprov', prov);
-    //console.log("setting groups : "+ grps);
     ctx.set('x-syn-groups', grps);
   }
   pg.touch_user(userId.id);
@@ -198,23 +202,23 @@ router.get('/link/:id', async (ctx, next) => {
 it probably means you do not have the Synereo browser plugin installed.
 </p>
 `;
- body += pluginClause;
- if (url) body += `<p>This is the link you were (probably) after: <a href="${url}">${url}</a></p>`
- ctx.body = body;
+  body += pluginClause;
+  if (url) body += `<p>This is the link you were (probably) after: <a href="${url}">${url}</a></p>`
+  ctx.body = body;
 })
 
 async function handleAddContent(userId, {publicKey, content, signature, amount}): Promise<Rpc.SendAddContentResponse> {
   let link = cache.getLinkFromContent(content);
   if (link) {
-     return {prevLink: cache.linkToUri(link.linkId)} as Rpc.AddContentAlreadyRegistered;
+    return { prevLink: cache.linkToUri(link.linkId) } as Rpc.AddContentAlreadyRegistered;
   }
   link = await pg.insert_content(userId, content, amount);
-  return {link: cache.linkToUri(link.linkId)} as Rpc.AddContentOk;
+  return { link: cache.linkToUri(link.linkId) } as Rpc.AddContentOk;
 }
 
 async function handleAmplify(userId, {publicKey, content, signature, amount}): Promise<Rpc.AddContentOk> {
   let link = await pg.amplify_content(userId, content, amount);   // need to handle errors properly here.
-  return  {link: cache.linkToUri(link.linkId)};
+  return { link: cache.linkToUri(link.linkId) };
 }
 
 router.post('/rpc', async function (ctx: any) {
@@ -263,10 +267,10 @@ router.post('/rpc', async function (ctx: any) {
         let links = cache.getChainFromContent(params.url);
         let result: Rpc.LoadLinksResponse = links.map(lnk => {
           let url = cache.linkToUri(lnk.linkId)
-          let item: Rpc.LoadLinksResponseItem = {url, hitCount: lnk.hitCount, amount: lnk.amount } 
+          let item: Rpc.LoadLinksResponseItem = { url, hitCount: lnk.hitCount, amount: lnk.amount }
           return item;
         });
-        ctx.body = {id, result };
+        ctx.body = { id, result };
         break;
       }
       case "getRedirect": {
@@ -276,12 +280,12 @@ router.post('/rpc', async function (ctx: any) {
           let linkId = cache.getLinkIdFromUrl(url);
           if (linkId) contentUrl = cache.getContentFromLinkId(linkId);
         }
-        ctx.body = contentUrl ? {id, result: {contentUrl}}
-                              : {id, error: {message: "invalid link"}}
-        break;                              
+        ctx.body = contentUrl ? { id, result: { contentUrl } }
+          : { id, error: { message: "invalid link" } }
+        break;
       }
       default:
-        if (id) ctx.body = { id, error: { code: -32601, message: "Invalid method: "+method } };
+        if (id) ctx.body = { id, error: { code: -32601, message: "Invalid method: " + method } };
     }
   }
   catch (e) {
@@ -350,8 +354,8 @@ router.all('*', async (ctx, next) => {
 <p>You have landed on the home page of Synereo Chrome plugin extension.</p>
 <p>(This page is currently in serious contention for the world's ugliest webpage!  Support our bid, vote for us!!! ... )</p>
 `
- body += pluginClause;
- ctx.body = body;
+  body += pluginClause;
+  ctx.body = body;
 })
 
 app.use(router.routes())

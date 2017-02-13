@@ -5,7 +5,7 @@
   "main": "index.ts",
   "scripts": {
     "start": "node dist/server/server.js",
-    "build": "npm run mklib && npm run mksrv && npm run mkapp",
+    "build": "npm run mklib && npm run mksrv && npm run mkapp && npm run mkrelease",
     "clean": "rimraf dist",
     "gen": "npm run mklib && node src/scripts/gentypes.js",
     "mkapp": "webpack --config webpack.capuchin.js",

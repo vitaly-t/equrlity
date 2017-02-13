@@ -12,8 +12,7 @@ export interface Save {
 
 export interface Initialize {
   eventType: "Initialize";
-  publicKey: JsonWebKey;
-  privateKey: JsonWebKey;
+  state: AppState;
 }
 
 export interface GetState {
@@ -67,8 +66,11 @@ function currentTab(): Promise<chrome.tabs.Tab> {
 function extractHeadersToState(st: AppState, rsp: AxiosResponse): AppState {
   let ampCredits = parseInt(rsp.headers['x-syn-credits']);
   let moniker = rsp.headers['x-syn-moniker'];
+  let jwt = rsp.headers['x-syn-token'];
+  if (jwt && st.jwt) throw new Error("Unexpected token received");
+  if (!st.jwt && !jwt) throw new Error("Expected token but none received");
   let responses = [...st.responses, rsp];
-  return { ...st, responses, ampCredits, moniker };
+  return { ...st, responses, ampCredits, moniker, jwt };
 }
 
 export namespace AsyncHandlers {
@@ -84,7 +86,7 @@ export namespace AsyncHandlers {
     }
     let src = state.activeUrl;
     let url = expandedUrl(state, src);
-    let response = await Comms.sendAddContent(state.privateKey, state.publicKey, url, amount)
+    let response = await Comms.sendAddContent(state, url, amount)
     let thunk = (st: AppState) => {
       let rsp: Rpc.Response = response.data;
       if (rsp.error) throw new Error("Server returned error: " + rsp.error.message);
@@ -106,7 +108,7 @@ export namespace AsyncHandlers {
   }
 
   export async function GetRedirect(state: AppState, curl: string): Promise<(st: AppState) => AppState> {
-    let response = await Comms.sendGetRedirect(curl);
+    let response = await Comms.sendGetRedirect(state, curl);
     let tab = await currentTab();
     return (st: AppState) => {
       let rsp : Rpc.Response = response.data;
@@ -133,7 +135,7 @@ export namespace AsyncHandlers {
     }
     if (isSeen(state, curl)) return (st => { return { ...st, activeUrl: curl }; });
     if (isSynereoLink(parse(curl))) return GetRedirect(state,curl)
-    let response = await Comms.sendLoadLinks(state.publicKey, curl);
+    let response = await Comms.sendLoadLinks(state, curl);
     let thunk = (st: AppState) => {
       let rsp : Rpc.Response = response.data;
       if (rsp.error) throw new Error("Server returned error: " + rsp.error.message);
@@ -151,11 +153,12 @@ export namespace AsyncHandlers {
 
 export namespace Handlers {
 
-  export async function Initialize(state: AppState, publicKey: JsonWebKey, privateKey: JsonWebKey): Promise<AppState> {
-    const rsp = await Comms.sendInitialize(publicKey)
-    let st = extractHeadersToState(state, rsp);
+  export async function Initialize(init: AppState, state_: AppState): Promise<AppState> {
+    let state = {...init, ...state_};
+    const rsp = await Comms.sendInitialize(state)
+    state = extractHeadersToState(state, rsp);
     let activeTab = await currentTab()
-    return { ...st, publicKey, privateKey, activeTab }
+    return { ...state, activeTab }
   }
 
 }

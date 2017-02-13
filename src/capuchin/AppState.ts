@@ -9,13 +9,14 @@ export interface AppState {
   activeUrl: string | null;
   moniker: string;
   ampCredits: number;
+  jwt: string;
 }
 
 export function initState(): AppState {
   console.log("initState called");
   return { publicKey: null, privateKey: null, responses: [], 
            links: Object.create(null), redirects: Object.create(null), 
-           activeUrl: null, moniker: 'unknown', ampCredits: 0 };
+           activeUrl: null, moniker: 'unknown', ampCredits: 0, jwt: '' };
 }
 
 export function isLinked(state: AppState, curl: string): boolean {
