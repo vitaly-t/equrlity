@@ -19,3 +19,4 @@ dist/
 *.crx
 *.pem
 *.zip
+//*.tar.gz

@@ -11,15 +11,15 @@ export function jwt(opts): (cxt: Koa.Context, next: () => Promise<any>) => any {
   assert(opts.secret, '"secret" option is required');
 
   return async function (ctx: Koa.Context, next: () => Promise<any>) {
-    var token, msg, user, parts, scheme, credentials, ignoreExp;
+    var token, user;
 
     if (opts.cookie) token = ctx.cookies.get(opts.cookie);
     if (!token) {
       if (ctx.header.authorization) {
-        parts = ctx.header.authorization.split(' ');
+        let parts = ctx.header.authorization.split(' ');
         if (parts.length == 2) {
-          scheme = parts[0];
-          credentials = parts[1];
+          let scheme = parts[0];
+          let credentials = parts[1];
 
           if (/^Bearer$/i.test(scheme)) {
             token = credentials;
@@ -31,12 +31,18 @@ export function jwt(opts): (cxt: Koa.Context, next: () => Promise<any>) => any {
     try {
       user = JWT.verify(token, opts.secret, opts);
     } catch (e) {
-      console.log( 'Invalid token : ' + e.message);
+      console.log('Invalid token : ' + e.message);
     }
 
-    if (!user) console.log("No user verified");
-    ctx[opts.key] = user;
-    ctx['token'] = token;
+    if (!user) {
+      console.log("No user verified");
+      ctx[opts.key] = null;
+    }
+    else {
+      console.log("user verified")
+      ctx[opts.key] = user;
+      ctx['token'] = token;
+    }
     await next();
   };
 };

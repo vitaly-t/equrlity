@@ -9,7 +9,7 @@ import * as session from 'koa-session';
 import * as Router from 'koa-router';
 import * as OxiDate from '../lib/oxidate';
 import * as uuid from '../lib/uuid.js';
-import * as jwt from '../lib/jwt';
+import * as jwt from './jwt';
 //import passport from './auth';
 //import * as koastatic from 'koa2-static-files';
 import serve from './koa-static';
@@ -113,12 +113,8 @@ let authent = async function (ctx, prov, authId) {
     let tok = jwt.sign(ctx.userId, jwt_secret); //{expiresInMinutes: 60*24*14});
     console.log("setting cookie");
     ctx.cookies.set('syn_user', tok);
+    ctx['token'] = tok;
 
-    //@@GS - I was unable to get the plugin popup to use cookies properly
-    // so instead we send the token both as a cookie and also as a header.
-    // on receipt we will either get an Authorization: Bearer header from rpc calls, 
-    // or a normal cookie from webpages.  (Hopefully that will also work with the imminent 'Settings' page.)
-    ctx.set('x-syn-token', tok);
 
     //await ctx.login(user);   // for when passport is enabled
 
@@ -127,14 +123,12 @@ let authent = async function (ctx, prov, authId) {
 
 app.keys = ['foo'];
 
-//let serve = koastatic("./assets", { defer: true });
 //app.use(koastatic.static(__dirname + '/assets')); 
-//console.log("__dirname: "+__dirname);
 //app.use(serve("assets", "./assets"));
 
 app.use(bodyParser());
-//app.use(session(app));
 
+//app.use(session(app));
 //app.use(passport.initialize());
 //app.use(passport.session());
 //app.use(flash());
@@ -179,7 +173,9 @@ let pluginClause = `
    <p><a href="assets/synereo-plugin.tar.gz" download >Tar.gz file (Linux  / Mac)</a></p>
 <p>To install it you will have to unzip/untar the file into a directory, then go in to your
 Chrome extensions page, and select "Load unpacked extension".</p>
-<p>You may need to first tick the "Developer Mode" tick-box (top right) to allow unpacked extensions to load.</p>         
+<p>You may need to first tick the "Developer Mode" box (top right) to allow unpacked extensions to load. 
+If you wish, you can also untick it after installing/upgrading the extension.
+</p>         
 `;
 */
 
@@ -189,8 +185,9 @@ let pluginClause = `
    <p><a href="/download/synereo.tar.gz" download >Tar.gz file (Linux  / Mac)</a></p>
 <p>To install it you will have to unzip/untar the file into a directory, then go in to your
 Chrome extensions page, and select "Load unpacked extension".</p>
-<p>You may need to first tick the "Developer Mode" tick-box (top right) to allow unpacked extensions to load.</p>         
-<p>To upgrade an existing install, simply overwrite the old install with the new, and select "Reload" in the extensions page.</p>         
+<p>You may need to first tick the "Developer Mode" box (top right) to allow unpacked extensions to load. 
+If you wish, you can also untick it after installing the extension.)</p>         
+<p>To upgrade an existing installation, simply overwrite the existing files with the new ones, and select "Reload" in the extensions page.</p>         
 `;
 
 router.get('/link/:id', async (ctx, next) => {
@@ -223,6 +220,14 @@ async function handleAmplify(userId, {publicKey, content, signature, amount}): P
 
 router.post('/rpc', async function (ctx: any) {
   let {jsonrpc, method, params, id} = ctx.request.body;  // from bodyparser 
+  if (!ctx.header.authorization) {
+      //@@GS - I was unable to get the plugin popup to use cookies properly
+    // so instead we send the token both as a cookie and also as a header.
+    // on receipt we will either get an Authorization: Bearer header from rpc calls, 
+    // or a normal cookie from webpages.  (Hopefully that will also work with the imminent 'Settings' page.)
+    ctx.set('x-syn-token', ctx['token']);
+  }
+
   if (jsonrpc != "2.0") {
     if (id) ctx.body = { id, error: { code: -32600, message: "Invalid version" } };
     return;
