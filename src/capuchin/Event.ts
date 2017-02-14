@@ -69,6 +69,7 @@ function extractHeadersToState(st: AppState, rsp: AxiosResponse): AppState {
   let jwt = rsp.headers['x-syn-token'];
   if (jwt && st.jwt) throw new Error("Unexpected token received");
   if (!st.jwt && !jwt) throw new Error("Expected token but none received");
+  if (!jwt) jwt = st.jwt;
   let responses = [...st.responses, rsp];
   return { ...st, responses, ampCredits, moniker, jwt };
 }

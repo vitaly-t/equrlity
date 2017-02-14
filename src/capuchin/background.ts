@@ -40,6 +40,7 @@ async function initialize(): Promise<AppState> {
     if (!st.jwt) throw new Error("Server failed to deliver token");
     localForage.setItem<string>('jwt', st.jwt);
   }
+  else if (jwt !== st.jwt) throw new Error("Unexpected update to token");
   return st;
 }
 

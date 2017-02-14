@@ -61,8 +61,6 @@ function readFileAsync(src: string): Promise<string> {
 
 let createUser = async function (ctx) {
   let o = cache.users;
-  //console.log("user count : "+o.count);
-  //console.log(JSON.stringify(userId));
   let i = o.size;
   let userName = ''
   while (true) {
@@ -92,7 +90,6 @@ let authent = async function (ctx, prov, authId) {
       ctx.userId = { id: user.userId };
       if (prov !== 'ip') {
         let ip = clientIP(ctx.req);
-        //console.log("uuid : " + ctx.userId.id);
         let auth = { ...pg.emptyAuth(), authId: 'ip:' + ip, userId: ctx.userId.id };
         await pg.upsert_auth(auth);
       }
@@ -103,7 +100,6 @@ let authent = async function (ctx, prov, authId) {
         await createUser(ctx);
       }
       user = ctx.user;
-      console.log("create auth for : " + user.userName);
       let auth = { ...pg.emptyAuth(), authId: prov + ':' + authId, userId: ctx.userId.id }
       await pg.upsert_auth(auth);
     }
@@ -111,13 +107,9 @@ let authent = async function (ctx, prov, authId) {
     else ctx.userId.auth = prov + ':' + authId;
 
     let tok = jwt.sign(ctx.userId, jwt_secret); //{expiresInMinutes: 60*24*14});
-    console.log("setting cookie");
-    ctx.cookies.set('syn_user', tok);
     ctx['token'] = tok;
 
-
     //await ctx.login(user);   // for when passport is enabled
-
   }
 };
 
@@ -133,7 +125,20 @@ app.use(bodyParser());
 //app.use(passport.session());
 //app.use(flash());
 
-app.use(jwt.jwt({ secret: jwt_secret, cookie: 'syn_user', ignoreExpiration: true, key: 'userId' }));
+app.use(async (ctx, next) => {
+  try {
+    await next();
+  } catch (err) {
+    ctx.status = 400;
+    ctx.body = {
+      message: 'Unhandled error',
+      error: err
+    };
+  }
+})
+
+
+app.use(jwt.jwt({ secret: jwt_secret, ignoreExpiration: true, key: 'userId' }));
 
 app.use(async function (ctx, next) {
 
@@ -225,6 +230,7 @@ router.post('/rpc', async function (ctx: any) {
     // so instead we send the token both as a cookie and also as a header.
     // on receipt we will either get an Authorization: Bearer header from rpc calls, 
     // or a normal cookie from webpages.  (Hopefully that will also work with the imminent 'Settings' page.)
+    console.log("sending token");
     ctx.set('x-syn-token', ctx['token']);
   }
 
