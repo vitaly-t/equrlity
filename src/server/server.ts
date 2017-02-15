@@ -224,22 +224,22 @@ async function handleAmplify(userId, {publicKey, content, signature, amount}): P
 }
 
 async function changeMoniker(id: Dbt.userId, newName: string): Promise<boolean> {
-          console.log("setting new Moniker : " + newName);
-        if (checkMonikerUsed(newName)) return false;
-          let prv = cache.users[id];
-          let usr = { ...prv, userName: newName };
-          console.log("updating user : " + JSON.stringify(usr));
-          let updt = await pg.upsert_user(usr);
-          console.log("user updated : " + JSON.stringify(updt));
-          cache.users.set(id, usr);
-          return true;
+  console.log("setting new Moniker : " + newName);
+  if (checkMonikerUsed(newName)) return false;
+  let prv = cache.users[id];
+  let usr = { ...prv, userName: newName };
+  console.log("updating user : " + JSON.stringify(usr));
+  let updt = await pg.upsert_user(usr);
+  console.log("user updated : " + JSON.stringify(updt));
+  cache.users.set(id, usr);
+  return true;
 
 }
 
 router.post('/rpc', async function (ctx: any) {
   let {jsonrpc, method, params, id} = ctx.request.body;  // from bodyparser 
   if (!ctx.header.authorization) {
-      //@@GS - I was unable to get the plugin popup to use cookies properly
+    //@@GS - I was unable to get the plugin popup to use cookies properly
     // so instead we send the token both as a cookie and also as a header.
     // on receipt we will either get an Authorization: Bearer header from rpc calls, 
     // or a normal cookie from webpages.  (Hopefully that will also work with the imminent 'Settings' page.)
@@ -273,8 +273,8 @@ router.post('/rpc', async function (ctx: any) {
       case "changeMoniker": {
         let newName = ctx.body.userName;  // from bodyparser 
         let ok = await changeMoniker(ctx.userId.id, newName);
-        if (ok)  ctx.body = { id, result: { ok: true } };
-        else  ctx.body = { id, error: {message: "taken"} };
+        if (ok) ctx.body = { id, result: { ok: true } };
+        else ctx.body = { id, error: { message: "taken" } };
         break;
       }
       case "loadLinks": {
@@ -307,16 +307,16 @@ router.post('/rpc', async function (ctx: any) {
             ctx.body = { id, error: { message: "Nickname not available" } };
             return;
           }
-          usr = {...usr, userName: moniker};
+          usr = { ...usr, userName: moniker };
         }
         let idep = parseInt(deposit);
         if (idep > 0) {
           let ampCredits = usr.ampCredits + idep;
-          usr = {...usr, ampCredits};
+          usr = { ...usr, ampCredits };
         }
-        if (email) usr = {...usr, email};
+        if (email) usr = { ...usr, email };
         await pg.upsert_user(usr);
-        ctx.body = {id, result: {ok: true}};
+        ctx.body = { id, result: { ok: true } };
         break;
       }
       default:

@@ -66,7 +66,7 @@ export class PopupPanel extends React.Component<PopupPanelProps, PopupPanelState
         let cancelAction = () => chrome.runtime.sendMessage({ eventType: "SetMode", mode: "Amplify" });
         let frm = (<Form
           fields={[
-            { name: 'Nickname', key: 'moniker', type: 'text', required: false },
+            { name: 'Nickname', key: 'moniker', type: 'text', required: false, placeholder: st.moniker },
             { name: 'Deposit', key: 'deposit', type: 'number', max: '1000', step: '10', required: false },
             { name: 'Email', key: 'email', type: 'email', required: false }
           ]}

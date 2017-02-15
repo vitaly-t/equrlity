@@ -10,6 +10,10 @@ export type AddContentRequest = {
   amount: Integer;
 }
 
+export type InitializeRequest = {
+  publicKey: JsonWebKey;
+}
+
 export type AddContentOk = {
   link: UrlString;
 }      

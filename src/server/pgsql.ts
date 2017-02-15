@@ -80,6 +80,7 @@ export namespace DbCache {
           AND table_name   = '${t.name}'`);
         t.rowType.heading.forEach(async c => {
           if (cols.findIndex(v => v.column_name === c.name) < 0) {
+            console.log(`Adding column ${c.name} to table ${t.name}`);
             let stmt = `ALTER TABLE "${t.name}" ADD COLUMN "${c.name}" ${c.type.sqlType} `;
             await db.none(stmt);
           }
