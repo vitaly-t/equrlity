@@ -1,41 +1,89 @@
 import * as React from 'react';
 import { AppState, expandedUrl, isWaiting, isLinked } from "../AppState";
 import { Url, format } from 'url';
-import { SaveButton } from "./SaveButton";
 import { serverUrl } from '../Comms';
+import Form from 'react-input';
+import * as Rpc from '../../lib/rpc'
 
 export interface PopupPanelProps { appState?: AppState; serverMessage?: string };
+export interface PopupPanelState { amplifyAmount: number };
 
-export const PopupPanel = (props: PopupPanelProps) => {
-  if (props.serverMessage) {
-    console.log("rendering server message...");
-    return <div>Server error: {props.serverMessage} </div>;
+export class PopupPanel extends React.Component<PopupPanelProps, PopupPanelState> {
+
+  constructor(props) {
+    super(props);
+    this.state = { amplifyAmount: 20 };
   }
-  let st = props.appState;
-  let curl = st.activeUrl
-  if (curl && isWaiting(st, curl)) {
-    console.log("rendering waiting for response...");
-    return <div>Waiting for response from Server</div>;
+
+  ctrls: { amountInput?: HTMLInputElement } = {}
+
+  changeAmplifyAmount() {
+    this.setState({amplifyAmount: parseInt(this.ctrls.amountInput.value) });
   }
-  console.log("rendering popup...");
-  let pnl = <div>Internal error - no active URL found</div>
-  if (curl) {
-    let tgt = expandedUrl(st);
-    console.log("rendering for target :" + tgt);
-    
-    let lbl = isLinked(st, curl) ? "Re-Amplify" : "Amplify";
-    let amount = 20;  // need to receive this from the UI
-    let action = () => chrome.runtime.sendMessage({ eventType: "Save", amount, async: true });
-    pnl = (<div>
-      <p>Investment amount: {amount} </p>
-      <p>Target : {tgt}</p>
-      <SaveButton action={action} label={lbl} />
-      <p>Using Server Url: {serverUrl} </p>
-    </div>);
+
+  render() {
+    let props = this.props;
+    if (props.serverMessage) {
+      console.log("rendering server message...");
+      return <div>Server error: {props.serverMessage} </div>;
+    }
+    let st = props.appState;
+    let curl = st.activeUrl
+    if (curl && isWaiting(st, curl)) {
+      console.log("rendering waiting for response...");
+      return <div>Waiting for response from Server</div>;
+    }
+    console.log("rendering popup...");
+    switch (st.mode) {
+      case "Amplify": {
+        let pnl = <div>No active URL found</div>
+        if (curl) {
+          let tgt = expandedUrl(st);
+          console.log("rendering for target :" + tgt);
+
+          let lbl = isLinked(st, curl) ? "Re-Amplify" : "Amplify";
+          let saveaction = () => {
+            let amount = this.state.amplifyAmount;
+            chrome.runtime.sendMessage({ eventType: "Save", amount, async: true });
+          }
+          pnl = (<div>
+            <p>Target : {tgt}</p>
+            <p>Investment amount: <input type="number" ref={(e) => this.ctrls.amountInput = e} 
+                                value={this.state.amplifyAmount} onChange={(e) => this.changeAmplifyAmount() } /></p>
+            <button onClick={saveaction} >{lbl}</button>
+          </div>);
+        }
+        let settingsAction = () => chrome.runtime.sendMessage({ eventType: "SetMode", mode: "Settings" });
+        return <div>
+          <p>Using Server Url: {serverUrl} </p>
+          <p>Your Synereo Nickname is: {st.moniker}</p>
+          <p>Your current Amp Balance is: {st.ampCredits}</p>
+          <p><button onClick={settingsAction}>Change Settings</button></p>
+          {pnl}
+        </div>
+      }
+      case "Settings": {
+        let cancelAction = () => chrome.runtime.sendMessage({ eventType: "SetMode", mode: "Amplify" });
+        let frm = (<Form
+          fields={[
+            { name: 'Nickname', key: 'moniker', type: 'text', required: false },
+            { name: 'Deposit', key: 'deposit', type: 'number', max: '1000', step: '10', required: false },
+            { name: 'Email', key: 'email', type: 'email', required: false }
+          ]}
+          onSubmit={(settings: Rpc.ChangeSettingsRequest) => {
+            console.log("onSubmit fired");
+            chrome.runtime.sendMessage({ eventType: "ChangeSettings", settings });
+
+          }}
+        />)
+        return <div>
+          <h3>Your Settings:</h3>
+          {frm}
+          <button onClick={cancelAction}>Abandon Changes</button>
+          <p>This form brought to you by UglyAsF*ck Enterprises.  All rights reserved</p>
+        </div>;
+
+      }
+    }
   }
-  return <div>
-    <p>Your Synereo Moniker is: {st.moniker}</p>
-    <p>Your current Amp Balance is: {st.ampCredits}</p>
-    {pnl}
-  </div>
 }

@@ -7,6 +7,12 @@ The backend (server) uses Typescript, NodeJS and PostgreSQL.
 The project supports (assumes?) the use of the excellent (and free) Visual Studio Code development tool,
 and includes configuration files for that tool.
 
+## Testing current prototype
+
+To experiment, visit: [Synereo Test Prototype](https://synereo-amplitude.herokuapp.com).
+
+There you will be able download the plugin, and instructions are provided as to installing and running it.
+
 ## Build Dependencies
 
 * [Git](https://git-scm.com/)

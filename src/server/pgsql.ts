@@ -68,6 +68,24 @@ export namespace DbCache {
       await createDataTables();
       console.log(" ... finished creating data tables");
     }
+    oxb.tables.forEach(async t => {
+      if (tbls.findIndex(v => v.table_name === t.name) < 0) {
+        let stmt = OxiGen.genCreateTableStatement(t);
+        await db.none(stmt);
+      }
+      else {
+        let cols: Array<any> = await db.any(`
+          SELECT column_name FROM information_schema.columns
+          WHERE table_schema = 'public'
+          AND table_name   = '${t.name}'`);
+        t.rowType.heading.forEach(async c => {
+          if (cols.findIndex(v => v.column_name === c.name) < 0) {
+            let stmt = `ALTER TABLE "${t.name}" ADD COLUMN "${c.name}" ${c.type.sqlType} `;
+            await db.none(stmt);
+          }
+        })
+      }
+    })
 
     let userRows: Array<Dbt.User> = await db.any("select * from users;");
     users.clear();

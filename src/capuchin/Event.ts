@@ -1,4 +1,5 @@
-import { AppState, initState, setLink, expandedUrl, isSeen, setLoading, getRedirectUrl, prepareUrl, isSynereoLink } from './AppState';
+import { AppState, initState, setLink, expandedUrl, isSeen, setLoading, 
+        getRedirectUrl, prepareUrl, isSynereoLink, PopupMode } from './AppState';
 import * as Comms from './Comms';
 import { Url, parse, format } from 'url';
 import { AxiosResponse } from 'axios';
@@ -39,7 +40,17 @@ export interface Thunk {
   fn: (st: AppState) => AppState;
 }
 
-export type Message = Save | Initialize | GetState | Load | ActivateTab | Render | Thunk
+export interface SetMode {
+  eventType: "SetMode";
+  mode: PopupMode;
+}
+
+export interface ChangeSettings {
+  eventType: "ChangeSettings";
+  settings: Rpc.ChangeSettingsRequest;
+}
+
+export type Message = Save | Initialize | GetState | Load | ActivateTab | Render | SetMode | ChangeSettings | Thunk 
 
 export function getTab(tabId: number): Promise<chrome.tabs.Tab> {
   return new Promise((resolve, reject) => {
@@ -160,6 +171,14 @@ export namespace Handlers {
     state = extractHeadersToState(state, rsp);
     let activeTab = await currentTab()
     return { ...state, activeTab }
+  }
+
+  export async function ChangeSettings(state: AppState, settings: Rpc.ChangeSettingsRequest): Promise<AppState> {
+    const response = await Comms.sendChangeSettings(state, settings);
+    let rsp : Rpc.Response = response.data;
+    if (rsp.error) throw new Error("Server returned error: " + rsp.error.message);
+    state = extractHeadersToState(state, response);
+    return state;
   }
 
 }

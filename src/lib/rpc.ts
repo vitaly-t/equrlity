@@ -1,4 +1,4 @@
-export type Method = "addContent" | "initialize" | "changeMoniker" | "loadLinks" | "getRedirect" ;
+export type Method = "addContent" | "initialize" | "changeMoniker" | "loadLinks" | "getRedirect" | "changeSettings";
 
 export type UrlString = string;
 export type Integer = number;
@@ -37,6 +37,14 @@ export type LoadLinksResponse = Array<LoadLinksResponseItem>;
 export type GetRedirectRequest = { linkUrl: UrlString; }
 
 export type GetRedirectResponse = { contentUrl: UrlString; }
+
+export type ChangeSettingsRequest = {
+  moniker: string;
+  deposit: Integer;
+  email: string;
+}
+
+export type ChangeSettingsResponse = { ok: boolean; }
 
 export type Request = {
    jsonrpc: string, 

@@ -32,6 +32,10 @@ export default {
       "tsType": "Date",
       "sqlType": "date"
     },
+    "email": {
+      "tsType": "string",
+      "sqlType": "varchar(160)"
+    },
     "integer": {
       "tsType": "number",
       "sqlType": "integer"
@@ -112,6 +116,7 @@ export default {
       "userId",
       "publicKey",
       "userName",
+      "email",
       { "name": "ampCredits", "type": "integer" },
       { "name": "created", "type": "timestamp" },
       { "name": "updated", "type": "timestamp" },

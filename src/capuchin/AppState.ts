@@ -1,5 +1,7 @@
 import { Url, format, parse } from 'url';
 
+export type PopupMode = "Amplify" | "Settings";
+
 export interface AppState {
   publicKey: JsonWebKey | null;
   privateKey: JsonWebKey | null;
@@ -10,13 +12,14 @@ export interface AppState {
   moniker: string;
   ampCredits: number;
   jwt: string;
+  mode: PopupMode;
 }
 
 export function initState(): AppState {
   console.log("initState called");
   return { publicKey: null, privateKey: null, responses: [], 
            links: Object.create(null), redirects: Object.create(null), 
-           activeUrl: null, moniker: 'unknown', ampCredits: 0, jwt: '' };
+           activeUrl: null, moniker: 'unknown', ampCredits: 0, jwt: '', mode: "Amplify" };
 }
 
 export function isLinked(state: AppState, curl: string): boolean {

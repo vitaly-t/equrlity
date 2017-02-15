@@ -129,6 +129,13 @@ export async function handleMessage(event: Message, async: boolean = false): Pro
         break;
       case "GetState":
         break;
+      case "SetMode":
+        st = {...st, mode: event.mode};
+        break;  
+      case "ChangeSettings":
+        st = await Handlers.ChangeSettings(st, event.settings);
+        st = {...st, mode: "Amplify"};
+        break;  
     }
     storeState(st);
   }

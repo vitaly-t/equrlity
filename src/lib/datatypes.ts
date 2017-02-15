@@ -7,6 +7,7 @@ export type contentId = number;
 export type contentCryptId = ArrayBuffer;
 export type contentType = "url" | "yt_video" | "text" | "mp3";
 export type date = Date;
+export type email = string;
 export type integer = number;
 export type json = string;
 export type linkId = number;
@@ -24,6 +25,7 @@ export interface User {
   readonly userId: userId | null,
   readonly publicKey: publicKey | null,
   readonly userName: userName | null,
+  readonly email: email | null,
   readonly ampCredits: integer | null,
   readonly created: timestamp | null,
   readonly updated: timestamp | null,

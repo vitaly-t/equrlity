@@ -82,3 +82,7 @@ export async function sendLoadLinks(st: AppState, url: string): Promise<AxiosRes
 export async function sendGetRedirect(st: AppState, linkUrl: string): Promise<AxiosResponse> {
   return await sendApiRequest(st, "getRedirect", { linkUrl });
 }
+
+export async function sendChangeSettings(st: AppState, settings: Rpc.ChangeSettingsRequest): Promise<AxiosResponse> {
+  return await sendApiRequest(st, "changeSettings", settings);
+}
