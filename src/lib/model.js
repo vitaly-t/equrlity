@@ -121,13 +121,31 @@ export default {
       { "name": "created", "type": "timestamp" },
       { "name": "updated", "type": "timestamp" },
       { "name": "groups", "type": "userGroup", "multiValued": true }
+    ],
+    "UserLink": [
+      { "name": "user_A", "type": "userId"},
+      { "name": "user_B", "type": "userId"},
+      { "name": "hitCount", "type": "integer" },
+      { "name": "created", "type": "timestamp" },
+      { "name": "updated", "type": "timestamp" },
     ]
+
   },
   "tables": {
     "users": {
       "rowType": "User",
       "primaryKey": [ "userId" ],
     },
+    /*  we will calculate these from the links table for the moment
+    "userlinks": {
+      "rowType": "UserLink",
+      "primaryKey": [ "user_A", "user_B" ],
+      "foreignKeys": [
+        { "ref": "users", "columns": [ "user_A" ] },
+        { "ref": "users", "columns": [ "user_B" ] },
+      ]
+    },
+    */
     "auths": {
       "rowType": "Auth",
       "primaryKey": [ "authId" ],
@@ -155,6 +173,7 @@ export default {
         { "ref": "contents", "columns": [ "contentId" ]  },
         { "ref": "links", "columns": [ "prevLink" ] },
       ],
+      "uniques": [ [ "contentId", "userId" ] ],
     },
   }
 }

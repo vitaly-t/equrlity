@@ -32,8 +32,16 @@ export interface User {
   readonly groups: userGroup[] | null
 };
 
+export interface UserLink {
+  readonly user_A: userId | null,
+  readonly user_B: userId | null,
+  readonly hitCount: integer | null,
+  readonly created: timestamp | null,
+  readonly updated: timestamp | null
+};
+
 export interface Auth {
-  readonly authId: authId | null,
+  readonly authId: authId | null,  
   readonly userId: userId | null,
   readonly created: timestamp | null,
   readonly updated: timestamp | null

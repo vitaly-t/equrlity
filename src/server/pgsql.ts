@@ -12,7 +12,6 @@ import * as pgPromise from 'pg-promise';
 import * as Dbt from '../lib/datatypes'
 import * as OxiGen from '../lib/oxigen';
 
-
 // your protocol extensions:
 //interface IExtensions {
 //    findUser(userId: number): Promise<any>;
@@ -50,11 +49,13 @@ if (!connectUrl.startsWith('postgres:')) connectUrl = 'postgres:' + connectUrl;
 export const db: IDatabase<any> = pgp(connectUrl);
 
 export namespace DbCache {
+
   // ahem ... cache the whole db in memory 
   export const users = new Map<Dbt.userId, Dbt.User>();
   export const auths = new Map<Dbt.authId, Dbt.Auth>();
   export const contents = new Map<Dbt.contentId, Dbt.Content>();
   export const links = new Map<Dbt.linkId, Dbt.Link>();
+  export const userlinks = new Map<Dbt.userId, Dbt.userId[] >();
   export let linkRows: Array<Dbt.Link> = [];
   export const domain = isDev() ? 'localhost:8080' : process.env.AMPLITUDE_DOMAIN;
   export function isSynereo(url: Url): boolean {
@@ -62,6 +63,7 @@ export namespace DbCache {
   }
 
   export async function init() {
+
     let tbls: Array<any> = await db.any("select table_name from information_schema.tables where table_schema = 'public'");
     if (tbls.length == 0) {
       console.log("Creating data tables");
@@ -102,8 +104,13 @@ export namespace DbCache {
 
     linkRows = await db.any("select * from links order by \"linkId\" desc");
     links.clear();
-    linkRows.forEach(r => links.set(r.linkId, r));
+    linkRows.forEach(r => {
+       links.set(r.linkId, r);
+    //  if (!userlinks.has(r.userId))
+    });
 
+    // maybe later ...
+    //let userlinks: Array<Dbt.UserLink> = await db.any("select * from userlinks");
   }
 
   export function getChainFromLinkId(linkId: Dbt.linkId): Array<Dbt.Link> {
@@ -117,12 +124,13 @@ export namespace DbCache {
   }
 
   export function getChainFromContent(content: Dbt.content): Array<Dbt.Link> {
-    let id = contentIdFromContent(content);
+    let id = getContentIdFromContent(content);
     if (!id) return [];
     let link = linkRows.find(l => l.contentId == id);
     if (!link) return [];
     return getChainFromLinkId(link.linkId);
   }
+
   export function getContentFromLinkId(linkId: Dbt.linkId): string | null {
     let link = links.get(linkId);
     if (!link) return null;
@@ -131,15 +139,21 @@ export namespace DbCache {
     return content.content;
   }
 
-  export function getLinkFromContent(content: string): Dbt.Link | null {
-    let id = contentIdFromContent(content);
-    if (!id) return null;
+  export function getContentIdFromLinkId(linkId: Dbt.linkId): Dbt.contentId | null {
+    let link = links.get(linkId);
+    if (!link) return null;
+    let content = contents.get(link.contentId);
+    if (!content) return null;
+    return content.contentId;
+  }
+
+  export function getLatestLinkFromContentId(id: Dbt.contentId): Dbt.Link | null {
     let link = linkRows.find(l => l.contentId == id);
     if (!link) return null;
     return link;
   }
 
-  export function contentIdFromContent(content: string): Dbt.contentId | null {
+  export function getContentIdFromContent(content: string): Dbt.contentId | null {
     let result = null;
     for (const [k, v] of contents) {
       if (v.content === content) {
@@ -149,14 +163,20 @@ export namespace DbCache {
     }
     return result;
   }
-
-  export function isContentKnown(content: string): boolean {
-    return contentIdFromContent != null;
+  
+  export async function getLinkAlreadyInvestedIn(userId: Dbt.userId, contentId: Dbt.contentId): Promise<Dbt.linkId | null> {
+    let recs = await db.oneOrNone(`select "linkId" from links where "contentId" = ${contentId} and "userId" = ${userId}` );
+    if (recs.length > 0) return recs[0].linkId;
+    return null;
   }
 
-  export function linkToUri(linkId: Dbt.linkId): string {
+  export function isContentKnown(content: string): boolean {
+    return getContentIdFromContent(content) != null;
+  }
+
+  export function linkToUrl(linkId: Dbt.linkId): string {
     let content = getContentFromLinkId(linkId);
-    return "http://" + domain + "/link/" + linkId.toString() + "#" + content
+    return (isDev() ? "http://" : "https://" ) + domain + "/link/" + linkId.toString() + "#" + content
   }
 
   export function getLinkIdFromUrl(url: Url): Dbt.linkId {
@@ -166,6 +186,55 @@ export namespace DbCache {
     return linkId;
   }
 
+  export async function payForView(viewerId: Dbt.userId, viewedLinkId: Dbt.linkId): Promise<Dbt.integer> {
+    //@@GS  thought long and hard about using a transaction here, but couldn't see
+    // a way of doing it safely without locking the whole cache or similar.
+    // given the small amounts involved I figured this would probably be ok.
+    let links = getChainFromLinkId(viewedLinkId);
+    let viewedLink = links[0];
+    let bal = viewedLink.amount;
+    if (bal == 0) return bal
+
+    // is viewer already in links?
+    if (links.findIndex(l => l.userId == viewerId) >= 0) return bal;
+
+    // viewer gets paid 1
+    let viewer = users.get(viewerId);
+    let ampCredits = viewer.ampCredits + 1;
+    viewer = { ...viewer, ampCredits }
+    await updateRecord("users", viewer);
+    bal -= 1
+
+    // each link in the parent chain gets paid 1
+    let stmt = OxiGen.genUpdateStatement(oxb.tables.get("links"), {linkId: 0, amount: 0});
+    let l = links.length - 1
+    while (bal > 0 && l > 0) {
+      let {linkId, amount} = links[l];
+      amount += 1;
+      try {
+        await db.none(stmt, {linkId, amount});
+        bal -= 1;
+      }
+      catch (e) {
+        console.log("error updating link: "+e.message);
+      }
+      l -= 1;
+    }
+    await db.none(stmt, {linkId: viewedLinkId, amount: bal});
+  }
+
+}
+
+export async function updateRecord(tblnm: string, rec: Object): Promise<void> {
+  let tbl = oxb.tables.get(tblnm);
+  let stmt = OxiGen.genUpdateStatement(tbl, rec);
+  await db.none(stmt, rec);
+}
+
+export async function insertRecord(tblnm: string, rec: Object): Promise<any> {
+  let tbl = oxb.tables.get(tblnm);
+  let stmt = OxiGen.genInsertStatement(tbl, rec);
+  return await db.one(stmt, rec);
 }
 
 export function query(cqry) {
@@ -270,6 +339,20 @@ export async function amplify_content(userId: Dbt.userId, content: string, amoun
   DbCache.linkRows.push(rslt);
   DbCache.links.set(linkId, rslt);
   await adjust_user_balance(DbCache.users.get(userId), -amount);
+  return rslt;
+}
+
+export async function transfer_link_to_user(link: Dbt.Link, adj: Dbt.integer): Promise<Dbt.Link> {
+  let links = DbCache.linkRows;
+  let linkId = link.linkId;
+  let i = links.indexOf(link);
+  if (i < 0) i = links.findIndex(l => l.linkId == linkId)
+  if (i < 0) throw new Error("Corruptions in links")   
+  let amount = link.amount - adj;
+  let rslt = { ...link, amount };
+  DbCache.linkRows[i] = rslt
+  DbCache.links.set(linkId, rslt);
+  await adjust_user_balance(DbCache.users.get(link.userId), adj);
   return rslt;
 }
 

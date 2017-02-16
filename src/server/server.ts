@@ -210,17 +210,27 @@ it probably means you do not have the Synereo browser plugin installed.
 })
 
 async function handleAddContent(userId, {publicKey, content, signature, amount}): Promise<Rpc.SendAddContentResponse> {
-  let link = cache.getLinkFromContent(content);
+  let link = cache.getLatestLinkFromContentId(content);
   if (link) {
-    return { prevLink: cache.linkToUri(link.linkId) } as Rpc.AddContentAlreadyRegistered;
+    return { prevLink: cache.linkToUrl(link.linkId) } as Rpc.AddContentAlreadyRegistered;
   }
   link = await pg.insert_content(userId, content, amount);
-  return { link: cache.linkToUri(link.linkId) } as Rpc.AddContentOk;
+  return { link: cache.linkToUrl(link.linkId) } as Rpc.AddContentOk;
 }
 
 async function handleAmplify(userId, {publicKey, content, signature, amount}): Promise<Rpc.AddContentOk> {
-  let link = await pg.amplify_content(userId, content, amount);   // need to handle errors properly here.
-  return { link: cache.linkToUri(link.linkId) };
+  let linkId = cache.getLinkIdFromUrl(parse(content));
+  let link = cache.links.get(linkId);
+  if (link.userId == userId) {
+    await pg.transfer_link_to_user(link, -amount);
+  }
+  else {
+    let contentId = cache.getContentIdFromContent(content);
+    let prevId = cache.getLinkAlreadyInvestedIn(userId, contentId);
+    if (prevId) throw new Error("user has previously invested in this content");
+    await pg.amplify_content(userId, content, amount);  
+  }
+  return { link: cache.linkToUrl(link.linkId) };
 }
 
 async function changeMoniker(id: Dbt.userId, newName: string): Promise<boolean> {
@@ -233,16 +243,15 @@ async function changeMoniker(id: Dbt.userId, newName: string): Promise<boolean> 
   console.log("user updated : " + JSON.stringify(updt));
   cache.users.set(id, usr);
   return true;
-
 }
 
 router.post('/rpc', async function (ctx: any) {
   let {jsonrpc, method, params, id} = ctx.request.body;  // from bodyparser 
   if (!ctx.header.authorization) {
     //@@GS - I was unable to get the plugin popup to use cookies properly
-    // so instead we send the token both as a cookie and also as a header.
-    // on receipt we will either get an Authorization: Bearer header from rpc calls, 
-    // or a normal cookie from webpages.  (Hopefully that will also work with the imminent 'Settings' page.)
+    // so instead we send the token as a header.
+    // on receipt we will get an Authorization: Bearer header from rpc calls.
+    // unfortunately, other routes will now have to manage without use of cookies.
     console.log("sending token");
     ctx.set('x-syn-token', ctx['token']);
   }
@@ -253,9 +262,30 @@ router.post('/rpc', async function (ctx: any) {
   }
   try {
     switch (method as Rpc.Method) {
+      case "initialize": {
+        // data goes back through the headers.
+        let {publicKey} = params
+        let usr = getUser(ctx.userId.id);
+        if (!usr) throw new Error("Internal error getting user details");
+        usr = { ...usr, publicKey };
+        await pg.upsert_user(usr);
+        ctx.body = { id, ok: true };
+        break;
+      }
       case "addContent": {
         let url = parse(params.content);
         let result = null;
+        let {publicKey: any} = params;
+        let usr = getUser(ctx.userId.id);
+        /*  Julia - help!!!
+        if (usr.publicKey) {
+          if (usr.publicKey !== publicKey) throw new Error("Invalid public key supplied");
+        }
+        else {
+          usr = { ...usr, publicKey };
+          await pg.upsert_user(usr);
+        }
+        */
         if (cache.isSynereo(url)) {
           result = await handleAmplify(ctx.userId.id, params)
         }
@@ -263,11 +293,6 @@ router.post('/rpc', async function (ctx: any) {
           result = await handleAddContent(ctx.userId.id, params)
         }
         ctx.body = { id, result }
-        break;
-      }
-      case "initialize": {
-        // data goes back through the headers.
-        ctx.body = { id, ok: true };
         break;
       }
       case "changeMoniker": {
@@ -280,7 +305,7 @@ router.post('/rpc', async function (ctx: any) {
       case "loadLinks": {
         let links = cache.getChainFromContent(params.url);
         let result: Rpc.LoadLinksResponse = links.map(lnk => {
-          let url = cache.linkToUri(lnk.linkId)
+          let url = cache.linkToUrl(lnk.linkId)
           let item: Rpc.LoadLinksResponseItem = { url, hitCount: lnk.hitCount, amount: lnk.amount }
           return item;
         });
@@ -292,10 +317,13 @@ router.post('/rpc', async function (ctx: any) {
         let url = parse(params.linkUrl);
         if (cache.isSynereo(url)) {
           let linkId = cache.getLinkIdFromUrl(url);
-          if (linkId) contentUrl = cache.getContentFromLinkId(linkId);
+          if (linkId) {
+            contentUrl = cache.getContentFromLinkId(linkId);
+            console.log("attention gots to get paid for!!!");
+            await cache.payForView(ctx.userId.id, linkId)
+          }
         }
-        ctx.body = contentUrl ? { id, result: { contentUrl } }
-          : { id, error: { message: "invalid link" } }
+        ctx.body = contentUrl ? { id, result: { contentUrl } } : { id, error: { message: "invalid link" } }
         break;
       }
       case "changeSettings": {
