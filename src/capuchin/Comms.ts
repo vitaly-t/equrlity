@@ -75,8 +75,8 @@ export async function sendInitialize(st: AppState): Promise<AxiosResponse> {
   return await sendApiRequest(st, "initialize", { publicKey: st.publicKey });
 }
 
-export async function sendLoadLinks(st: AppState, url: string): Promise<AxiosResponse> {
-  return await sendApiRequest(st, "loadLinks", { publicKey: st.publicKey, url });
+export async function sendLoadLink(st: AppState, url: string): Promise<AxiosResponse> {
+  return await sendApiRequest(st, "loadLink", { publicKey: st.publicKey, url });
 }
 
 export async function sendGetRedirect(st: AppState, linkUrl: string): Promise<AxiosResponse> {

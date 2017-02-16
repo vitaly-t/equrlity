@@ -23,6 +23,7 @@ const jwt_secret = process.env.JWT_AMPLITUDE_KEY;
 
 cache.init();
 //pg.resetDatabase();
+//pg.recreateDataTables();
 
 const app = new Koa();
 const router = new Router();
@@ -176,11 +177,6 @@ let pluginClause = `
 <p>You can download the latest release of our Chrome plugin by clicking either of these links:</p> 
    <p><a href="assets/synereo-plugin.zip" download >Zip file (Windows)</a></p>
    <p><a href="assets/synereo-plugin.tar.gz" download >Tar.gz file (Linux  / Mac)</a></p>
-<p>To install it you will have to unzip/untar the file into a directory, then go in to your
-Chrome extensions page, and select "Load unpacked extension".</p>
-<p>You may need to first tick the "Developer Mode" box (top right) to allow unpacked extensions to load. 
-If you wish, you can also untick it after installing/upgrading the extension.
-</p>         
 `;
 */
 
@@ -210,7 +206,7 @@ it probably means you do not have the Synereo browser plugin installed.
 })
 
 async function handleAddContent(userId, {publicKey, content, signature, amount}): Promise<Rpc.SendAddContentResponse> {
-  let link = cache.getLatestLinkFromContentId(content);
+  let link = await pg.getLinkFromContent(content);
   if (link) {
     return { prevLink: cache.linkToUrl(link.linkId) } as Rpc.AddContentAlreadyRegistered;
   }
@@ -222,7 +218,7 @@ async function handleAmplify(userId, {publicKey, content, signature, amount}): P
   let linkId = cache.getLinkIdFromUrl(parse(content));
   let link = cache.links.get(linkId);
   if (link.userId == userId) {
-    await pg.transfer_link_to_user(link, -amount);
+    await pg.reclaim_amount_from_link(link, -amount);
   }
   else {
     let contentId = cache.getContentIdFromContent(content);
@@ -302,13 +298,14 @@ router.post('/rpc', async function (ctx: any) {
         else ctx.body = { id, error: { message: "taken" } };
         break;
       }
-      case "loadLinks": {
-        let links = cache.getChainFromContent(params.url);
-        let result: Rpc.LoadLinksResponse = links.map(lnk => {
-          let url = cache.linkToUrl(lnk.linkId)
-          let item: Rpc.LoadLinksResponseItem = { url, hitCount: lnk.hitCount, amount: lnk.amount }
-          return item;
-        });
+      case "loadLink": {
+        let lnk = await pg.getLinkFromContent(params.url);
+        if (!lnk) {
+          ctx.body = {id, result: {found: false}};
+          return;
+        }
+        let url = cache.linkToUrl(lnk.linkId)
+        let result = { found: true, url, hitCount: lnk.hitCount, amount: lnk.amount }
         ctx.body = { id, result };
         break;
       }

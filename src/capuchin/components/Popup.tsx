@@ -36,7 +36,7 @@ export class PopupPanel extends React.Component<PopupPanelProps, PopupPanelState
     console.log("rendering popup...");
     switch (st.mode) {
       case "Amplify": {
-        let pnl = <div>No active URL found</div>
+        let pnl = st.lastErrorMessage ?  <div>Error: {st.lastErrorMessage}</div> : <div>No active URL found</div>
         if (curl) {
           let tgt = expandedUrl(st);
           console.log("rendering for target :" + tgt);
@@ -48,7 +48,7 @@ export class PopupPanel extends React.Component<PopupPanelProps, PopupPanelState
           }
           pnl = (<div>
             <p>Target : {tgt}</p>
-            <p>Investment amount: <input type="number" ref={(e) => this.ctrls.amountInput = e} 
+            <p>Investment amount: <input type="number" ref={(e) => this.ctrls.amountInput = e} max={st.ampCredits}
                                 value={this.state.amplifyAmount} onChange={(e) => this.changeAmplifyAmount() } /></p>
             <button onClick={saveaction} >{lbl}</button>
           </div>);

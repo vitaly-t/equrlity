@@ -34,13 +34,15 @@ async function initialize(): Promise<AppState> {
   const privateKey = await localForage.getItem<JsonWebKey>('privateKey');
   const jwt = await localForage.getItem<string>('jwt');
   if (!jwt) console.log("No JWT found");
-  state = {...state, publicKey, privateKey, jwt};
+  state = { ...state, publicKey, privateKey, jwt };
   let st = await handleMessage({ eventType: "Initialize", state });
-  if (!jwt) {
-    if (!st.jwt) throw new Error("Server failed to deliver token");
-    localForage.setItem<string>('jwt', st.jwt);
+  if (!st.lastErrorMessage) {
+    if (!jwt) {
+      if (!st.jwt) throw new Error("Server failed to deliver token");
+      localForage.setItem<string>('jwt', st.jwt);
+    }
+    else if (jwt !== st.jwt) throw new Error("Unexpected update to token");
   }
-  else if (jwt !== st.jwt) throw new Error("Unexpected update to token");
   return st;
 }
 
@@ -116,7 +118,7 @@ export async function handleMessage(event: Message, async: boolean = false): Pro
   //console.log("handleMessage called for: " + event.eventType);
   try {
     if (__handling) {
-      if (async) setTimeout(() => handleMessage(event, true), 0);
+      if (async) setTimeout(() => handleMessage(event, true), 1);
       else throw new Error("attempt to call handleMessage re-entrantly");
     }
     __handling = true;
@@ -130,17 +132,20 @@ export async function handleMessage(event: Message, async: boolean = false): Pro
       case "GetState":
         break;
       case "SetMode":
-        st = {...st, mode: event.mode};
-        break;  
+        st = { ...st, mode: event.mode };
+        break;
       case "ChangeSettings":
         st = await Handlers.ChangeSettings(st, event.settings);
-        st = {...st, mode: "Amplify"};
-        break;  
+        st = { ...st, mode: "Amplify" };
+        break;
     }
+    st.lastErrorMessage = '';
     storeState(st);
   }
   catch (e) {
     console.log("error in handler :" + e.message);
+    st.lastErrorMessage = e.message;
+    if (e.message === "Network Error") setTimeout(() => initialize(), 5000);
   }
   finally {
     __handling = false;

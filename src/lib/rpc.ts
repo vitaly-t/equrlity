@@ -1,4 +1,4 @@
-export type Method = "addContent" | "initialize" | "changeMoniker" | "loadLinks" | "getRedirect" | "changeSettings";
+export type Method = "addContent" | "initialize" | "changeMoniker" | "loadLink" | "getRedirect" | "changeSettings";
 
 export type UrlString = string;
 export type Integer = number;
@@ -25,18 +25,19 @@ export type AddContentAlreadyRegistered = {
 export type SendAddContentResponse = AddContentOk | AddContentAlreadyRegistered;
 export type RecvAddContentResponse = AddContentOk & AddContentAlreadyRegistered;
 
-export type LoadLinksRequest = {
+export type LoadLinkRequest = {
   publicKey: JsonWebKey;
   url: UrlString;
 }
 
-export type LoadLinksResponseItem = {
-   url: UrlString;
-   hitCount: Integer;
-   amount: Integer; 
+export type LoadLinkResponse = {
+  found: boolean;
+  url: UrlString;
+  hitCount: Integer;
+  amount: Integer; 
+  investorNickName: string;
 }
 
-export type LoadLinksResponse = Array<LoadLinksResponseItem>;
 
 export type GetRedirectRequest = { linkUrl: UrlString; }
 

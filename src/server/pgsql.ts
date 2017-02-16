@@ -55,8 +55,7 @@ export namespace DbCache {
   export const auths = new Map<Dbt.authId, Dbt.Auth>();
   export const contents = new Map<Dbt.contentId, Dbt.Content>();
   export const links = new Map<Dbt.linkId, Dbt.Link>();
-  export const userlinks = new Map<Dbt.userId, Dbt.userId[] >();
-  export let linkRows: Array<Dbt.Link> = [];
+  export const userlinks = new Map<Dbt.userId, Dbt.userId[]>();
   export const domain = isDev() ? 'localhost:8080' : process.env.AMPLITUDE_DOMAIN;
   export function isSynereo(url: Url): boolean {
     return url.host === domain;
@@ -102,11 +101,11 @@ export namespace DbCache {
     contents.clear();
     contentRows.forEach(r => contents.set(r.contentId, r));
 
-    linkRows = await db.any("select * from links order by \"linkId\" desc");
+    let linkRows = await db.any('select * from links order by "linkId" ');
     links.clear();
     linkRows.forEach(r => {
-       links.set(r.linkId, r);
-    //  if (!userlinks.has(r.userId))
+      links.set(r.linkId, r);
+      //  if (!userlinks.has(r.userId))
     });
 
     // maybe later ...
@@ -121,14 +120,6 @@ export namespace DbCache {
       rslt.push(link);
     }
     return rslt;
-  }
-
-  export function getChainFromContent(content: Dbt.content): Array<Dbt.Link> {
-    let id = getContentIdFromContent(content);
-    if (!id) return [];
-    let link = linkRows.find(l => l.contentId == id);
-    if (!link) return [];
-    return getChainFromLinkId(link.linkId);
   }
 
   export function getContentFromLinkId(linkId: Dbt.linkId): string | null {
@@ -147,12 +138,6 @@ export namespace DbCache {
     return content.contentId;
   }
 
-  export function getLatestLinkFromContentId(id: Dbt.contentId): Dbt.Link | null {
-    let link = linkRows.find(l => l.contentId == id);
-    if (!link) return null;
-    return link;
-  }
-
   export function getContentIdFromContent(content: string): Dbt.contentId | null {
     let result = null;
     for (const [k, v] of contents) {
@@ -163,9 +148,9 @@ export namespace DbCache {
     }
     return result;
   }
-  
+
   export async function getLinkAlreadyInvestedIn(userId: Dbt.userId, contentId: Dbt.contentId): Promise<Dbt.linkId | null> {
-    let recs = await db.oneOrNone(`select "linkId" from links where "contentId" = ${contentId} and "userId" = ${userId}` );
+    let recs = await db.oneOrNone(`select "linkId" from links where "contentId" = ${contentId} and "userId" = ${userId}`);
     if (recs.length > 0) return recs[0].linkId;
     return null;
   }
@@ -176,7 +161,7 @@ export namespace DbCache {
 
   export function linkToUrl(linkId: Dbt.linkId): string {
     let content = getContentFromLinkId(linkId);
-    return (isDev() ? "http://" : "https://" ) + domain + "/link/" + linkId.toString() + "#" + content
+    return (isDev() ? "http://" : "https://") + domain + "/link/" + linkId.toString() + "#" + content
   }
 
   export function getLinkIdFromUrl(url: Url): Dbt.linkId {
@@ -206,21 +191,21 @@ export namespace DbCache {
     bal -= 1
 
     // each link in the parent chain gets paid 1
-    let stmt = OxiGen.genUpdateStatement(oxb.tables.get("links"), {linkId: 0, amount: 0});
+    let stmt = OxiGen.genUpdateStatement(oxb.tables.get("links"), { linkId: 0, amount: 0 });
     let l = links.length - 1
     while (bal > 0 && l > 0) {
       let {linkId, amount} = links[l];
       amount += 1;
       try {
-        await db.none(stmt, {linkId, amount});
+        await db.none(stmt, { linkId, amount });
         bal -= 1;
       }
       catch (e) {
-        console.log("error updating link: "+e.message);
+        console.log("error updating link: " + e.message);
       }
       l -= 1;
     }
-    await db.none(stmt, {linkId: viewedLinkId, amount: bal});
+    await db.none(stmt, { linkId: viewedLinkId, amount: bal });
   }
 
 }
@@ -243,7 +228,7 @@ export function query(cqry) {
 
 export function emptyUser(): Dbt.User {
   let rec = OxiGen.emptyRec<Dbt.User>(oxb.tables.get("users"));
-  return { ...rec, ampCredits: 100 };
+  return { ...rec, ampCredits: 1000 };
 }
 
 const upsert_user_sql = OxiGen.genUpsertStatement(oxb.tables.get("users"));
@@ -255,11 +240,12 @@ export async function upsert_user(usr: Dbt.User) {
   await db.none(upsert_user_sql, newusr)
   DbCache.users.set(usr.userId, newusr);
   return newusr;
-};
+}
 
 export async function adjust_user_balance(usr: Dbt.User, adj: Dbt.integer) {
   let tbl = oxb.tables.get("users");
   let ampCredits = usr.ampCredits + adj;
+  if (ampCredits < 0) throw new Error("Negative balances not allowed");
   let newusr = { ...usr, ampCredits }
   let stmt = OxiGen.genUpdateStatement(tbl, newusr);
   await db.none(stmt, newusr);
@@ -283,7 +269,7 @@ export function get_user_from_auth(prov, authId) {
   let rslt = DbCache.auths[prov + ':' + authId];
   if (rslt) rslt = DbCache.users[rslt];
   return rslt;
-};
+}
 
 export async function touch_user(userId) {
   let usr = DbCache.users.get(userId);
@@ -291,7 +277,7 @@ export async function touch_user(userId) {
   await db.none('update users set updated = $2 where "userId" = $1', [userId, dt])
   usr = { ...usr, updated: dt };
   DbCache.users.set(usr.userId, usr);
-};
+}
 
 export async function touch_auth(prov, authId) {
   let key = prov + ':' + authId;
@@ -300,7 +286,7 @@ export async function touch_auth(prov, authId) {
   await db.none('update auths set updated = $2 where "authId" = $1', [key, dt]);
   auth = { ...auth, updated: dt };
   DbCache.auths.set(auth.authId, auth);
-};
+}
 
 export function emptyContent(): Dbt.Content {
   return OxiGen.emptyRec<Dbt.Content>(oxb.tables.get("contents"));
@@ -310,7 +296,26 @@ export function emptyLink(): Dbt.Link {
   return OxiGen.emptyRec<Dbt.Link>(oxb.tables.get("links"));
 }
 
+export async function getLinkFromContent(url: Dbt.content): Promise<Dbt.Link | null> {
+  let id = DbCache.getContentIdFromContent(url);
+  if (!id) return null;
+  return await getLinkFromContentId(id);
+}
+
+export async function getLinkFromContentId(id: Dbt.contentId): Promise<Dbt.Link | null> {
+
+  let recs: Dbt.Link[] = await db.manyOrNone(`select * from links where "contentId" = ${id} and "prevLink" is null`);
+  let l = recs.length;
+  if (l == 0) return null;
+  if (l == 1) return recs[0];
+  let i = Math.floor(Math.random() * l)
+  return recs[i];
+}
+
 export async function insert_content(userId: Dbt.userId, content: string, amount: Dbt.integer, contentType: Dbt.contentType = "url"): Promise<Dbt.Link> {
+  let usr = DbCache.users.get(userId);
+  if (amount > usr.ampCredits) throw new Error("Negative balances not allowed");
+
   let cont: Dbt.Content = { ...emptyContent(), userId, content, contentType, amount };
   let contents = oxb.tables.get("contents");
   let stmt = OxiGen.genInsertStatement(contents, cont);
@@ -323,40 +328,37 @@ export async function insert_content(userId: Dbt.userId, content: string, amount
   let {linkId} = rslt2;
   let rslt = { ...link, linkId };
   DbCache.contents.set(contentId, { ...cont, contentId });
-  DbCache.linkRows.push(rslt);
   DbCache.links.set(linkId, rslt);
   await adjust_user_balance(DbCache.users.get(userId), -amount);
   return rslt;
 }
 
 export async function amplify_content(userId: Dbt.userId, content: string, amount: Dbt.integer, contentType: Dbt.contentType = "url"): Promise<Dbt.Link> {
+  let usr = DbCache.users.get(userId);
+  if (amount > usr.ampCredits) throw new Error("Negative balances not allowed");
+
   let prevLink = DbCache.getLinkIdFromUrl(parse(content));
   let prv = DbCache.links.get(prevLink);
   let links = oxb.tables.get("links");
   let link: Dbt.Link = { ...prv, userId, prevLink, amount };
   let {linkId} = await db.one(OxiGen.genInsertStatement(links, link), link);
   let rslt = { ...link, linkId };
-  DbCache.linkRows.push(rslt);
   DbCache.links.set(linkId, rslt);
   await adjust_user_balance(DbCache.users.get(userId), -amount);
   return rslt;
 }
 
-export async function transfer_link_to_user(link: Dbt.Link, adj: Dbt.integer): Promise<Dbt.Link> {
-  let links = DbCache.linkRows;
-  let linkId = link.linkId;
-  let i = links.indexOf(link);
-  if (i < 0) i = links.findIndex(l => l.linkId == linkId)
-  if (i < 0) throw new Error("Corruptions in links")   
+export async function reclaim_amount_from_link(link: Dbt.Link, adj: Dbt.integer): Promise<Dbt.Link> {
   let amount = link.amount - adj;
-  let rslt = { ...link, amount };
-  DbCache.linkRows[i] = rslt
-  DbCache.links.set(linkId, rslt);
+  if (amount < 0) throw new Error("Negative investments not allowed");
   await adjust_user_balance(DbCache.users.get(link.userId), adj);
+  let rslt = { ...link, amount };
+  await updateRecord("links", rslt);
+  DbCache.links.set(rslt.linkId, rslt);
   return rslt;
 }
 
-export async function createDataTables() {   //  careful with that axe, Eugene!
+export async function createDataTables() {
   let tbls = Array.from(oxb.tables.values())
   for (const t of tbls) {
     let stmt = OxiGen.genCreateTableStatement(t);
@@ -365,7 +367,7 @@ export async function createDataTables() {   //  careful with that axe, Eugene!
   DbCache.init();
 }
 
-export async function recreateDataTables() {   //  careful with that axe, Eugene!
+export async function recreateDataTables() {
   let tbls = Array.from(oxb.tables.values())
   let drops = tbls.map(t => "DROP TABLE " + t.name + ";\n");
   drops.reverse();
@@ -375,7 +377,7 @@ export async function recreateDataTables() {   //  careful with that axe, Eugene
   DbCache.init();
 }
 
-export async function resetDataTables() {   //  careful with that axe, Eugene!
+export async function resetDataTables() {
   let tbls = Array.from(oxb.tables.values()).reverse()
   for (const t of tbls) {
     let stmt = "DELETE FROM " + t.name + ";\n";

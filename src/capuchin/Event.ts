@@ -106,7 +106,7 @@ export namespace AsyncHandlers {
       if (rslt.prevLink) {
         chrome.runtime.sendMessage({ eventType: 'RenderMessage', msg: "Content already registered." });
         // very naughty state mutation here ... so sue me!!
-        // this is to prevent triggering an immediate render instantaneously wiping out the above message.
+        // this is to prevent an immediate render from instantaneously wiping out the above message.
         st.links[url] = parse(rslt.prevLink);
         return st;
       }
@@ -147,14 +147,14 @@ export namespace AsyncHandlers {
     }
     if (isSeen(state, curl)) return (st => { return { ...st, activeUrl: curl }; });
     if (isSynereoLink(parse(curl))) return GetRedirect(state,curl)
-    let response = await Comms.sendLoadLinks(state, curl);
+    let response = await Comms.sendLoadLink(state, curl);
     let thunk = (st: AppState) => {
       let rsp : Rpc.Response = response.data;
       if (rsp.error) throw new Error("Server returned error: " + rsp.error.message);
       st = { ...st, activeUrl: curl };
-      let rslt: Rpc.LoadLinksResponse = rsp.result;  
-      if (rslt.length > 0) {
-        st = setLink(st, curl, rslt[0].url);
+      let rslt: Rpc.LoadLinkResponse = rsp.result;  
+      if (rslt.found) {
+        st = setLink(st, curl, rslt.url);
       }
       return st;
     };

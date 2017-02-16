@@ -13,13 +13,14 @@ export interface AppState {
   ampCredits: number;
   jwt: string;
   mode: PopupMode;
+  lastErrorMessage: string;
 }
 
 export function initState(): AppState {
   console.log("initState called");
   return { publicKey: null, privateKey: null, responses: [], 
            links: Object.create(null), redirects: Object.create(null), 
-           activeUrl: null, moniker: 'unknown', ampCredits: 0, jwt: '', mode: "Amplify" };
+           activeUrl: null, moniker: 'unknown', ampCredits: 0, jwt: '', mode: "Amplify", lastErrorMessage: '' };
 }
 
 export function isLinked(state: AppState, curl: string): boolean {
