@@ -11,6 +11,7 @@ export type email = string;
 export type integer = number;
 export type json = string;
 export type linkId = number;
+export type linkDescription = string;
 export type percentage = number;
 export type publicKey = ArrayBuffer;
 export type text = string;
@@ -32,16 +33,8 @@ export interface User {
   readonly groups: userGroup[] | null
 };
 
-export interface UserLink {
-  readonly user_A: userId | null,
-  readonly user_B: userId | null,
-  readonly hitCount: integer | null,
-  readonly created: timestamp | null,
-  readonly updated: timestamp | null
-};
-
 export interface Auth {
-  readonly authId: authId | null,  
+  readonly authId: authId | null,
   readonly userId: userId | null,
   readonly created: timestamp | null,
   readonly updated: timestamp | null
@@ -59,6 +52,7 @@ export interface Link {
   readonly linkId: linkId | null,
   readonly userId: userId | null,
   readonly contentId: contentId | null,
+  readonly linkDescription: linkDescription | null,
   readonly prevLink: linkId | null,
   readonly hitCount: integer | null,
   readonly amount: integer | null

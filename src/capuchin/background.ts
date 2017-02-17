@@ -1,7 +1,7 @@
 import * as localForage from "localforage";
 import * as Crypto from './Crypto'
 
-import { AppState, initState, expandedUrl, isSeen, setLoading, isWaiting, setWaiting, prepareUrl } from './AppState';
+import { AppState, initState, expandedUrl, isSeen, setLoading, setWaiting, prepareUrl, serializeLinks } from './AppState';
 import { Url, parse, format } from 'url';
 import { Message, Handlers, AsyncHandlers, getTab } from './Event';
 
@@ -55,7 +55,12 @@ chrome.runtime.onMessage.addListener((message, sender, cb) => {
     // unfortunately, we don't appear to be able to dispatch a message to the popup without also receiving it here :-(
     return true;
   }
-  if (message.eventType == "GetState") cb(currentState());
+  if (message.eventType == "GetState") {
+    let st: any = currentState();
+    let links = serializeLinks(st.links);
+    st = {...st, links}
+    cb(st);
+  }
   else if (message.async) handleAsyncMessage(message);
   else handleMessage(message);
 });
@@ -87,7 +92,7 @@ export async function handleAsyncMessage(event: Message) {
         //console.log("refreshing with correct state");
         chrome.runtime.sendMessage({ eventType: 'Render', appState: currentState() });
       }, 5000);
-      fn = await AsyncHandlers.Save(st, event.amount);
+      fn = await AsyncHandlers.Save(st, event.linkDescription, event.amount);
       break;
     }
     case "Load": {
@@ -110,6 +115,7 @@ export async function handleMessage(event: Message, async: boolean = false): Pro
     if (__state !== st) {
       //console.log("storing state");
       __state = st;
+      if (!(st.links instanceof Map)) console.log("bizarro");
       chrome.runtime.sendMessage({ eventType: 'Render', appState: st });
     }
   }

@@ -122,6 +122,15 @@ export namespace DbCache {
     return rslt;
   }
 
+  export function getLinkDepth(link: Dbt.Link): Dbt.integer {
+    let rslt = 0
+    while (link.prevLink) {
+      ++rslt;
+      link = links.get(link.prevLink);
+    }
+    return rslt;
+  }
+
   export function getContentFromLinkId(linkId: Dbt.linkId): string | null {
     let link = links.get(linkId);
     if (!link) return null;
@@ -160,8 +169,9 @@ export namespace DbCache {
   }
 
   export function linkToUrl(linkId: Dbt.linkId): string {
+    let desc = DbCache.links.get(linkId).linkDescription;
     let content = getContentFromLinkId(linkId);
-    return (isDev() ? "http://" : "https://") + domain + "/link/" + linkId.toString() + "#" + content
+    return (isDev() ? "http://" : "https://") + domain + "/link/" + linkId.toString() + (desc ?  "#" + desc : '')
   }
 
   export function getLinkIdFromUrl(url: Url): Dbt.linkId {
@@ -316,7 +326,7 @@ export async function getLinkFromContentId(id: Dbt.contentId): Promise<Dbt.Link 
   return recs[i];
 }
 
-export async function insert_content(userId: Dbt.userId, content: string, amount: Dbt.integer, contentType: Dbt.contentType = "url"): Promise<Dbt.Link> {
+export async function insert_content(userId: Dbt.userId, content: string, linkDescription: string, amount: Dbt.integer, contentType: Dbt.contentType = "url"): Promise<Dbt.Link> {
   let usr = DbCache.users.get(userId);
   if (amount > usr.ampCredits) throw new Error("Negative balances not allowed");
 
@@ -327,7 +337,7 @@ export async function insert_content(userId: Dbt.userId, content: string, amount
   let {contentId} = rslt1;
 
   let links = oxb.tables.get("links");
-  let link: Dbt.Link = { ...emptyLink(), userId, contentId, amount };
+  let link: Dbt.Link = { ...emptyLink(), userId, contentId, linkDescription, amount };
   let rslt2 = await db.one(OxiGen.genInsertStatement(links, link), link);
   let {linkId} = rslt2;
   let rslt = { ...link, linkId };
@@ -337,14 +347,14 @@ export async function insert_content(userId: Dbt.userId, content: string, amount
   return rslt;
 }
 
-export async function amplify_content(userId: Dbt.userId, content: string, amount: Dbt.integer, contentType: Dbt.contentType = "url"): Promise<Dbt.Link> {
+export async function amplify_content(userId: Dbt.userId, content: string, linkDescription, amount: Dbt.integer, contentType: Dbt.contentType = "url"): Promise<Dbt.Link> {
   let usr = DbCache.users.get(userId);
   if (amount > usr.ampCredits) throw new Error("Negative balances not allowed");
 
   let prevLink = DbCache.getLinkIdFromUrl(parse(content));
   let prv = DbCache.links.get(prevLink);
   let links = oxb.tables.get("links");
-  let link: Dbt.Link = { ...prv, userId, prevLink, amount };
+  let link: Dbt.Link = { ...prv, userId, prevLink, linkDescription, amount };
   let {linkId} = await db.one(OxiGen.genInsertStatement(links, link), link);
   let rslt = { ...link, linkId };
   DbCache.links.set(linkId, rslt);

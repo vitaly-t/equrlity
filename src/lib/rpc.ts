@@ -7,6 +7,7 @@ export type AddContentRequest = {
   publicKey: JsonWebKey;
   content: UrlString;
   signature: string;
+  linkDescription: string;
   amount: Integer;
 }
 
@@ -16,10 +17,12 @@ export type InitializeRequest = {
 
 export type AddContentOk = {
   link: UrlString;
+  linkDepth: Integer;
 }      
 
 export type AddContentAlreadyRegistered = {
   prevLink: UrlString;
+  linkAmplifier: string;
 }      
 
 export type SendAddContentResponse = AddContentOk | AddContentAlreadyRegistered;
@@ -33,15 +36,14 @@ export type LoadLinkRequest = {
 export type LoadLinkResponse = {
   found: boolean;
   url: UrlString;
-  hitCount: Integer;
-  amount: Integer; 
-  investorNickName: string;
+  linkDepth: Integer;
+  linkAmplifier: string;
 }
 
 
 export type GetRedirectRequest = { linkUrl: UrlString; }
 
-export type GetRedirectResponse = { contentUrl: UrlString; }
+export type GetRedirectResponse = { found: boolean, contentUrl: UrlString; linkDepth: Integer, linkAmplifier: string }
 
 export type ChangeSettingsRequest = {
   moniker: string;

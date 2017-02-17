@@ -205,16 +205,20 @@ it probably means you do not have the Synereo browser plugin installed.
   ctx.body = body;
 })
 
-async function handleAddContent(userId, {publicKey, content, signature, amount}): Promise<Rpc.SendAddContentResponse> {
+async function handleAddContent(userId, {publicKey, content, signature, linkDescription, amount}): Promise<Rpc.SendAddContentResponse> {
   let link = await pg.getLinkFromContent(content);
   if (link) {
-    return { prevLink: cache.linkToUrl(link.linkId) } as Rpc.AddContentAlreadyRegistered;
+    let linkAmplifier = cache.users.get(userId).userName;
+    let linkDepth = cache.getLinkDepth(link);
+    let rsp: Rpc.AddContentAlreadyRegistered = { prevLink: cache.linkToUrl(link.linkId), linkAmplifier };
+    return rsp;
   }
-  link = await pg.insert_content(userId, content, amount);
-  return { link: cache.linkToUrl(link.linkId) } as Rpc.AddContentOk;
+  link = await pg.insert_content(userId, content, linkDescription, amount);
+  let rsp: Rpc.AddContentOk = { link: cache.linkToUrl(link.linkId), linkDepth: 0 };
+  return rsp;
 }
 
-async function handleAmplify(userId, {publicKey, content, signature, amount}): Promise<Rpc.AddContentOk> {
+async function handleAmplify(userId, {publicKey, content, signature, linkDescription, amount}): Promise<Rpc.AddContentOk> {
   let linkId = cache.getLinkIdFromUrl(parse(content));
   let link = cache.links.get(linkId);
   if (link.userId == userId) {
@@ -224,9 +228,11 @@ async function handleAmplify(userId, {publicKey, content, signature, amount}): P
     let contentId = cache.getContentIdFromContent(content);
     let prevId = cache.getLinkAlreadyInvestedIn(userId, contentId);
     if (prevId) throw new Error("user has previously invested in this content");
-    await pg.amplify_content(userId, content, amount);  
+    await pg.amplify_content(userId, content, linkDescription, amount);
   }
-  return { link: cache.linkToUrl(link.linkId) };
+  let linkAmplifier = cache.users.get(userId).userName;
+  let linkDepth = cache.getLinkDepth(link);
+  return { link: cache.linkToUrl(link.linkId), linkDepth, linkAmplifier };
 }
 
 async function changeMoniker(id: Dbt.userId, newName: string): Promise<boolean> {
@@ -301,11 +307,13 @@ router.post('/rpc', async function (ctx: any) {
       case "loadLink": {
         let lnk = await pg.getLinkFromContent(params.url);
         if (!lnk) {
-          ctx.body = {id, result: {found: false}};
+          ctx.body = { id, result: { found: false } };
           return;
         }
         let url = cache.linkToUrl(lnk.linkId)
-        let result = { found: true, url, hitCount: lnk.hitCount, amount: lnk.amount }
+        let linkDepth = cache.getLinkDepth(lnk);
+        let linkAmplifier = cache.users.get(lnk.userId).userName
+        let result: Rpc.LoadLinkResponse = { found: true, url, linkDepth, linkAmplifier }
         ctx.body = { id, result };
         break;
       }
@@ -314,13 +322,18 @@ router.post('/rpc', async function (ctx: any) {
         let url = parse(params.linkUrl);
         if (cache.isSynereo(url)) {
           let linkId = cache.getLinkIdFromUrl(url);
-          if (linkId) {
-            contentUrl = cache.getContentFromLinkId(linkId);
-            console.log("attention gots to get paid for!!!");
-            await cache.payForView(ctx.userId.id, linkId)
-          }
+          if (!linkId) throw new Error("invalid link");
+          contentUrl = cache.getContentFromLinkId(linkId);
+          console.log("attention gots to get paid for!!!");
+          await cache.payForView(ctx.userId.id, linkId)
+          let link = cache.links.get(linkId);
+          let linkDepth = cache.getLinkDepth(link)
+          let linkAmplifier = cache.users.get(link.userId).userName;
+          let result: Rpc.GetRedirectResponse = { found: true, contentUrl, linkDepth, linkAmplifier };
+          ctx.body = { id, result };
+          break;
         }
-        ctx.body = contentUrl ? { id, result: { contentUrl } } : { id, error: { message: "invalid link" } }
+        ctx.body = { id, result: { found: false } }
         break;
       }
       case "changeSettings": {

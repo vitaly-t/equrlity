@@ -1,24 +1,28 @@
 import * as React from 'react';
-import { AppState, expandedUrl, isWaiting, isLinked } from "../AppState";
+import { AppState, expandedUrl, isWaiting, getLinked } from "../AppState";
 import { Url, format } from 'url';
 import { serverUrl } from '../Comms';
 import Form from 'react-input';
 import * as Rpc from '../../lib/rpc'
 
 export interface PopupPanelProps { appState?: AppState; serverMessage?: string };
-export interface PopupPanelState { amplifyAmount: number };
+export interface PopupPanelState { amplifyAmount: number, description: string };
 
 export class PopupPanel extends React.Component<PopupPanelProps, PopupPanelState> {
 
   constructor(props) {
     super(props);
-    this.state = { amplifyAmount: 20 };
+    this.state = { amplifyAmount: 20, description: '' };
   }
 
-  ctrls: { amountInput?: HTMLInputElement } = {}
+  ctrls: { amountInput?: HTMLInputElement, descriptionInput?: HTMLInputElement } = {}
 
   changeAmplifyAmount() {
     this.setState({amplifyAmount: parseInt(this.ctrls.amountInput.value) });
+  }
+
+  changeDescription() {
+    this.setState({description: this.ctrls.descriptionInput.value });
   }
 
   render() {
@@ -40,16 +44,21 @@ export class PopupPanel extends React.Component<PopupPanelProps, PopupPanelState
         if (curl) {
           let tgt = expandedUrl(st);
           console.log("rendering for target :" + tgt);
-
-          let lbl = isLinked(st, curl) ? "Re-Amplify" : "Amplify";
+          let linkInfo = getLinked(st, curl);
+          let lbl = linkInfo ? "Re-Amplify" : "Amplify";
           let saveaction = () => {
             let amount = this.state.amplifyAmount;
-            chrome.runtime.sendMessage({ eventType: "Save", amount, async: true });
+            let linkDescription = this.state.description
+            chrome.runtime.sendMessage({ eventType: "Save", amount, linkDescription, async: true });
           }
+          let infoDiv = linkInfo ? <div>{ `Amplified by: ${linkInfo.linkAmplifier}, Link depth : ${linkInfo.linkDepth}` }</div> : null;
           pnl = (<div>
             <p>Target : {tgt}</p>
+            {infoDiv}
             <p>Investment amount: <input type="number" ref={(e) => this.ctrls.amountInput = e} max={st.ampCredits}
                                 value={this.state.amplifyAmount} onChange={(e) => this.changeAmplifyAmount() } /></p>
+            <p>Description: <input type="string" ref={(e) => this.ctrls.descriptionInput = e} 
+                                value={this.state.description} onChange={(e) => this.changeDescription() } /></p>
             <button onClick={saveaction} >{lbl}</button>
           </div>);
         }
@@ -60,6 +69,7 @@ export class PopupPanel extends React.Component<PopupPanelProps, PopupPanelState
           <p>Your current Amp Balance is: {st.ampCredits}</p>
           <p><button onClick={settingsAction}>Change Settings</button></p>
           {pnl}
+          <p>This panel brought to you by UglyAsF*ck Interfaces Ltd. (C) 1996. All rights reserved</p>
         </div>
       }
       case "Settings": {
@@ -80,7 +90,7 @@ export class PopupPanel extends React.Component<PopupPanelProps, PopupPanelState
           <h3>Your Settings:</h3>
           {frm}
           <button onClick={cancelAction}>Abandon Changes</button>
-          <p>This form brought to you by UglyAsF*ck Enterprises.  All rights reserved</p>
+          <p>This form brought to you by UglyAsF*ck Interface Ltd. (C) 1996. All rights reserved</p>
         </div>;
 
       }

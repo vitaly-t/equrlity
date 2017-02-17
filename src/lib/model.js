@@ -47,6 +47,10 @@ export default {
       "tsType": "number",
       "sqlType": "integer"
     },
+    "linkDescription": {
+      "tsType": "string",
+      "sqlType": "varchar(40)"
+    },
     "percentage": {
       "tsType": "number",
       "sqlType": "integer",
@@ -108,6 +112,7 @@ export default {
       "linkId",
       "userId",
       "contentId",
+      "linkDescription",
       { "name": "prevLink", "type": "linkId" },
       { "name": "hitCount", "type": "integer" },
       { "name": "amount", "type": "integer" },

@@ -62,12 +62,12 @@ export async function sendApiRequest(st: AppState, method: Rpc.Method, params: a
   return await xhr.post(serverUrl, data );
 }
 
-export async function sendAddContent(st: AppState, url: string, amount: number): Promise<AxiosResponse> {
+export async function sendAddContent(st: AppState, url: string, linkDescription: string, amount: number): Promise<AxiosResponse> {
   const privateCryptoKey: CryptoKey = await Crypto.importPrivateKeyfromJWK(st.privateKey);
   const signature: ArrayBuffer = await Crypto.signData(privateCryptoKey, UTF8.stringToUtf8ByteArray(url).buffer);
   const uint8ArraySignature = new Uint8Array(signature);
   const sig = printBase64Binary(new Uint8Array(signature));
-  let req: Rpc.AddContentRequest =  { publicKey: st.publicKey, content: url, signature: sig, amount };
+  let req: Rpc.AddContentRequest =  { publicKey: st.publicKey, content: url, signature: sig, linkDescription, amount };
   return await sendApiRequest(st, "addContent", req );
 }
 

@@ -9,6 +9,7 @@ export interface Save {
   eventType: "Save";
   url: string;
   amount: number;
+  linkDescription: string;
 }
 
 export interface Initialize {
@@ -53,19 +54,19 @@ export interface ChangeSettings {
 export type Message = Save | Initialize | GetState | Load | ActivateTab | Render | SetMode | ChangeSettings | Thunk 
 
 export function getTab(tabId: number): Promise<chrome.tabs.Tab> {
-  return new Promise((resolve, reject) => {
+  return new Promise( resolve => {
     chrome.tabs.get(tabId, t => resolve(t));
   });
 }
 
 function updateTab(tabId: number, props: chrome.tabs.UpdateProperties): Promise<chrome.tabs.Tab> {
-  return new Promise((resolve, reject) => {
+  return new Promise( resolve => {
     chrome.tabs.update(tabId, props, t => resolve(t));
   });
 }
 
 function tabsQuery(q: chrome.tabs.QueryInfo): Promise<chrome.tabs.Tab[]> {
-  return new Promise((resolve, reject) => {
+  return new Promise( resolve => {
     chrome.tabs.query(q, a => resolve(a));
   });
 }
@@ -87,7 +88,7 @@ function extractHeadersToState(st: AppState, rsp: AxiosResponse): AppState {
 
 export namespace AsyncHandlers {
 
-  export async function Save(state: AppState, amount: number): Promise<(st: AppState) => AppState> {
+  export async function Save(state: AppState, linkDescription: string, amount: number): Promise<(st: AppState) => AppState> {
     let curTab = await currentTab();
     if (!curTab) console.log("No current tab");
     if (curTab && prepareUrl(curTab.url) !== state.activeUrl) {
@@ -98,7 +99,7 @@ export namespace AsyncHandlers {
     }
     let src = state.activeUrl;
     let url = expandedUrl(state, src);
-    let response = await Comms.sendAddContent(state, url, amount)
+    let response = await Comms.sendAddContent(state, url, linkDescription, amount)
     let thunk = (st: AppState) => {
       let rsp: Rpc.Response = response.data;
       if (rsp.error) throw new Error("Server returned error: " + rsp.error.message);
@@ -107,13 +108,15 @@ export namespace AsyncHandlers {
         chrome.runtime.sendMessage({ eventType: 'RenderMessage', msg: "Content already registered." });
         // very naughty state mutation here ... so sue me!!
         // this is to prevent an immediate render from instantaneously wiping out the above message.
-        st.links[url] = parse(rslt.prevLink);
+        let synereoUrl = parse(rslt.prevLink);
+        let linkAmplifier = rslt.linkAmplifier
+        st.links.set(url, {synereoUrl, linkDepth: 0, linkAmplifier });
         return st;
       }
       else {  //  a new link has been generated 
         st = extractHeadersToState(st, response);
         console.log("received link: " + rslt.link)
-        return setLink(st, src, rslt.link);
+        return setLink(st, src, rslt.link, rslt.linkDepth, st.moniker);
       }
     };
     return thunk;
@@ -126,8 +129,8 @@ export namespace AsyncHandlers {
       let rsp : Rpc.Response = response.data;
       if (rsp.error) throw new Error("Server returned error: " + rsp.error.message);
       let rslt: Rpc.GetRedirectResponse = rsp.result;  
-      if (rslt.contentUrl) {
-        st = setLink(st, rslt.contentUrl, curl);
+      if (rslt.found) {
+        st = setLink(st, rslt.contentUrl, curl, rslt.linkDepth, rslt.linkAmplifier);
         st = { ...st, activeUrl: rslt.contentUrl };
         console.log("redirecting to: " + rslt.contentUrl);
         chrome.tabs.update(tab.id, { url: rslt.contentUrl });
@@ -154,7 +157,7 @@ export namespace AsyncHandlers {
       st = { ...st, activeUrl: curl };
       let rslt: Rpc.LoadLinkResponse = rsp.result;  
       if (rslt.found) {
-        st = setLink(st, curl, rslt.url);
+        st = setLink(st, curl, rslt.url, rslt.linkDepth, rslt.linkAmplifier);
       }
       return st;
     };
