@@ -205,6 +205,10 @@ export namespace DbCache {
       }
       l -= 1;
     }
+    if (bal == 0) {
+      let link = DbCache.links.get(viewedLinkId);
+      await redeem_link({...link, amount: 0});
+    }
     await db.none(stmt, { linkId: viewedLinkId, amount: bal });
   }
 
@@ -348,14 +352,32 @@ export async function amplify_content(userId: Dbt.userId, content: string, amoun
   return rslt;
 }
 
-export async function reclaim_amount_from_link(link: Dbt.Link, adj: Dbt.integer): Promise<Dbt.Link> {
+//@@GS - I don't think this should be used.  Only way to get amps out of a link should be to redeem it.
+export async function reclaim_amount_from_link(link: Dbt.Link, adj: Dbt.integer): Promise<Dbt.Link | null> {
   let amount = link.amount - adj;
   if (amount < 0) throw new Error("Negative investments not allowed");
+  if (amount == 0) {
+    await redeem_link(link);
+    return null;
+  }
   await adjust_user_balance(DbCache.users.get(link.userId), adj);
   let rslt = { ...link, amount };
   await updateRecord("links", rslt);
   DbCache.links.set(rslt.linkId, rslt);
   return rslt;
+}
+
+export async function redeem_link(link: Dbt.Link): Promise<void> {
+  let linkIdsToReParent = await db.manyOrNone(`select "linkId" from links where "prevLink" = ${link.linkId}`)
+  let stmt = `update links set "parentLink" = ' + ${link.prevLink ? link.prevLink.toString() : 'null'} 
+              where "parentLink" = ${link.linkId}`;
+  await db.none(stmt);
+  await db.none(`delete from links where "linkId" = ${link.linkId}`);               
+  if (link.amount > 0) await adjust_user_balance(DbCache.users.get(link.userId), link.amount);
+  linkIdsToReParent.forEach( ({linkId}) => {
+    let l = DbCache.links.get(linkId);
+    DbCache.links.set(linkId, {...l, prevLink: link.prevLink});
+  });
 }
 
 export async function createDataTables() {
