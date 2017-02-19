@@ -23,7 +23,7 @@ const cache = pg.DbCache;
 const jwt_secret = process.env.JWT_AMPLITUDE_KEY;
 
 cache.init();
-pg.resetDataTables();
+//pg.resetDataTables();
 //pg.recreateDataTables();
 
 const app = new Koa();
