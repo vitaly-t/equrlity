@@ -17,6 +17,7 @@ import * as send from 'koa-send';
 import clientIP from './clientIP.js';
 import { Url, parse } from 'url';
 import * as Rpc from '../lib/rpc';
+import { capuchinVersion } from '../lib/utils';
 
 const cache = pg.DbCache;
 const jwt_secret = process.env.JWT_AMPLITUDE_KEY;
@@ -82,7 +83,7 @@ let createUser = async function (ctx) {
 let authent = async function (ctx, prov, authId) {
   console.log("authent call with authId : " + authId);
   if (!authId) {
-    ctx.status = 401
+    ctx.status = 403
   } else {
     console.log("authenticating for provider: " + prov);
     let user = pg.get_user_from_auth(prov, authId);
@@ -119,7 +120,6 @@ app.keys = ['foo'];
 //app.use(koastatic.static(__dirname + '/assets')); 
 //app.use(serve("assets", "./assets"));
 
-app.use(bodyParser());
 
 //app.use(session(app));
 //app.use(passport.initialize());
@@ -130,14 +130,34 @@ app.use(async (ctx, next) => {
   try {
     await next();
   } catch (err) {
-    ctx.status = 400;
-    ctx.body = {
-      message: 'Unhandled error',
-      error: err
-    };
+    ctx.status = 500;
+    ctx.body = { error: { message: 'Unhandled error on Server : ' + err.message } };
   }
 })
 
+app.use(async (ctx, next) => {
+  let client_ver = ctx.headers['x-syn-client-version'];
+  if (!client_ver) {
+    ctx.status = 400;
+    ctx.body = { error: { message: 'Invalid Client' } }
+    return;
+  }
+  let [client,version] = client_ver.split("-");
+  if (client !== 'capuchin') {
+    ctx.status = 400;
+    ctx.body = { error: { message: 'Invalid Client' } }
+    return;
+  }
+  if (version !== capuchinVersion()) {
+    ctx.status = 400;
+    ctx.body = { error: { message: 'Client is out-of-date and requires upgrade' } };
+    return;
+  }
+  await next();
+});
+
+
+app.use(bodyParser());
 
 app.use(jwt.jwt({ secret: jwt_secret, ignoreExpiration: true, key: 'userId' }));
 

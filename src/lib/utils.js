@@ -10,3 +10,6 @@ export function isDev() {
     return process.env.NODE_ENV === 'development'
 }
 
+export function capuchinVersion() {
+	return "0.7.5";
+}

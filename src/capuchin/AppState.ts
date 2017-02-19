@@ -48,20 +48,30 @@ export function setLink(state: AppState, curl_: string, syn_: string, linkDepth:
   return { ...state, links, redirects };
 }
 
-export function serializeLinks(links: Map<string,Url>): any {
-   let rslt = Object.create(null);
-   links.forEach( (v,k) => {
-     rslt[k] = v;
+// serialization occurs by sendMessages between background "page"" and popup panel
+// Map don't serialize :-(
+export function preSerialize(st: AppState): any {
+   let links = Object.create(null);
+   st.links.forEach( (v,k) => {
+     links[k] = v;
    });
-   return rslt;
+   let redirects = Object.create(null);
+   st.redirects.forEach( (v,k) => {
+     redirects[k] = v;
+   });
+   return {...st, links, redirects};
 }
 
-export function deserializeLinks(links: any): Map<string,Url> {
-   let rslt = new Map<string,Url>();
-   for (const k in links) {
-     rslt.set(k, links[k]);
+export function postDeserialize(st: any): AppState {
+   let links = new Map<string,Url>();
+   for (const k in st.links) {
+     links.set(k, st.links[k]);
    };
-   return rslt;
+   let redirects = new Map<string,string>();
+   for (const k in st.redirects) {
+     redirects.set(k, st.redirects[k]);
+   };
+   return {...st, links, redirects};
 }
 
 export function expandedUrl(state: AppState, curl_: string = state.activeUrl): string {
@@ -69,14 +79,13 @@ export function expandedUrl(state: AppState, curl_: string = state.activeUrl): s
   let rslt = curl;
   if (isSeen(state, curl)) {
     let info: LinkInfo = state.links.get(curl);
-    let url: Url = info.synereoUrl;
-    if (url) rslt = format(url);
+    if (info) rslt = format(info.synereoUrl);
   }
   return rslt;
 }
 
 export function isSynereoLink(url: Url): boolean {
-  let srch = process.env.NODE_ENV == "development" ? "localhost:8080" : "synereo.com";
+  let srch = process.env.NODE_ENV == "development" ? "localhost:8080" : "synereo";
   return (url.host.toLowerCase().indexOf(srch) >= 0)
     && (url.path.startsWith("/link/"))
 }
@@ -90,6 +99,7 @@ export function setLoading(state: AppState, curl_: string): AppState {
   let curl = prepareUrl(curl_)
   let st = state;
   if (!isSeen(st, curl)) {
+    console.log("setLoading called: "+ curl_);
     let links = new Map(st.links);
     links.set(curl, null);
     st = { ...st, links };
@@ -112,7 +122,7 @@ export function setWaiting(state: AppState, curl_: string): AppState {
 
 export function isWaiting(state: AppState, curl_: string): boolean {
   let curl = prepareUrl(curl_)
-  return state.links.get(curl) == null;
+  return state.links.get(curl) === null;
 }
 
 function prePrepareUrl(curl: string): Url | null {

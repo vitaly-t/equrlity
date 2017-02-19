@@ -1,7 +1,7 @@
 import * as localForage from "localforage";
 import * as Crypto from './Crypto'
 
-import { AppState, initState, expandedUrl, isSeen, setLoading, setWaiting, prepareUrl, serializeLinks } from './AppState';
+import { AppState, initState, expandedUrl, isSeen, setLoading, setWaiting, prepareUrl, preSerialize } from './AppState';
 import { Url, parse, format } from 'url';
 import { Message, Handlers, AsyncHandlers, getTab } from './Event';
 
@@ -56,9 +56,7 @@ chrome.runtime.onMessage.addListener((message, sender, cb) => {
     return true;
   }
   if (message.eventType == "GetState") {
-    let st: any = currentState();
-    let links = serializeLinks(st.links);
-    st = {...st, links}
+    let st = preSerialize(currentState());
     cb(st);
   }
   else if (message.async) handleAsyncMessage(message);
@@ -79,6 +77,7 @@ chrome.tabs.onActivated.addListener(({tabId, windowId}) => {
 export async function handleAsyncMessage(event: Message) {
   let st = currentState();
   let fn = null;
+  try {
   switch (event.eventType) {
     case "Save": {
       let curl = prepareUrl(st.activeUrl);
@@ -86,11 +85,11 @@ export async function handleAsyncMessage(event: Message) {
 
       // we can't do storeState from here. 
       // so instead we just lie by calling render with temporary state; (so much for source of truth!!)
-      chrome.runtime.sendMessage({ eventType: 'Render', appState: setWaiting(st, st.activeUrl) });
+      chrome.runtime.sendMessage({ eventType: 'Render', appState: preSerialize(setWaiting(st, st.activeUrl)) });
       // force a refresh with correct state in 10 seconds
       setTimeout(() => {
         //console.log("refreshing with correct state");
-        chrome.runtime.sendMessage({ eventType: 'Render', appState: currentState() });
+        chrome.runtime.sendMessage({ eventType: 'Render', appState: preSerialize(currentState()) });
       }, 5000);
       fn = await AsyncHandlers.Save(st, event.linkDescription, event.amount);
       break;
@@ -106,6 +105,12 @@ export async function handleAsyncMessage(event: Message) {
     }
   }
   if (fn) handleMessage({ eventType: "Thunk", fn }, true);
+}
+catch(e) {
+  let fn = (st: AppState) => { return {...st, lastErrorMessage: e.message }; };
+  handleMessage({ eventType: "Thunk", fn }, true);
+  if (e.message === "Network Error") setTimeout(() => initialize(), 5000);
+}
 
 }
 
@@ -116,7 +121,7 @@ export async function handleMessage(event: Message, async: boolean = false): Pro
       //console.log("storing state");
       __state = st;
       if (!(st.links instanceof Map)) console.log("bizarro");
-      chrome.runtime.sendMessage({ eventType: 'Render', appState: st });
+      chrome.runtime.sendMessage({ eventType: 'Render', appState: preSerialize(st) });
     }
   }
 
@@ -128,6 +133,7 @@ export async function handleMessage(event: Message, async: boolean = false): Pro
       else throw new Error("attempt to call handleMessage re-entrantly");
     }
     __handling = true;
+    st.lastErrorMessage = '';
     switch (event.eventType) {
       case "Thunk":
         st = event.fn(st);
@@ -144,8 +150,9 @@ export async function handleMessage(event: Message, async: boolean = false): Pro
         st = await Handlers.ChangeSettings(st, event.settings);
         st = { ...st, mode: "Amplify" };
         break;
+      default:
+        throw new Error("Unknown eventType: "+event.eventType);
     }
-    st.lastErrorMessage = '';
     storeState(st);
   }
   catch (e) {

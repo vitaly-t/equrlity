@@ -40,7 +40,8 @@ export class PopupPanel extends React.Component<PopupPanelProps, PopupPanelState
     console.log("rendering popup...");
     switch (st.mode) {
       case "Amplify": {
-        let pnl = st.lastErrorMessage ?  <div>Error: {st.lastErrorMessage}</div> : <div>No active URL found</div>
+        if (st.lastErrorMessage) return  <div>Error: {st.lastErrorMessage}</div>
+        let pnl = <div>No active URL found</div>
         if (curl) {
           let tgt = expandedUrl(st);
           console.log("rendering for target :" + tgt);
@@ -90,7 +91,7 @@ export class PopupPanel extends React.Component<PopupPanelProps, PopupPanelState
           <h3>Your Settings:</h3>
           {frm}
           <button onClick={cancelAction}>Abandon Changes</button>
-          <p>This form brought to you by UglyAsF*ck Interface Ltd. (C) 1996. All rights reserved</p>
+          <p>This form brought to you by UglyAsF*ck Interfaces Ltd. (C) 1996. All rights reserved</p>
         </div>;
 
       }

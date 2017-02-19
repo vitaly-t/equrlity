@@ -1,13 +1,11 @@
 import * as React from "react";
 import * as ReactDOM from "react-dom";
 
-import { AppState, deserializeLinks } from "./AppState";
+import { AppState, postDeserialize } from "./AppState";
 import { PopupPanel } from "./components/Popup";
 
-function render(state_: any) {
+function render(state: AppState) {
   console.log("render called");
-  let links = deserializeLinks(state_.links);  // stoopid Map can't be serialized...
-  let state: AppState = {...state_, links};
   let elem = document.getElementById('app')
   let url = state.activeUrl;
   if (!elem) console.log("cannot get app element");
@@ -26,12 +24,13 @@ function renderServerMessage(msg: string) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  chrome.runtime.sendMessage({ eventType: "GetState" }, st => render(st) );
+  chrome.runtime.sendMessage({ eventType: "GetState" }, st => render(postDeserialize(st)) );
 });
 
 chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
   if (message.eventType === "Render") {
-    render(message.appState);
+    let state: AppState = postDeserialize(message.appState);
+    render(state);
   }
   else if (message.eventType === "RenderMessage") {
     renderServerMessage(message.msg);

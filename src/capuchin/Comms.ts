@@ -4,6 +4,7 @@ import { Url, parse } from 'url';
 import axios, { AxiosResponse, AxiosError } from 'axios';
 import * as Rpc from '../lib/rpc';
 import {AppState} from './AppState';
+import { capuchinVersion } from '../lib/utils';
 
 export function isDev(): boolean {
   return process.env.NODE_ENV === "development"
@@ -41,6 +42,7 @@ async function getCookie() {
 async function apiRequest(st: AppState) {
   let headers = { 'content-type': 'application/json', 'Accept': 'application/json'}
   if (st.jwt) headers['Authorization'] = 'Bearer '+st.jwt;
+  headers['x-syn-client-version'] = 'capuchin-' +capuchinVersion();
   return axios.create({
     timeout: 10000,
     //withCredentials: true,  // not needed since cookies didn't work...
@@ -59,7 +61,16 @@ export async function sendApiRequest(st: AppState, method: Rpc.Method, params: a
   let xhr = await apiRequest(st);
   id += 1;
   let data: Rpc.Request = { jsonrpc: "2.0", method, params, id };
-  return await xhr.post(serverUrl, data );
+  try {
+     return await xhr.post(serverUrl, data );
+  }
+  catch (e) {
+    if (!e.response) throw e;
+    let msg = "Invalid response from server";
+    try { msg = e.response.data.error.message; }
+    catch (e) {}
+    throw new Error(msg + " (" + e.response.status.toString() + ")");
+  } 
 }
 
 export async function sendAddContent(st: AppState, url: string, linkDescription: string, amount: number): Promise<AxiosResponse> {
