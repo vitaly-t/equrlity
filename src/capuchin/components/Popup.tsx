@@ -4,6 +4,7 @@ import { Url, format } from 'url';
 import { serverUrl } from '../Comms';
 import Form from 'react-input';
 import * as Rpc from '../../lib/rpc'
+import {capuchinVersion} from '../../lib/utils';
 
 export interface PopupPanelProps { appState?: AppState; serverMessage?: string };
 export interface PopupPanelState { amplifyAmount: number, description: string };
@@ -38,12 +39,15 @@ export class PopupPanel extends React.Component<PopupPanelProps, PopupPanelState
       return <div>Waiting for response from Server</div>;
     }
     console.log("rendering popup...");
+    let versionDiv = ( <p>Version: {capuchinVersion()}. Proudly brought to you by UglyAsF*ck Interfaces Ltd. (C) 1996. All rights reserved</p> );
     switch (st.mode) {
       case "Amplify": {
         if (st.lastErrorMessage) return  <div>Error: {st.lastErrorMessage}</div>
         let pnl = <div>No active URL found</div>
         if (curl) {
           let tgt = expandedUrl(st);
+          let desc = this.state.description;
+          if (!desc) desc = curl;
           console.log("rendering for target :" + tgt);
           let linkInfo = getLinked(st, curl);
           let lbl = linkInfo ? "Re-Amplify" : "Amplify";
@@ -58,8 +62,8 @@ export class PopupPanel extends React.Component<PopupPanelProps, PopupPanelState
             {infoDiv}
             <p>Investment amount: <input type="number" ref={(e) => this.ctrls.amountInput = e} max={st.ampCredits}
                                 value={this.state.amplifyAmount} onChange={(e) => this.changeAmplifyAmount() } /></p>
-            <p>Description: <input type="string" ref={(e) => this.ctrls.descriptionInput = e} 
-                                value={this.state.description} onChange={(e) => this.changeDescription() } /></p>
+            <p>Description: <input type="string" style={ {width: 400}} ref={(e) => this.ctrls.descriptionInput = e} 
+                                value={desc} onChange={(e) => this.changeDescription() } /></p>
             <button onClick={saveaction} >{lbl}</button>
           </div>);
         }
@@ -70,7 +74,7 @@ export class PopupPanel extends React.Component<PopupPanelProps, PopupPanelState
           <p>Your current Amp Balance is: {st.ampCredits}</p>
           <p><button onClick={settingsAction}>Change Settings</button></p>
           {pnl}
-          <p>This panel brought to you by UglyAsF*ck Interfaces Ltd. (C) 1996. All rights reserved</p>
+          {versionDiv}
         </div>
       }
       case "Settings": {
@@ -91,7 +95,7 @@ export class PopupPanel extends React.Component<PopupPanelProps, PopupPanelState
           <h3>Your Settings:</h3>
           {frm}
           <button onClick={cancelAction}>Abandon Changes</button>
-          <p>This form brought to you by UglyAsF*ck Interfaces Ltd. (C) 1996. All rights reserved</p>
+          {versionDiv}
         </div>;
 
       }

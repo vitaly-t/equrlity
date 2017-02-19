@@ -37,11 +37,7 @@ async function initialize(): Promise<AppState> {
   state = { ...state, publicKey, privateKey, jwt };
   let st = await handleMessage({ eventType: "Initialize", state });
   if (!st.lastErrorMessage) {
-    if (!jwt) {
-      if (!st.jwt) throw new Error("Server failed to deliver token");
-      localForage.setItem<string>('jwt', st.jwt);
-    }
-    else if (jwt !== st.jwt) throw new Error("Unexpected update to token");
+    if (!jwt) localForage.setItem<string>('jwt', st.jwt);
   }
   return st;
 }
@@ -120,7 +116,6 @@ export async function handleMessage(event: Message, async: boolean = false): Pro
     if (__state !== st) {
       //console.log("storing state");
       __state = st;
-      if (!(st.links instanceof Map)) console.log("bizarro");
       chrome.runtime.sendMessage({ eventType: 'Render', appState: preSerialize(st) });
     }
   }

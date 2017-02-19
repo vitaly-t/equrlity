@@ -3,6 +3,16 @@ export default {
     "authId": {
       "sqlType": "varchar(128)"
     },
+    "authProvider": {
+      "sqlType": "varchar(36)",
+      "enum": [
+        "ip",
+        "facebook",
+        "github",
+        "twitter",
+        "linkedin",
+      ]
+    },
     "binary": {
       "tsType": "ArrayBuffer",
       "sqlType": "bytea"
@@ -90,6 +100,7 @@ export default {
   },
   "tupleTypes": {
     "Auth": [
+      "authProvider",
       "authId",
       "userId",
       {
@@ -140,6 +151,7 @@ export default {
     "users": {
       "rowType": "User",
       "primaryKey": [ "userId" ],
+      "uniques": [ ["userName"] ],
     },
     /*  we will calculate these from the links table for the moment
     "userlinks": {
@@ -153,7 +165,7 @@ export default {
     */
     "auths": {
       "rowType": "Auth",
-      "primaryKey": [ "authId" ],
+      "primaryKey": [ "authProvider","authId" ],
       "foreignKeys": [
         { "ref": "users", "columns": [ "userId" ] }
       ]

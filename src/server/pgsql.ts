@@ -95,7 +95,7 @@ export namespace DbCache {
 
     let authRows: Array<Dbt.Auth> = await db.any("select * from auths");
     auths.clear();
-    authRows.forEach(r => auths.set(r.authId, r));
+    authRows.forEach(r => auths.set(r.authProvider + ":" +r.authId, r));
 
     let contentRows: Array<Dbt.Content> = await db.any("select * from contents");
     contents.clear();
@@ -294,12 +294,11 @@ export async function touch_user(userId) {
 }
 
 export async function touch_auth(prov, authId) {
-  let key = prov + ':' + authId;
-  let auth = DbCache.auths.get(key);
+  let auth = DbCache.auths.get(prov + ":" + authId);
   let dt = new Date();
-  await db.none('update auths set updated = $2 where "authId" = $1', [key, dt]);
+  await db.none(`update auths set updated = $2 where "authId" = '${authId}' and "authProvider" = '${prov}' `);
   auth = { ...auth, updated: dt };
-  DbCache.auths.set(auth.authId, auth);
+  DbCache.auths.set(auth.authProvider + ":" + auth.authId, auth);
 }
 
 export function emptyContent(): Dbt.Content {

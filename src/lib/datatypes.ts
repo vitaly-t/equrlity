@@ -2,6 +2,7 @@
 
 
 export type authId = string;
+export type authProvider = "ip" | "facebook" | "github" | "twitter" | "linkedin";
 export type binary = ArrayBuffer;
 export type contentId = number;
 export type contentCryptId = ArrayBuffer;
@@ -34,6 +35,7 @@ export interface User {
 };
 
 export interface Auth {
+  readonly authProvider: authProvider | null,
   readonly authId: authId | null,
   readonly userId: userId | null,
   readonly created: timestamp | null,

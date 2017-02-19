@@ -1,6 +1,6 @@
 {
   "name": "Synereo",
-  "version": "0.6",
+  "version": "__CAPUCHIN_VERSION__",
   "manifest_version": 3,
   "description": "AMPLIFY THIS!",
   "browser_action": {

@@ -23,7 +23,7 @@ const cache = pg.DbCache;
 const jwt_secret = process.env.JWT_AMPLITUDE_KEY;
 
 cache.init();
-//pg.resetDatabase();
+pg.resetDataTables();
 //pg.recreateDataTables();
 
 const app = new Koa();
@@ -80,6 +80,7 @@ let createUser = async function (ctx) {
   return rslt;
 };
 
+/*
 let authent = async function (ctx, prov, authId) {
   console.log("authent call with authId : " + authId);
   if (!authId) {
@@ -92,7 +93,7 @@ let authent = async function (ctx, prov, authId) {
       ctx.userId = { id: user.userId };
       if (prov !== 'ip') {
         let ip = clientIP(ctx.req);
-        let auth = { ...pg.emptyAuth(), authId: 'ip:' + ip, userId: ctx.userId.id };
+        let auth = { ...pg.emptyAuth(), authProvider: 'ip', authId: ip, userId: ctx.userId.id };
         await pg.upsert_auth(auth);
       }
       else pg.touch_auth(prov, authId)
@@ -101,9 +102,6 @@ let authent = async function (ctx, prov, authId) {
         if (prov !== 'ip') console.log("authentication problem - no previous user"); // return;  // ???
         await createUser(ctx);
       }
-      user = ctx.user;
-      let auth = { ...pg.emptyAuth(), authId: prov + ':' + authId, userId: ctx.userId.id }
-      await pg.upsert_auth(auth);
     }
     if (prov === 'ip') delete ctx.userId.auth;
     else ctx.userId.auth = prov + ':' + authId;
@@ -114,8 +112,9 @@ let authent = async function (ctx, prov, authId) {
     //await ctx.login(user);   // for when passport is enabled
   }
 };
+*/
 
-app.keys = ['foo'];
+app.keys = ['amplitude'];  //@@GS what does this do again?
 
 //app.use(koastatic.static(__dirname + '/assets')); 
 //app.use(serve("assets", "./assets"));
@@ -139,13 +138,13 @@ app.use(async (ctx, next) => {
   let client_ver = ctx.headers['x-syn-client-version'];
   if (!client_ver) {
     ctx.status = 400;
-    ctx.body = { error: { message: 'Invalid Client' } }
+    ctx.body = { error: { message: 'Invalid Client' } };
     return;
   }
-  let [client,version] = client_ver.split("-");
+  let [client, version] = client_ver.split("-");
   if (client !== 'capuchin') {
     ctx.status = 400;
-    ctx.body = { error: { message: 'Invalid Client' } }
+    ctx.body = { error: { message: 'Invalid Client' } };
     return;
   }
   if (version !== capuchinVersion()) {
@@ -162,19 +161,9 @@ app.use(bodyParser());
 app.use(jwt.jwt({ secret: jwt_secret, ignoreExpiration: true, key: 'userId' }));
 
 app.use(async function (ctx, next) {
-
-  let userId = ctx['userId'];
-  if (!userId) console.log("jwt returned no key");
-  let user = userId ? getUser(userId.id) : null;
-  if (userId && !user) console.log("unable to locate user for : " + userId.id);
-  if (!userId || !user) {
-    let ip = clientIP(ctx.req);
-    await authent(ctx, 'ip', ip);
-  }
-
   await next();
-  userId = ctx['userId'];
-  user = getUser(userId.id);
+
+  let user: Dbt.User = ctx['user'];
   ctx.set("Access-Control-Allow-Origin", "*");
   ctx.set("Access-Control-Allow-Headers", ["X-Requested-With", "Content-Type", "Authorization"]);
   ctx.set("Access-Control-Expose-Headers", ["x-syn-moniker", "x-syn-credits", "x-syn-token", "x-syn-authprov", "x-syn-groups"]);
@@ -182,15 +171,43 @@ app.use(async function (ctx, next) {
   ctx.set('x-syn-credits', user.ampCredits.toString());
   ctx.set('x-syn-moniker', user.userName);
 
-  if (userId.auth) {
-    let auth = userId.auth;
-    let prov = auth.slice(0, auth.indexOf(':'));
-    let grps = ctx.user.groups || '';
-    ctx.set('x-syn-authprov', prov);
-    ctx.set('x-syn-groups', grps);
-  }
-  pg.touch_user(userId.id);
+  pg.touch_user(user.userId);
 });
+
+app.use(async function (ctx, next) {
+  let userId = ctx['userId'];
+  if (!userId) {
+    console.log("jwt returned no key");
+    await createUser(ctx);
+  }
+  else {
+    let user = getUser(userId.id);
+    if (!user) {
+      ctx.status = 400;
+      ctx.body = { error: { message: 'Invalid token supplied (out of date?)' } };
+      return;
+    }
+    ctx.user = user;
+  }
+  ctx['token'] = jwt.sign(ctx['userId'], jwt_secret); //{expiresInMinutes: 60*24*14});
+  await next();
+});
+
+
+/*
+app.use(async function (ctx, next) {
+//  Julia! - authentication / passport stuff should go here.  The identification stuff has been handled above
+// and the context now contains both userId and user
+
+await next()
+if (cxt.auth) {
+  let auth = cxt.auth;
+  let prov = auth.slice(0, auth.indexOf(':'));
+  let grps = ctx.user.groups || '';
+  ctx.set('x-syn-authprov', prov);
+  ctx.set('x-syn-groups', grps);
+}
+*/
 
 /* @@GS - Wasted an entire weekend trying to get the download thing to work.  Still no idea why it fails
 let pluginClause = ` 
