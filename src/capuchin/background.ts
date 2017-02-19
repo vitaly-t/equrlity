@@ -105,7 +105,7 @@ export async function handleAsyncMessage(event: Message) {
 catch(e) {
   let fn = (st: AppState) => { return {...st, lastErrorMessage: e.message }; };
   handleMessage({ eventType: "Thunk", fn }, true);
-  if (e.message === "Network Error") setTimeout(() => initialize(), 5000);
+  if (e.message === "Network Error") setTimeout(() => initialize(), 15000);
 }
 
 }
@@ -153,7 +153,7 @@ export async function handleMessage(event: Message, async: boolean = false): Pro
   catch (e) {
     console.log("error in handler :" + e.message);
     st.lastErrorMessage = e.message;
-    if (e.message === "Network Error") setTimeout(() => initialize(), 5000);
+    if (e.message === "Network Error") setTimeout(() => initialize(), 15000);
   }
   finally {
     __handling = false;

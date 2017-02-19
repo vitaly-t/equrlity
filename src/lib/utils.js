@@ -11,5 +11,5 @@ export function isDev() {
 }
 
 export function capuchinVersion() {
-	return "0.7.5";
+	return "0.7.6";
 }
