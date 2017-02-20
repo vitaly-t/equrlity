@@ -42,7 +42,7 @@ The amount you invested in the link will be used to make payments to other Syner
 (ie. open the page). The viewer of the link will be paid 1 Amp for providing their attention.  
 
 If the link has a parent, that parent link will also get paid 1 Amp, and so on back up the chain. So if a link
-has four parents, each view will decrement the balance by 5, 1 going to the viewer, and 1 going to each of the parent
+has four parents, each view will decrement the balance by 5, 1 going to the viewer, and 1 going to each of the four parent
 links.
 
 If the viewer wishes, she can choose to Re-Amplify your the link you sent them.  The link created will have your
@@ -53,10 +53,9 @@ Once the balance in a link drops to zero, it will be automatically removed from 
 
 ### Redeeming links
 
-(NB - Not yet implemented.)
-
-At any stage you can review all the links you currently have investments in, along with their current balances.
-You can choose to "redeem" any such links, such that the balance will be transferred back into your account,
+At any stage you can review all the links you currently have investments along with their current balances,
+by clicking on the "Edit / View Settings" button in the extension popup.
+From there you can also choose to "redeem" any such links, such that the balance will be transferred back into your account,
 and the link removed.
 
 ## Build Dependencies
