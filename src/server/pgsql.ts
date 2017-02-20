@@ -201,7 +201,7 @@ export namespace DbCache {
     bal -= 1
 
     // each link in the parent chain gets paid 1
-    let stmt = OxiGen.genUpdateStatement(oxb.tables.get("links"), { linkId: 0, amount: 0 });
+    let stmt = OxiGen.genUpdateStatement(oxb.tables.get("links"), { linkId: 0, amount: 0, hitCount: 0 });
     let l = links.length - 1
     while (bal > 0 && l > 0) {
       let {linkId, amount} = links[l];
@@ -219,7 +219,7 @@ export namespace DbCache {
       let link = DbCache.links.get(viewedLinkId);
       await redeem_link({...link, amount: 0});
     }
-    await db.none(stmt, { linkId: viewedLinkId, amount: bal });
+    else await db.none(stmt, { linkId: viewedLinkId, amount: bal, hitCount: viewedLink.hitCount + 1 });
   }
 
 }

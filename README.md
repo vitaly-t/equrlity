@@ -53,7 +53,7 @@ Once the balance in a link drops to zero, it will be automatically removed from 
 
 ### Redeeming links
 
-At any stage you can review all the links you currently have investments along with their current balances,
+At any stage you can review all the links you currently have investments in, along with their current balances,
 by clicking on the "Edit / View Settings" button in the extension popup.
 From there you can also choose to "redeem" any such links, such that the balance will be transferred back into your account,
 and the link removed.
