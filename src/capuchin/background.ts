@@ -1,5 +1,5 @@
 import * as localForage from "localforage";
-import * as Crypto from './Crypto'
+import * as Crypto from '../lib/Crypto'
 
 import { AppState, initState, expandedUrl, isSeen, setLoading, setWaiting, prepareUrl, preSerialize } from './AppState';
 import { Url, parse, format } from 'url';
@@ -138,8 +138,8 @@ export async function handleMessage(event: Message, async: boolean = false): Pro
         break;
       case "GetState":
         break;
-      case "SetMode":
-        st = { ...st, mode: event.mode };
+      case "LaunchSettingsPage":
+        chrome.tabs.create({'url': chrome.extension.getURL('settings.html'), 'selected': true});
         break;
       case "ChangeSettings":
         st = await Handlers.ChangeSettings(st, event.settings);

@@ -15,6 +15,6 @@
   ],
   "background": {
     "persistent": true,
-    "scripts": ["background.js"]
+    "scripts": ["background_bndl.js"]
   }
 }

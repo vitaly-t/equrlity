@@ -1,4 +1,6 @@
-export type Method = "addContent" | "initialize" | "changeMoniker" | "loadLink" | "getRedirect" | "changeSettings";
+import * as Dbt from './datatypes';
+
+export type Method = "addContent" | "initialize" | "changeMoniker" | "loadLink" | "getRedirect" | "changeSettings" | "getUserLinks" ;
 
 export type UrlString = string;
 export type Integer = number;
@@ -40,7 +42,6 @@ export type LoadLinkResponse = {
   linkAmplifier: string;
 }
 
-
 export type GetRedirectRequest = { linkUrl: UrlString; }
 
 export type GetRedirectResponse = { found: boolean, contentUrl: UrlString; linkDepth: Integer, linkAmplifier: string }
@@ -52,6 +53,20 @@ export type ChangeSettingsRequest = {
 }
 
 export type ChangeSettingsResponse = { ok: boolean; }
+
+export type GetUserLinksRequest = {}
+
+export type UserLinkItem = {
+  linkId: Dbt.linkId;
+  contentUrl: Dbt.content;
+  linkDepth: Dbt.integer;
+  viewCount: Dbt.integer;
+  amount: Dbt.integer;
+}
+
+export type GetUserLinksResponse = {
+  links: UserLinkItem[];
+}
 
 export type Request = {
    jsonrpc: string, 

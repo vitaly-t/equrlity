@@ -2,7 +2,7 @@ import * as React from "react";
 import * as ReactDOM from "react-dom";
 
 import { AppState, postDeserialize } from "./AppState";
-import { PopupPanel } from "./components/Popup";
+import { PopupPanel } from "./Popup";
 
 function render(state: AppState) {
   console.log("render called");

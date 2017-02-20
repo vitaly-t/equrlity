@@ -130,7 +130,7 @@ const publicRouter = new Router();
 
 app.use(bodyParser());
 
-app.use(cors({ 
+app.use(cors({
   origin: "*",
   allowMethods: 'GET,HEAD,PUT,POST,DELETE,PATCH',
   allowHeaders: ["X-Requested-With", "Content-Type", "Authorization", "x-syn-client-version"],
@@ -164,35 +164,38 @@ Chrome extensions page, and select "Load unpacked extension".</p>
 If you wish, you can also untick it after installing the extension.)</p>         
 <p>To upgrade an existing installation, simply overwrite the existing files with the new ones, and select "Reload" in the extensions page.</p>         
 `;
+const header = `<h2>CALL TO ACTION - JOIN SYNEREO - YOU KNOW YOU WANT TO - WHAT COULD GO WRONG???</h2>`;
+const footer = `<p>Proudly brought to you by UglyAsF*ck Interfaces Ltd. (C) 1996. All rights reserved</p>`;
 
 publicRouter.get('/link/:id', async (ctx, next) => {
   let linkId: Dbt.linkId = parseInt(ctx.params.id);
   let url = cache.getContentFromLinkId(linkId);
-  let body = `
-<h2>CALL TO ACTION - JOIN SYNEREO - YOU KNOW YOU WANT TO - WHAT COULD GO WRONG???</h2>
+  let linkClause = url ? `<p>This is the link you were (probably) after: <a href="${url}">${url}</a></p>` : '';
+  ctx.body = `
+${header};
 <p>You have followed a Synereo link.  If you can see this message (for more than a second or so)
-it probably means you do not have the Synereo browser plugin installed.
-</p>
+it probably means you do not have the Synereo browser plugin installed.</p>
+${pluginClause}
+${linkClause}
+${footer}
 `;
-  body += pluginClause;
-  if (url) body += `<p>This is the link you were (probably) after: <a href="${url}">${url}</a></p>`
-  ctx.body = body;
 })
 
 publicRouter.get('/', async (ctx, next) => {
-  let body = `
-<h2>CALL TO ACTION - JOIN SYNEREO - YOU KNOW YOU WANT TO - WHAT COULD GO WRONG???</h2>
+  ctx.body = `
+${header};
 <p>You have landed on the home page of Synereo Chrome plugin extension.</p>
 <p>(This page is currently in serious contention for the world's ugliest webpage!  Support our bid, vote for us!!! ... )</p>
-`
-  body += pluginClause;
-  ctx.body = body;
+${pluginClause}
+${footer}
+`;
 })
+
 app.use(publicRouter.routes());
 
 //app.use(publicRouter.allowedMethods());
 
-//  From here on, it's for approved client(s) only
+//  From here on, it's for known client(s) only
 
 app.use(async (ctx, next) => {
   try {
@@ -426,6 +429,20 @@ router.post('/rpc', async function (ctx: any) {
         if (email) usr = { ...usr, email };
         await pg.upsert_user(usr);
         ctx.body = { id, result: { ok: true } };
+        break;
+      }
+      case "getUserLinks": {
+        let a = await pg.get_links_for_user(ctx.userId.id);
+        let links = a.map(l => {
+          let linkId = l.linkId;
+          let contentUrl = cache.contents.get(l.contentId).content;
+          let linkDepth = cache.getLinkDepth(l);
+          let viewCount = l.hitCount;
+          let amount = l.amount;
+          let rl: Rpc.UserLinkItem = { linkId, contentUrl, linkDepth, viewCount, amount };
+          return rl;
+        });
+        ctx.body = { id, result: { links } };
         break;
       }
       default:

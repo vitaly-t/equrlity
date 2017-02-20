@@ -376,6 +376,11 @@ export async function reclaim_amount_from_link(link: Dbt.Link, adj: Dbt.integer)
   return rslt;
 }
 
+export async function get_links_for_user(userId: Dbt.userId): Promise<Dbt.Link[]> {
+  let links = await db.manyOrNone(`select * from links where "userId" = ${userId}`);
+  return links;
+}
+
 export async function redeem_link(link: Dbt.Link): Promise<void> {
   let linkIdsToReParent = await db.manyOrNone(`select "linkId" from links where "prevLink" = ${link.linkId}`)
   let stmt = `update links set "parentLink" = ' + ${link.prevLink ? link.prevLink.toString() : 'null'} 

@@ -36,11 +36,6 @@ export interface Render {
   appState: AppState;
 }
 
-export interface Thunk {
-  eventType: "Thunk";
-  fn: (st: AppState) => AppState;
-}
-
 export interface SetMode {
   eventType: "SetMode";
   mode: PopupMode;
@@ -51,7 +46,16 @@ export interface ChangeSettings {
   settings: Rpc.ChangeSettingsRequest;
 }
 
-export type Message = Save | Initialize | GetState | Load | ActivateTab | Render | SetMode | ChangeSettings | Thunk 
+export interface LaunchSettingsPage {
+  eventType: "LaunchSettingsPage";
+}
+
+export interface Thunk {
+  eventType: "Thunk";
+  fn: (st: AppState) => AppState;
+}
+
+export type Message = Save | Initialize | GetState | Load | ActivateTab | Render | SetMode | ChangeSettings | LaunchSettingsPage | Thunk 
 
 export function getTab(tabId: number): Promise<chrome.tabs.Tab> {
   return new Promise( resolve => {

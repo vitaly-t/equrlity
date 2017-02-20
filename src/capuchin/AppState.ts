@@ -9,12 +9,11 @@ export interface AppState {
   privateKey: JsonWebKey | null;
   responses: Object[];
   links: Map<string, LinkInfo>;
-  redirects: Map<string, string>;   // keys are synereo urls (strings) - values are source urls 
+  redirects: Map<string, string>;   // keys are synereo urls - values are source urls 
   activeUrl: string | null;
   moniker: string;
   ampCredits: number;
   jwt: string;
-  mode: PopupMode;
   lastErrorMessage: string;
 }
 
@@ -23,7 +22,7 @@ export function initState(): AppState {
   return {
     publicKey: null, privateKey: null, responses: [],
     links: new Map<string, LinkInfo>(), redirects: new Map<string, string>(),
-    activeUrl: null, moniker: 'unknown', ampCredits: 0, jwt: '', mode: "Amplify", lastErrorMessage: ''
+    activeUrl: null, moniker: 'unknown', ampCredits: 0, jwt: '', lastErrorMessage: ''
   };
 }
 
@@ -49,7 +48,7 @@ export function setLink(state: AppState, curl_: string, syn_: string, linkDepth:
 }
 
 // serialization occurs by sendMessages between background "page"" and popup panel
-// Map don't serialize :-(
+// Maps don't serialize :-(
 export function preSerialize(st: AppState): any {
    let links = Object.create(null);
    st.links.forEach( (v,k) => {

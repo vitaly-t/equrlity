@@ -9,11 +9,12 @@ module.exports = function (env) {
   return {
     entry: {
       main: './src/capuchin/main.tsx',
-      background: './src/capuchin/background.ts'
+      background: './src/capuchin/background.ts',
+      settings: './src/capuchin/settings.tsx'
     },
     output: {
       path: path.resolve(__dirname, tgtdir),
-      filename: '[name].js'
+      filename: '[name]_bndl.js'
     },
     resolve: {
       extensions: [".ts", ".tsx", ".js"]
@@ -24,6 +25,10 @@ module.exports = function (env) {
           test: /\.tsx?$/,
           loader: 'ts-loader',
           exclude: /node_modules/
+        },
+        {
+          test: /\.css$/,
+          use: ['style-loader', 'css-loader']
         },
         {
           enforce: 'pre',
@@ -39,10 +44,10 @@ module.exports = function (env) {
       new CopyWebpackPlugin([
         {
           from: 'src/capuchin/assets',
-          transform: function(content, path) { 
+          transform: function (content, path) {
             //console.log(content);
             var str = (new TextDecoder('utf-8')).decode(content);
-            var rslt = str.replace("__CAPUCHIN_VERSION__", capuchinVersion()); 
+            var rslt = str.replace("__CAPUCHIN_VERSION__", capuchinVersion());
             return (new TextEncoder()).encode(rslt);
           }
         }
