@@ -5,6 +5,7 @@ import axios, { AxiosResponse, AxiosError } from 'axios';
 import * as Rpc from '../lib/rpc';
 import {AppState} from './AppState';
 import * as Utils from '../lib/utils';
+import * as Dbt from '../lib/datatypes';
 
 export function isDev(): boolean {
   return process.env.NODE_ENV === "development"
@@ -85,4 +86,8 @@ export async function sendChangeSettings(st: AppState, settings: Rpc.ChangeSetti
 
 export async function sendGetUserLinks(st: AppState): Promise<AxiosResponse> {
   return await sendApiRequest(st, "getUserLinks", {} );
+}
+
+export async function sendRedeemLink(st: AppState, linkId: Dbt.linkId): Promise<AxiosResponse> {
+  return await sendApiRequest(st, "redeemLink", {linkId} );
 }

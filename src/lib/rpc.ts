@@ -1,6 +1,7 @@
 import * as Dbt from './datatypes';
 
-export type Method = "addContent" | "initialize" | "changeMoniker" | "loadLink" | "getRedirect" | "changeSettings" | "getUserLinks" ;
+export type Method = "addContent" | "initialize" | "changeMoniker" | "loadLink" | "getRedirect" | "changeSettings" 
+                   | "getUserLinks" | "redeemLink" ;
 
 export type UrlString = string;
 export type Integer = number;
@@ -64,9 +65,10 @@ export type UserLinkItem = {
   amount: Dbt.integer;
 }
 
-export type GetUserLinksResponse = {
-  links: UserLinkItem[];
-}
+export type GetUserLinksResponse = { links: UserLinkItem[]; }
+
+export type RedeemLinkRequest = { linkId: Dbt.linkId; }
+export type RedeemLinkResponse = { links: UserLinkItem[]; }
 
 export type Request = {
    jsonrpc: string, 

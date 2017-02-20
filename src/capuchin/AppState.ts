@@ -1,4 +1,5 @@
 import { Url, format, parse } from 'url';
+import {UserLinkItem} from '../lib/rpc';
 
 export interface LinkInfo { synereoUrl: Url, linkDepth: number, linkAmplifier: string };
 
@@ -15,6 +16,7 @@ export interface AppState {
   ampCredits: number;
   jwt: string;
   lastErrorMessage: string;
+  investments: UserLinkItem[];
 }
 
 export function initState(): AppState {
@@ -22,7 +24,7 @@ export function initState(): AppState {
   return {
     publicKey: null, privateKey: null, responses: [],
     links: new Map<string, LinkInfo>(), redirects: new Map<string, string>(),
-    activeUrl: null, moniker: 'unknown', ampCredits: 0, jwt: '', lastErrorMessage: ''
+    activeUrl: null, moniker: 'unknown', ampCredits: 0, jwt: '', lastErrorMessage: '', investments: []
   };
 }
 

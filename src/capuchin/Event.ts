@@ -4,6 +4,7 @@ import * as Comms from './Comms';
 import { Url, parse, format } from 'url';
 import { AxiosResponse } from 'axios';
 import * as Rpc from '../lib/rpc';
+import * as Dbt from '../lib/datatypes';
 
 export interface Save {
   eventType: "Save";
@@ -36,11 +37,6 @@ export interface Render {
   appState: AppState;
 }
 
-export interface SetMode {
-  eventType: "SetMode";
-  mode: PopupMode;
-}
-
 export interface ChangeSettings {
   eventType: "ChangeSettings";
   settings: Rpc.ChangeSettingsRequest;
@@ -50,12 +46,22 @@ export interface LaunchSettingsPage {
   eventType: "LaunchSettingsPage";
 }
 
+export interface RedeemLink {
+  eventType: "RedeemLink";
+  linkId: Dbt.linkId;
+}
+
+export interface GetUserLinks {
+  eventType: "GetUserLinks";
+}
+
 export interface Thunk {
   eventType: "Thunk";
   fn: (st: AppState) => AppState;
 }
 
-export type Message = Save | Initialize | GetState | Load | ActivateTab | Render | SetMode | ChangeSettings | LaunchSettingsPage | Thunk 
+export type Message = Save | Initialize | GetState | Load | ActivateTab | Render | ChangeSettings | LaunchSettingsPage 
+                    | RedeemLink | GetUserLinks | Thunk ;
 
 export function getTab(tabId: number): Promise<chrome.tabs.Tab> {
   return new Promise( resolve => {
@@ -139,6 +145,32 @@ export namespace AsyncHandlers {
         console.log("redirecting to: " + rslt.contentUrl);
         chrome.tabs.update(tab.id, { url: rslt.contentUrl });
       }
+      return st;
+    };
+  }
+
+  export async function RedeemLink(state: AppState, linkId: Dbt.linkId): Promise<(st: AppState) => AppState> {
+    let response = await Comms.sendRedeemLink(state, linkId);
+    return (st: AppState) => {
+      let rsp : Rpc.Response = response.data;
+      if (rsp.error) throw new Error("Server returned error: " + rsp.error.message);
+      let rslt: Rpc.RedeemLinkResponse = rsp.result;  
+      let investments = rslt.links;  
+      st = extractHeadersToState(st, response);
+      st = {...st, investments}
+      return st;
+    };
+  }
+
+  export async function GetUserLinks(state: AppState): Promise<(st: AppState) => AppState> {
+    let response = await Comms.sendGetUserLinks(state);
+    return (st: AppState) => {
+      let rsp : Rpc.Response = response.data;
+      if (rsp.error) throw new Error("Server returned error: " + rsp.error.message);
+      let rslt: Rpc.GetUserLinksResponse = rsp.result;  
+      let investments = rslt.links;  
+      st = extractHeadersToState(st, response);
+      st = {...st, investments}
       return st;
     };
   }

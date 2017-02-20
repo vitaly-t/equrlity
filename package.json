@@ -38,6 +38,7 @@
     "@types/webcrypto": "0.0.27",
     "auto-prefixer": "^0.4.2",
     "axios": "^0.15.3",
+    "bootstrap": "^4.0.0-alpha.6",
     "dotenv": "^2.0.0",
     "history": "^4.5.0",
     "jquery": "^3.1.1",

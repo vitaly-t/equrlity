@@ -5,7 +5,6 @@ import { AppState, initState, expandedUrl, isSeen, setLoading, setWaiting, prepa
 import { Url, parse, format } from 'url';
 import { Message, Handlers, AsyncHandlers, getTab } from './Event';
 
-//currently we are using a single, global, mutable model.  What could go wrong??
 // no touchy!!  only to be set from within handleMessage
 let __state: AppState = initState();
 
@@ -94,6 +93,14 @@ export async function handleAsyncMessage(event: Message) {
       fn = await AsyncHandlers.Load(st, event.url);
       break;
     }
+    case "RedeemLink": {
+      fn = await AsyncHandlers.RedeemLink(st, event.linkId);
+      break;
+    }
+    case "GetUserLinks": {
+      fn = await AsyncHandlers.GetUserLinks(st);
+      break;
+    }
     case "ActivateTab": {
       let t = await getTab(event.tabId);
       fn = await AsyncHandlers.Load(st, t.url);
@@ -140,6 +147,7 @@ export async function handleMessage(event: Message, async: boolean = false): Pro
         break;
       case "LaunchSettingsPage":
         chrome.tabs.create({'url': chrome.extension.getURL('settings.html'), 'selected': true});
+        handleAsyncMessage({eventType: "GetUserLinks"})
         break;
       case "ChangeSettings":
         st = await Handlers.ChangeSettings(st, event.settings);

@@ -320,6 +320,20 @@ async function changeMoniker(id: Dbt.userId, newName: string): Promise<boolean> 
   return true;
 }
 
+async function GetUserLinks(id: Dbt.userId): Promise<Rpc.UserLinkItem[]> {
+  let a = await pg.get_links_for_user(id);
+  let links = a.map(l => {
+    let linkId = l.linkId;
+    let contentUrl = cache.contents.get(l.contentId).content;
+    let linkDepth = cache.getLinkDepth(l);
+    let viewCount = l.hitCount;
+    let amount = l.amount;
+    let rl: Rpc.UserLinkItem = { linkId, contentUrl, linkDepth, viewCount, amount };
+    return rl;
+  });
+  return links;
+
+}
 const router = new Router();
 router.post('/rpc', async function (ctx: any) {
   let {jsonrpc, method, params, id} = ctx.request.body;  // from bodyparser 
@@ -432,16 +446,14 @@ router.post('/rpc', async function (ctx: any) {
         break;
       }
       case "getUserLinks": {
-        let a = await pg.get_links_for_user(ctx.userId.id);
-        let links = a.map(l => {
-          let linkId = l.linkId;
-          let contentUrl = cache.contents.get(l.contentId).content;
-          let linkDepth = cache.getLinkDepth(l);
-          let viewCount = l.hitCount;
-          let amount = l.amount;
-          let rl: Rpc.UserLinkItem = { linkId, contentUrl, linkDepth, viewCount, amount };
-          return rl;
-        });
+        let links = await GetUserLinks(ctx.userId.id);
+        ctx.body = { id, result: { links } };
+        break;
+      }
+      case "redeemLink": {
+        let link = cache.links.get(params.linkId);
+        await pg.redeem_link(link)
+        let links = await GetUserLinks(ctx.userId.id);
         ctx.body = { id, result: { links } };
         break;
       }
