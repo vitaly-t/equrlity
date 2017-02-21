@@ -92,8 +92,7 @@ function extractHeadersToState(st: AppState, rsp: AxiosResponse): AppState {
   if (jwt && st.jwt) throw new Error("Unexpected token received");
   if (!st.jwt && !jwt) throw new Error("Expected token but none received");
   if (!jwt) jwt = st.jwt;
-  let responses = [...st.responses, rsp];
-  return { ...st, responses, ampCredits, moniker, jwt };
+  return { ...st, ampCredits, moniker, jwt };
 }
 
 export namespace AsyncHandlers {
@@ -111,6 +110,7 @@ export namespace AsyncHandlers {
     let url = expandedUrl(state, src);
     let response = await Comms.sendAddContent(state, url, linkDescription, amount)
     let thunk = (st: AppState) => {
+      st = extractHeadersToState(st, response);
       let rsp: Rpc.Response = response.data;
       if (rsp.error) throw new Error("Server returned error: " + rsp.error.message);
       let rslt: Rpc.RecvAddContentResponse = rsp.result;
@@ -124,7 +124,6 @@ export namespace AsyncHandlers {
         return st;
       }
       else {  //  a new link has been generated 
-        st = extractHeadersToState(st, response);
         console.log("received link: " + rslt.link)
         return setLink(st, src, rslt.link, rslt.linkDepth, st.moniker);
       }
@@ -136,6 +135,9 @@ export namespace AsyncHandlers {
     let response = await Comms.sendGetRedirect(state, curl);
     let tab = await currentTab();
     return (st: AppState) => {
+      let prv = st.ampCredits;
+      st = extractHeadersToState(st, response);
+      if (st.ampCredits !== prv) console.log("credits changed from : "+prv+" to "+st.ampCredits);
       let rsp : Rpc.Response = response.data;
       if (rsp.error) throw new Error("Server returned error: " + rsp.error.message);
       let rslt: Rpc.GetRedirectResponse = rsp.result;  
@@ -152,11 +154,11 @@ export namespace AsyncHandlers {
   export async function RedeemLink(state: AppState, linkId: Dbt.linkId): Promise<(st: AppState) => AppState> {
     let response = await Comms.sendRedeemLink(state, linkId);
     return (st: AppState) => {
+      st = extractHeadersToState(st, response);
       let rsp : Rpc.Response = response.data;
       if (rsp.error) throw new Error("Server returned error: " + rsp.error.message);
       let rslt: Rpc.RedeemLinkResponse = rsp.result;  
       let investments = rslt.links;  
-      st = extractHeadersToState(st, response);
       st = {...st, investments}
       return st;
     };
@@ -165,11 +167,11 @@ export namespace AsyncHandlers {
   export async function GetUserLinks(state: AppState): Promise<(st: AppState) => AppState> {
     let response = await Comms.sendGetUserLinks(state);
     return (st: AppState) => {
+      st = extractHeadersToState(st, response);
       let rsp : Rpc.Response = response.data;
       if (rsp.error) throw new Error("Server returned error: " + rsp.error.message);
       let rslt: Rpc.GetUserLinksResponse = rsp.result;  
       let investments = rslt.links;  
-      st = extractHeadersToState(st, response);
       st = {...st, investments}
       return st;
     };
@@ -188,13 +190,12 @@ export namespace AsyncHandlers {
     if (isSynereoLink(parse(curl))) return GetRedirect(state,curl)
     let response = await Comms.sendLoadLink(state, curl);
     let thunk = (st: AppState) => {
+      st = extractHeadersToState(st, response);
       let rsp : Rpc.Response = response.data;
       if (rsp.error) throw new Error("Server returned error: " + rsp.error.message);
       st = { ...st, activeUrl: curl };
       let rslt: Rpc.LoadLinkResponse = rsp.result;  
-      if (rslt.found) {
-        st = setLink(st, curl, rslt.url, rslt.linkDepth, rslt.linkAmplifier);
-      }
+      if (rslt.found) st = setLink(st, curl, rslt.url, rslt.linkDepth, rslt.linkAmplifier);
       return st;
     };
     return thunk;

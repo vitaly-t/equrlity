@@ -38,6 +38,11 @@ export default {
         "mp3"
       ]
     },
+    "created": {
+      "tsType": "Date",
+      "sqlType": "timestamp",
+      "sqlDefault": "CURRENT_TIMESTAMP"
+    },
     "date": {
       "tsType": "Date",
       "sqlType": "date"
@@ -79,6 +84,11 @@ export default {
       "tsType": "Date",
       "sqlType": "timestamp"
     },
+    "updated": {
+      "tsType": "Date",
+      "sqlType": "timestamp",
+      "sqlDefault": "CURRENT_TIMESTAMP"
+    },
     "userGroup": {
       "sqlType": "varchar(10)",
       "enum": [
@@ -99,53 +109,26 @@ export default {
     "content": "text",
   },
   "tupleTypes": {
-    "Auth": [
-      "authProvider",
-      "authId",
-      "userId",
-      {
-        "name": "created",
-        "type": "timestamp"
-      },
-      {
-        "name": "updated",
-        "type": "timestamp"
-      }
-    ],
-    "Content": [
-      "contentId", 
-      "contentType",
-      "userId",
-      "content",
+    "Auth": [ "authProvider", "authId", "userId", "created", "updated" ],
+    "Content": [ "contentId", "contentType", "userId", "content",
       { "name": "cryptHash", "type": "binary" },
     ],
-    "Link": [
-      "linkId",
-      "userId",
-      "contentId",
-      "linkDescription",
+    "Link": [ "linkId", "userId", "contentId", "linkDescription", "created", "updated",
       { "name": "prevLink", "type": "linkId" },
-      { "name": "hitCount", "type": "integer" },
+      { "name": "hitCount", "type": "integer", "default": "0"},
       { "name": "amount", "type": "integer" },
     ],
-    "User": [
-      "userId",
-      "publicKey",
-      "userName",
-      "email",
+    "User": [ "userId", "publicKey", "userName", "email", "created", "updated",
       { "name": "ampCredits", "type": "integer" },
-      { "name": "created", "type": "timestamp" },
-      { "name": "updated", "type": "timestamp" },
       { "name": "groups", "type": "userGroup", "multiValued": true }
     ],
     "UserLink": [
       { "name": "user_A", "type": "userId"},
       { "name": "user_B", "type": "userId"},
-      { "name": "hitCount", "type": "integer" },
-      { "name": "created", "type": "timestamp" },
-      { "name": "updated", "type": "timestamp" },
-    ]
-
+      "created",
+      "updated",
+    ],
+    "View": [ "userId", "linkId", "created" ]
   },
   "tables": {
     "users": {
@@ -181,9 +164,7 @@ export default {
     },
     "links": {
       "rowType": "Link",
-      "primaryKey": [
-        "linkId"
-      ],
+      "primaryKey": [ "linkId" ],
       "autoIncrement": "linkId",
       "foreignKeys": [
         { "ref": "users", "columns": [ "userId" ]  },
@@ -192,5 +173,13 @@ export default {
       ],
       "uniques": [ [ "contentId", "userId" ] ],
     },
+    "views": {
+      "rowType": "View",
+      "primaryKey": [ "userId", "linkId"],
+      "foreignKeys": [
+        { "ref": "users", "columns": [ "userId" ]  },
+        { "ref": "links", "columns": [ "linkId" ], "onDelete": "CASCADE" },
+      ],
+    }
   }
 }

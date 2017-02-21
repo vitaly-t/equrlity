@@ -38,6 +38,7 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
     console.log("saving settings");
     let settings: Rpc.ChangeSettingsRequest = { moniker: this.state.nickName, email: this.state.email, deposit: this.state.deposit };
     chrome.runtime.sendMessage({ eventType: "ChangeSettings", settings });
+    this.setState({ deposit: 0});
   }
 
   render() {
@@ -53,6 +54,7 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
         <tr key={l.linkId} >
           <td><Button onClick={redeem}>Redeem</Button></td>
           <td>{l.contentUrl}</td>
+          <td>{l.linkDepth}</td>
           <td>{l.viewCount}</td>
           <td>{l.amount}</td>
         </tr>
@@ -86,6 +88,7 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
             <tr>
               <th></th>
               <th>Content</th>
+              <th>Depth</th>
               <th>Views</th>
               <th>Balance</th>
             </tr>

@@ -48,9 +48,37 @@ if (!connectUrl.startsWith('postgres:')) connectUrl = 'postgres:' + connectUrl;
 
 export const db: IDatabase<any> = pgp(connectUrl);
 
+export async function createDataTables() {
+  let tbls = Array.from(oxb.tables.values())
+  for (const t of tbls) {
+    let stmt = OxiGen.genCreateTableStatement(t);
+    await db.none(stmt);
+  };
+  DbCache.init();
+}
+
+export async function recreateDataTables() {
+  let tbls = Array.from(oxb.tables.values())
+  let drops = tbls.map(t => "DROP TABLE " + t.name + ";\n");
+  drops.reverse();
+  let dropall = drops.join("\n");
+  await db.none(dropall);
+  await createDataTables();
+  DbCache.init();
+}
+
+export async function resetDataTables() {
+  let tbls = Array.from(oxb.tables.values()).reverse()
+  for (const t of tbls) {
+    let stmt = "DELETE FROM " + t.name + ";\n";
+    await db.none(stmt);
+  };
+  DbCache.init();
+}
+
 export namespace DbCache {
 
-  // ahem ... cache the whole db in memory 
+  // ahem ... cache (almost) the whole db in memory 
   export const users = new Map<Dbt.userId, Dbt.User>();
   export const auths = new Map<Dbt.authId, Dbt.Auth>();
   export const contents = new Map<Dbt.contentId, Dbt.Content>();
@@ -95,7 +123,7 @@ export namespace DbCache {
 
     let authRows: Array<Dbt.Auth> = await db.any("select * from auths");
     auths.clear();
-    authRows.forEach(r => auths.set(r.authProvider + ":" +r.authId, r));
+    authRows.forEach(r => auths.set(r.authProvider + ":" + r.authId, r));
 
     let contentRows: Array<Dbt.Content> = await db.any("select * from contents");
     contents.clear();
@@ -111,6 +139,9 @@ export namespace DbCache {
     // maybe later ...
     //let userlinks: Array<Dbt.UserLink> = await db.any("select * from userlinks");
   }
+
+  // all functions in cache (other than init) should be synchronous.  
+  // async funcs that simply use the cache should go in the outer namespace
 
   export function getChainFromLinkId(linkId: Dbt.linkId): Array<Dbt.Link> {
     let link = links.get(linkId);
@@ -158,12 +189,6 @@ export namespace DbCache {
     return result;
   }
 
-  export async function getLinkAlreadyInvestedIn(userId: Dbt.userId, contentId: Dbt.contentId): Promise<Dbt.linkId | null> {
-    let recs = await db.oneOrNone(`select "linkId" from links where "contentId" = ${contentId} and "userId" = ${userId}`);
-    if (recs.length > 0) return recs[0].linkId;
-    return null;
-  }
-
   export function isContentKnown(content: string): boolean {
     return getContentIdFromContent(content) != null;
   }
@@ -171,7 +196,7 @@ export namespace DbCache {
   export function linkToUrl(linkId: Dbt.linkId): string {
     let desc = DbCache.links.get(linkId).linkDescription;
     let content = getContentFromLinkId(linkId);
-    return (isDev() ? "http://" : "https://") + domain + "/link/" + linkId.toString() + (desc ?  "#" + desc : '')
+    return (isDev() ? "http://" : "https://") + domain + "/link/" + linkId.toString() + (desc ? "#" + desc : '')
   }
 
   export function getLinkIdFromUrl(url: Url): Dbt.linkId {
@@ -181,45 +206,10 @@ export namespace DbCache {
     return linkId;
   }
 
-  export async function payForView(viewerId: Dbt.userId, viewedLinkId: Dbt.linkId): Promise<Dbt.integer> {
-    //@@GS  thought long and hard about using a transaction here, but couldn't see
-    // a way of doing it safely without locking the whole cache or similar.
-    // given the small amounts involved I figured this would probably be ok.
-    let links = getChainFromLinkId(viewedLinkId);
-    let viewedLink = links[0];
-    let bal = viewedLink.amount;
-    if (bal == 0) return bal
-
-    // is viewer already in links?
-    if (links.findIndex(l => l.userId == viewerId) >= 0) return bal;
-
-    // viewer gets paid 1
-    let viewer = users.get(viewerId);
-    let ampCredits = viewer.ampCredits + 1;
-    viewer = { ...viewer, ampCredits }
-    await updateRecord("users", viewer);
-    bal -= 1
-
-    // each link in the parent chain gets paid 1
-    let stmt = OxiGen.genUpdateStatement(oxb.tables.get("links"), { linkId: 0, amount: 0, hitCount: 0 });
-    let l = links.length - 1
-    while (bal > 0 && l > 0) {
-      let {linkId, amount} = links[l];
-      amount += 1;
-      try {
-        await db.none(stmt, { linkId, amount });
-        bal -= 1;
-      }
-      catch (e) {
-        console.log("error updating link: " + e.message);
-      }
-      l -= 1;
-    }
-    if (bal == 0) {
-      let link = DbCache.links.get(viewedLinkId);
-      await redeem_link({...link, amount: 0});
-    }
-    else await db.none(stmt, { linkId: viewedLinkId, amount: bal, hitCount: viewedLink.hitCount + 1 });
+  export function get_user_from_auth(prov, authId) {
+    let rslt = auths[prov + ':' + authId];
+    if (rslt) rslt = users[rslt];
+    return rslt;
   }
 
 }
@@ -233,11 +223,7 @@ export async function updateRecord(tblnm: string, rec: Object): Promise<void> {
 export async function insertRecord(tblnm: string, rec: Object): Promise<any> {
   let tbl = oxb.tables.get(tblnm);
   let stmt = OxiGen.genInsertStatement(tbl, rec);
-  return await db.one(stmt, rec);
-}
-
-export function query(cqry) {
-  return db.any;
+  return await db.oneOrNone(stmt, rec);
 }
 
 export function emptyUser(): Dbt.User {
@@ -278,12 +264,6 @@ export async function upsert_auth(auth: Dbt.Auth) {
   await db.none(upsert_auth_sql, newauth);
   DbCache.auths.set(auth.authId, newauth);
 };
-
-export function get_user_from_auth(prov, authId) {
-  let rslt = DbCache.auths[prov + ':' + authId];
-  if (rslt) rslt = DbCache.users[rslt];
-  return rslt;
-}
 
 export async function touch_user(userId) {
   let usr = DbCache.users.get(userId);
@@ -361,15 +341,14 @@ export async function amplify_content(userId: Dbt.userId, content: string, linkD
   return rslt;
 }
 
-//@@GS - I don't think this should be used.  Only way to get amps out of a link should be to redeem it.
-export async function reclaim_amount_from_link(link: Dbt.Link, adj: Dbt.integer): Promise<Dbt.Link | null> {
-  let amount = link.amount - adj;
+export async function invest_in_link(link: Dbt.Link, adj: Dbt.integer): Promise<Dbt.Link | null> {
+  let amount = link.amount + adj;
   if (amount < 0) throw new Error("Negative investments not allowed");
   if (amount == 0) {
     await redeem_link(link);
     return null;
   }
-  await adjust_user_balance(DbCache.users.get(link.userId), adj);
+  await adjust_user_balance(DbCache.users.get(link.userId), -adj);
   let rslt = { ...link, amount };
   await updateRecord("links", rslt);
   DbCache.links.set(rslt.linkId, rslt);
@@ -386,40 +365,77 @@ export async function redeem_link(link: Dbt.Link): Promise<void> {
   let stmt = `update links set "prevLink" = ${link.prevLink ? link.prevLink.toString() : 'null'} 
               where "prevLink" = ${link.linkId}`;
   await db.none(stmt);
-  await db.none(`delete from links where "linkId" = ${link.linkId}`);               
+  await db.none(`delete from links where "linkId" = ${link.linkId}`);
   if (link.amount > 0) await adjust_user_balance(DbCache.users.get(link.userId), link.amount);
-  linkIdsToReParent.forEach( ({linkId}) => {
+  linkIdsToReParent.forEach(({linkId}) => {
     let l = DbCache.links.get(linkId);
-    DbCache.links.set(linkId, {...l, prevLink: link.prevLink});
+    DbCache.links.set(linkId, { ...l, prevLink: link.prevLink });
   });
 }
 
-export async function createDataTables() {
-  let tbls = Array.from(oxb.tables.values())
-  for (const t of tbls) {
-    let stmt = OxiGen.genCreateTableStatement(t);
-    await db.none(stmt);
-  };
-  DbCache.init();
+export async function has_viewed(userId: Dbt.userId, linkId: Dbt.linkId): Promise<boolean> {
+  let rslt = await db.any(`select created from views where "userId" = '${userId}' and "linkId" = ${linkId}`);
+  return (rslt && rslt.length === 1);
 }
 
-export async function recreateDataTables() {
-  let tbls = Array.from(oxb.tables.values())
-  let drops = tbls.map(t => "DROP TABLE " + t.name + ";\n");
-  drops.reverse();
-  let dropall = drops.join("\n");
-  await db.none(dropall);
-  await createDataTables();
-  DbCache.init();
+export async function view_count(linkId: Dbt.linkId): Promise<number> {
+  let rslt = await db.one(`select count(*) as cnt from views where "linkId" = ${linkId}`);
+  return parseInt(rslt.cnt);
 }
 
-export async function resetDataTables() {
-  let tbls = Array.from(oxb.tables.values()).reverse()
-  for (const t of tbls) {
-    let stmt = "DELETE FROM " + t.name + ";\n";
-    await db.none(stmt);
-  };
-  DbCache.init();
+export async function getLinkAlreadyInvestedIn(userId: Dbt.userId, contentId: Dbt.contentId): Promise<Dbt.linkId | null> {
+  let recs = await db.oneOrNone(`select "linkId" from links where "contentId" = ${contentId} and "userId" = ${userId}`);
+  if (recs.length > 0) return recs[0].linkId;
+  return null;
 }
 
+export async function payForView(viewerId: Dbt.userId, viewedLinkId: Dbt.linkId): Promise<Dbt.integer> {
+  //@@GS  thought long and hard about using a transaction here, but couldn't see
+  // a way of doing it safely without locking the whole cache or similar.
+  // given the small amounts involved I figured this would probably be ok.
+  let links = DbCache.getChainFromLinkId(viewedLinkId);
+  let viewedLink = links[0];
+  let bal = viewedLink.amount;
+  if (bal == 0) return bal
+
+  // is viewer already in links?
+  if (links.findIndex(l => l.userId == viewerId) >= 0) return bal;
+
+  // viewer gets paid 1
+  let viewer = DbCache.users.get(viewerId);
+  let ampCredits = viewer.ampCredits + 1;
+  viewer = { ...viewer, ampCredits }
+  await updateRecord("users", viewer);
+  DbCache.users.set(viewerId, viewer);
+  bal -= 1
+
+  await insertRecord("views", { userId: viewerId, linkId: viewedLinkId });
+
+  // each link in the parent chain gets paid 1
+  let stmt = OxiGen.genUpdateStatement(oxb.tables.get("links"), { linkId: 0, amount: 0 });
+  let l = links.length - 1
+  while (bal > 0 && l > 0) {
+    let {linkId, amount} = links[l];
+    amount += 1;
+    try {
+      await db.none(stmt, { linkId, amount });
+      let link = DbCache.links.get(linkId);
+      DbCache.links.set(linkId, {...link, amount});
+      bal -= 1;
+    }
+    catch (e) {
+      console.log("error updating link: " + e.message);
+    }
+    l -= 1;
+  }
+  if (bal == 0) {
+    let link = DbCache.links.get(viewedLinkId);
+    await redeem_link({ ...link, amount: 0 });
+    DbCache.links.delete(viewedLinkId);
+  }
+  else {
+    await db.none(stmt, { linkId: viewedLinkId, amount: bal });
+    DbCache.links.set(viewedLinkId, {...viewedLink, amount: bal});
+  }
+}
 

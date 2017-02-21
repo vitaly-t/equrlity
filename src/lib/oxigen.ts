@@ -7,6 +7,7 @@ export interface IScalarType {
   name: string,
   tsType: string,
   sqlType: string,
+  sqlDefault?: string,
   max?: number,
   min?: number,
   maxLen?: number,
@@ -17,7 +18,8 @@ export interface IColumn {
   name: string,
   type: IScalarType,
   multiValued?: boolean,
-  notNull?: boolean
+  notNull?: boolean,
+  default?: string
 }
 
 export interface TupleType {
@@ -176,7 +178,7 @@ export function genUpdateStatement(tbl: ITable, data: Object = null): string {
     tbl.primaryKey.forEach(s => {if (data[s] == null || data[s] == undefined) throw new Error("Primary Key value(s) missing"); } );
   }
   let where = tbl.primaryKey.map( c => cnm(c) + ' = ${'+c+'}' ).join(' AND ');
-  return "UPDATE "+ tbl.name + " SET" + columnSets(tbl, data).join() + " WHERE " + where ;
+  return "UPDATE "+ tbl.name + " SET " + columnSets(tbl, data).join() + " WHERE " + where ;
 }
 
 export function genUpsertStatement(tbl: ITable, data: Object = null): string {
@@ -196,8 +198,9 @@ export function genTypescriptType(tbl: ITable): string {
 
 export function genCreateTableStatement(tbl: ITable): string {
   let cols = tbl.rowType.heading.map( c => {
-    return colnm(c) + " " + 
-        (c.name === tbl.autoIncrement ? 'SERIAL' : c.type.sqlType + (c.multiValued ? '[]' : '') + (c.notNull ? ' NOT NULL' : '') );
+    let dflt = c.default ? c.default : c.type.sqlDefault ? c.type.sqlDefault : null;
+    return colnm(c) + " " +  (c.name === tbl.autoIncrement ? 'SERIAL' : c.type.sqlType + (c.multiValued ? '[]' : '')) 
+        + (c.notNull ? ' NOT NULL' : '')  +(dflt ? ' DEFAULT ' + dflt : '');
   });
   let stmt =  "CREATE TABLE "+tbl.name+" (\n  " +  cols.join(",\n  ");
   stmt += ",\n  PRIMARY KEY (" + tbl.primaryKey.map(cnm).join(",")+")";

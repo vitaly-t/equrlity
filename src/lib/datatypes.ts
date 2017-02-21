@@ -7,6 +7,7 @@ export type binary = ArrayBuffer;
 export type contentId = number;
 export type contentCryptId = ArrayBuffer;
 export type contentType = "url" | "yt_video" | "text" | "mp3";
+export type created = Date;
 export type date = Date;
 export type email = string;
 export type integer = number;
@@ -17,6 +18,7 @@ export type percentage = number;
 export type publicKey = ArrayBuffer;
 export type text = string;
 export type timestamp = Date;
+export type updated = Date;
 export type userGroup = "admin" | "author" | "member";
 export type userName = string;
 export type uuid = string;
@@ -28,9 +30,9 @@ export interface User {
   readonly publicKey: publicKey | null,
   readonly userName: userName | null,
   readonly email: email | null,
+  readonly created: created | null,
+  readonly updated: updated | null,
   readonly ampCredits: integer | null,
-  readonly created: timestamp | null,
-  readonly updated: timestamp | null,
   readonly groups: userGroup[] | null
 };
 
@@ -38,8 +40,8 @@ export interface Auth {
   readonly authProvider: authProvider | null,
   readonly authId: authId | null,
   readonly userId: userId | null,
-  readonly created: timestamp | null,
-  readonly updated: timestamp | null
+  readonly created: created | null,
+  readonly updated: updated | null
 };
 
 export interface Content {
@@ -55,9 +57,17 @@ export interface Link {
   readonly userId: userId | null,
   readonly contentId: contentId | null,
   readonly linkDescription: linkDescription | null,
+  readonly created: created | null,
+  readonly updated: updated | null,
   readonly prevLink: linkId | null,
   readonly hitCount: integer | null,
   readonly amount: integer | null
+};
+
+export interface View {
+  readonly userId: userId | null,
+  readonly linkId: linkId | null,
+  readonly created: created | null
 };
 
 // end of generated types

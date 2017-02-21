@@ -172,7 +172,7 @@ publicRouter.get('/link/:id', async (ctx, next) => {
   let url = cache.getContentFromLinkId(linkId);
   let linkClause = url ? `<p>This is the link you were (probably) after: <a href="${url}">${url}</a></p>` : '';
   ctx.body = `
-${header};
+${header}
 <p>You have followed a Synereo link.  If you can see this message (for more than a second or so)
 it probably means you do not have the Synereo browser plugin installed.</p>
 ${pluginClause}
@@ -234,8 +234,9 @@ app.use(async function (ctx, next) {
   await next();
 
 
-  let user: Dbt.User = ctx['user'];
+  let user: Dbt.User = getUser(ctx['userId'].id);
   if (user) {
+    console.log("Setting credits to : " + user.ampCredits.toString());
     ctx.set('x-syn-credits', user.ampCredits.toString());
     ctx.set('x-syn-moniker', user.userName);
 
@@ -295,11 +296,11 @@ async function handleAmplify(userId, {publicKey, content, signature, linkDescrip
   let linkId = cache.getLinkIdFromUrl(parse(content));
   let link = cache.links.get(linkId);
   if (link.userId == userId) {
-    await pg.reclaim_amount_from_link(link, -amount);
+    await pg.invest_in_link(link, amount);
   }
   else {
     let contentId = cache.getContentIdFromContent(content);
-    let prevId = cache.getLinkAlreadyInvestedIn(userId, contentId);
+    let prevId = await pg.getLinkAlreadyInvestedIn(userId, contentId);
     if (prevId) throw new Error("user has previously invested in this content");
     await pg.amplify_content(userId, content, linkDescription, amount);
   }
@@ -322,15 +323,15 @@ async function changeMoniker(id: Dbt.userId, newName: string): Promise<boolean> 
 
 async function GetUserLinks(id: Dbt.userId): Promise<Rpc.UserLinkItem[]> {
   let a = await pg.get_links_for_user(id);
-  let links = a.map(l => {
+  let links = Promise.all( a.map( async l => {
     let linkId = l.linkId;
     let contentUrl = cache.contents.get(l.contentId).content;
     let linkDepth = cache.getLinkDepth(l);
-    let viewCount = l.hitCount;
+    let viewCount = await pg.view_count(linkId);
     let amount = l.amount;
     let rl: Rpc.UserLinkItem = { linkId, contentUrl, linkDepth, viewCount, amount };
     return rl;
-  });
+  }));
   return links;
 
 }
@@ -412,8 +413,10 @@ router.post('/rpc', async function (ctx: any) {
           let linkId = cache.getLinkIdFromUrl(url);
           if (!linkId) throw new Error("invalid link");
           contentUrl = cache.getContentFromLinkId(linkId);
-          console.log("attention gots to get paid for!!!");
-          await cache.payForView(ctx.userId.id, linkId)
+          if (!(await pg.has_viewed(ctx.userId.id, linkId))) {
+            console.log("attention gots to get paid for!!!");
+            await pg.payForView(ctx.userId.id, linkId)
+          }
           let link = cache.links.get(linkId);
           let linkDepth = cache.getLinkDepth(link)
           let linkAmplifier = cache.users.get(link.userId).userName;

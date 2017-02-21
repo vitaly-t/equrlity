@@ -8,7 +8,6 @@ export type PopupMode = "Amplify" | "Settings";
 export interface AppState {
   publicKey: JsonWebKey | null;
   privateKey: JsonWebKey | null;
-  responses: Object[];
   links: Map<string, LinkInfo>;
   redirects: Map<string, string>;   // keys are synereo urls - values are source urls 
   activeUrl: string | null;
@@ -22,8 +21,7 @@ export interface AppState {
 export function initState(): AppState {
   console.log("initState called");
   return {
-    publicKey: null, privateKey: null, responses: [],
-    links: new Map<string, LinkInfo>(), redirects: new Map<string, string>(),
+    publicKey: null, privateKey: null, links: new Map<string, LinkInfo>(), redirects: new Map<string, string>(),
     activeUrl: null, moniker: 'unknown', ampCredits: 0, jwt: '', lastErrorMessage: '', investments: []
   };
 }
