@@ -260,36 +260,6 @@ if (cxt.auth) {
 }
 */
 
-async function handleAddContent(userId, {publicKey, content, signature, linkDescription, amount}): Promise<Rpc.SendAddContentResponse> {
-  let link = await pg.getLinkFromContent(content);
-  if (link) {
-    let linkAmplifier = cache.users.get(userId).userName;
-    let linkDepth = cache.getLinkDepth(link);
-    let rsp: Rpc.AddContentAlreadyRegistered = { prevLink: cache.linkToUrl(link.linkId), linkAmplifier };
-    return rsp;
-  }
-  link = await pg.insert_content(userId, content, linkDescription, amount);
-  let rsp: Rpc.AddContentOk = { link: cache.linkToUrl(link.linkId), linkDepth: 0 };
-  return rsp;
-}
-
-async function handleAmplify(userId, {publicKey, content, signature, linkDescription, amount}): Promise<Rpc.AddContentOk> {
-  let linkId = cache.getLinkIdFromUrl(parse(content));
-  let link = cache.links.get(linkId);
-  if (link.userId == userId) {
-    await pg.invest_in_link(link, amount);
-  }
-  else {
-    let contentId = cache.getContentIdFromContent(content);
-    let prevId = await pg.getLinkAlreadyInvestedIn(userId, contentId);
-    if (prevId) throw new Error("user has previously invested in this content");
-    await pg.amplify_content(userId, content, linkDescription, amount);
-  }
-  let linkAmplifier = cache.users.get(userId).userName;
-  let linkDepth = cache.getLinkDepth(link);
-  return { link: cache.linkToUrl(link.linkId), linkDepth, linkAmplifier };
-}
-
 async function changeMoniker(id: Dbt.userId, newName: string): Promise<boolean> {
   console.log("setting new Moniker : " + newName);
   if (cache.checkMonikerUsed(newName)) return false;
@@ -361,10 +331,10 @@ router.post('/rpc', async function (ctx: any) {
         }
         */
         if (cache.isSynereo(url)) {
-          result = await handleAmplify(ctx.userId.id, params)
+          result = await pg.handleAmplify(ctx.userId.id, params)
         }
         else {
-          result = await handleAddContent(ctx.userId.id, params)
+          result = await pg.handleAddContent(ctx.userId.id, params)
         }
         ctx.body = { id, result }
         break;

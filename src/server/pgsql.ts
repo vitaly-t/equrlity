@@ -2,6 +2,7 @@
 
 import { isDev, shuffle } from "../lib/utils.js";
 import { Url, parse } from 'url';
+import * as Rpc from '../lib/rpc';
 
 let connectUrl: string = isDev() ? process.env.DEV_AMPLITUDE_URL : process.env.AMPLITUDE_URL;
 
@@ -75,7 +76,7 @@ export async function createDataTables() {
   let tbls = Array.from(oxb.tables.values())
   for (const t of tbls) {
     let stmt = OxiGen.genCreateTableStatement(t);
-    console.log("creating table: "+t.name);
+    console.log("creating table: " + t.name);
     await db.none(stmt);
   };
   DbCache.init();
@@ -267,13 +268,11 @@ export namespace DbCache {
   }
 
   export function checkMonikerUsed(newName) {
-  return Object.keys(users).some(function (id) {
-    return users[id].userName === newName;
-  });
+    return Object.keys(users).some(function (id) {
+      return users[id].userName === newName;
+    });
 
-};
-
-
+  };
 
 }
 
@@ -495,7 +494,7 @@ export async function view_count(linkId: Dbt.linkId): Promise<number> {
 }
 
 export async function getLinkAlreadyInvestedIn(userId: Dbt.userId, contentId: Dbt.contentId): Promise<Dbt.linkId | null> {
-  let recs = await db.oneOrNone(`select "linkId" from links where "contentId" = ${contentId} and "userId" = ${userId}`);
+  let recs = await db.any(`select "linkId" from links where "contentId" = ${contentId} and "userId" = '${userId}' `);
   if (recs.length > 0) return recs[0].linkId;
   return null;
 }
@@ -566,5 +565,36 @@ export async function createUser(): Promise<Dbt.User> {
   console.log("created user : " + JSON.stringify(user));
   return user;
 };
+
+export async function handleAddContent(userId, {publicKey, content, signature, linkDescription, amount}): Promise<Rpc.SendAddContentResponse> {
+  let link = await getLinkFromContent(content);
+  if (link) {
+    let linkAmplifier = DbCache.users.get(userId).userName;
+    let linkDepth = DbCache.getLinkDepth(link);
+    let rsp: Rpc.AddContentAlreadyRegistered = { prevLink: DbCache.linkToUrl(link.linkId), linkAmplifier };
+    return rsp;
+  }
+  link = await insert_content(userId, content, linkDescription, amount);
+  let rsp: Rpc.AddContentOk = { link: DbCache.linkToUrl(link.linkId), linkDepth: 0 };
+  return rsp;
+}
+
+export async function handleAmplify(userId, {publicKey, content, signature, linkDescription, amount}): Promise<Rpc.AddContentOk> {
+  let linkId = DbCache.getLinkIdFromUrl(parse(content));
+  let link = DbCache.links.get(linkId);
+  if (link.userId == userId) {
+    await invest_in_link(link, amount);
+  }
+  else {
+    let contentId = DbCache.getContentIdFromContent(content);
+    let prevId = await getLinkAlreadyInvestedIn(userId, contentId);
+    if (prevId) throw new Error("user has previously invested in this content");
+    await amplify_content(userId, content, linkDescription, amount);
+  }
+  let linkAmplifier = DbCache.users.get(userId).userName;
+  let linkDepth = DbCache.getLinkDepth(link);
+  return { link: DbCache.linkToUrl(link.linkId), linkDepth, linkAmplifier };
+
+}
 
 
