@@ -31,6 +31,10 @@ module.exports = function (env) {
           use: ['style-loader', 'css-loader']
         },
         {
+          test: /\.(ttf|eot|woff)$/,
+          loader: 'file-loader'        
+        },
+        {
           enforce: 'pre',
           test: /\.js$/,
           loader: "source-map-loader"

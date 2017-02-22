@@ -73,47 +73,47 @@ export async function handleAsyncMessage(event: Message) {
   let st = currentState();
   let fn = null;
   try {
-  switch (event.eventType) {
-    case "Save": {
-      let curl = prepareUrl(st.activeUrl);
-      if (!curl) return;
+    switch (event.eventType) {
+      case "Save": {
+        let curl = prepareUrl(st.activeUrl);
+        if (!curl) return;
 
-      // we can't do storeState from here. 
-      // so instead we just lie by calling render with temporary state; (so much for source of truth!!)
-      chrome.runtime.sendMessage({ eventType: 'Render', appState: preSerialize(setWaiting(st, st.activeUrl)) });
-      // force a refresh with correct state in 10 seconds
-      setTimeout(() => {
-        //console.log("refreshing with correct state");
-        chrome.runtime.sendMessage({ eventType: 'Render', appState: preSerialize(currentState()) });
-      }, 5000);
-      fn = await AsyncHandlers.Save(st, event.linkDescription, event.amount);
-      break;
+        // we can't do storeState from here. 
+        // so instead we just lie by calling render with temporary state; (so much for source of truth!!)
+        chrome.runtime.sendMessage({ eventType: 'Render', appState: preSerialize(setWaiting(st, st.activeUrl)) });
+        // force a refresh with correct state in 10 seconds
+        setTimeout(() => {
+          //console.log("refreshing with correct state");
+          chrome.runtime.sendMessage({ eventType: 'Render', appState: preSerialize(currentState()) });
+        }, 5000);
+        fn = await AsyncHandlers.Save(st, event.linkDescription, event.amount);
+        break;
+      }
+      case "Load": {
+        fn = await AsyncHandlers.Load(st, event.url);
+        break;
+      }
+      case "RedeemLink": {
+        fn = await AsyncHandlers.RedeemLink(st, event.linkId);
+        break;
+      }
+      case "GetUserLinks": {
+        fn = await AsyncHandlers.GetUserLinks(st);
+        break;
+      }
+      case "ActivateTab": {
+        let t = await getTab(event.tabId);
+        fn = await AsyncHandlers.Load(st, t.url);
+        break;
+      }
     }
-    case "Load": {
-      fn = await AsyncHandlers.Load(st, event.url);
-      break;
-    }
-    case "RedeemLink": {
-      fn = await AsyncHandlers.RedeemLink(st, event.linkId);
-      break;
-    }
-    case "GetUserLinks": {
-      fn = await AsyncHandlers.GetUserLinks(st);
-      break;
-    }
-    case "ActivateTab": {
-      let t = await getTab(event.tabId);
-      fn = await AsyncHandlers.Load(st, t.url);
-      break;
-    }
+    if (fn) handleMessage({ eventType: "Thunk", fn }, true);
   }
-  if (fn) handleMessage({ eventType: "Thunk", fn }, true);
-}
-catch(e) {
-  let fn = (st: AppState) => { return {...st, lastErrorMessage: e.message }; };
-  handleMessage({ eventType: "Thunk", fn }, true);
-  if (e.message === "Network Error") setTimeout(() => initialize(), 15000);
-}
+  catch (e) {
+    let fn = (st: AppState) => { return { ...st, lastErrorMessage: e.message }; };
+    handleMessage({ eventType: "Thunk", fn }, true);
+    if (e.message === "Network Error") setTimeout(() => initialize(), 15000);
+  }
 
 }
 
@@ -146,8 +146,8 @@ export async function handleMessage(event: Message, async: boolean = false): Pro
       case "GetState":
         break;
       case "LaunchSettingsPage":
-        chrome.tabs.create({'url': chrome.extension.getURL('settings.html'), 'selected': true});
-        handleAsyncMessage({eventType: "GetUserLinks"})
+        chrome.tabs.create({ 'url': chrome.extension.getURL('settings.html'), 'selected': true });
+        handleAsyncMessage({ eventType: "GetUserLinks" })
         break;
       case "ChangeSettings":
         st = await Handlers.ChangeSettings(st, event.settings);
@@ -156,12 +156,12 @@ export async function handleMessage(event: Message, async: boolean = false): Pro
         let i = st.promotions.indexOf(event.url);
         if (i >= 0) {
           let promotions = st.promotions.slice(0)
-          promotions.splice(i,1);
-          st = {...st, promotions};          
+          promotions.splice(i, 1);
+          st = { ...st, promotions };
         }
         break;
       default:
-        throw new Error("Unknown eventType: "+event.eventType);
+        throw new Error("Unknown eventType: " + event.eventType);
     }
     storeState(st);
   }

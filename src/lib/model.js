@@ -184,7 +184,7 @@ export default {
       "primaryKey": [ "linkId", "userId"],
       "foreignKeys": [
         { "ref": "users", "columns": [ "userId" ] },
-        { "ref": "links", "columns": [ "linkId" ] },
+        { "ref": "links", "columns": [ "linkId" ], "onDelete": "CASCADE" },
       ],
     },
     "views": {

@@ -1,7 +1,7 @@
 import * as React from 'react';
 import * as ReactDOM from "react-dom";
-import 'bootstrap/dist/css/bootstrap.css';
-import { Table, Button } from 'reactStrap';
+import * as Blueprint from "@blueprintjs/core";
+import '@blueprintjs/core/dist/blueprint.css';
 
 import { AppState, postDeserialize } from "./AppState";
 import { sendGetUserLinks } from './Comms';
@@ -38,22 +38,22 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
     console.log("saving settings");
     let settings: Rpc.ChangeSettingsRequest = { moniker: this.state.nickName, email: this.state.email, deposit: this.state.deposit };
     chrome.runtime.sendMessage({ eventType: "ChangeSettings", settings });
-    this.setState({ deposit: 0});
+    this.setState({ deposit: 0 });
   }
 
   render() {
-
-    let invs = this.props.appState.investments;
+    let st = this.props.appState;
+    let invs = st.investments;
     let invrows = invs.map(l => {
       let linkId = l.linkId;
-      let redeem = () => {
-        chrome.runtime.sendMessage({ eventType: "RedeemLink", linkId, async: true });
-      };
+      let url = l.contentUrl;
+      let redeem = () => { chrome.runtime.sendMessage({ eventType: "RedeemLink", linkId, async: true }); };
+      let onclick = () => { chrome.tabs.create({ active: true, url }); };
 
       return (
         <tr key={l.linkId} >
-          <td><Button onClick={redeem}>Redeem</Button></td>
-          <td>{l.contentUrl}</td>
+          <td><button onClick={redeem}>Redeem</button></td>
+          <td><a href="" onClick={onclick} >{url}</a></td>
           <td>{l.linkDepth}</td>
           <td>{l.promotionsCount}</td>
           <td>{l.deliveriesCount}</td>
@@ -63,80 +63,87 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
       );
     });
 
-    let links = this.props.appState.promotions;
+    let links = st.promotions;
     let linkrows = links.map(url => {
-      let dismiss = () => {
-        chrome.runtime.sendMessage({ eventType: "DismissPromotion", url });
-      };
-      let onclick = () => {
-        chrome.tabs.create( { active: true, url } );
-      }
-      let [tgt,desc] = url.split('#'); 
+      let dismiss = () => { chrome.runtime.sendMessage({ eventType: "DismissPromotion", url }); };
+      let onclick = () => { chrome.tabs.create({ active: true, url }); };
+      let [tgt, desc] = url.split('#');
       if (desc) desc = desc.replace('_', ' ');
       return (
         <tr key={url} >
-          <td><Button onClick={dismiss}>Dismiss</Button></td>
-          <td><a href="dummy" onClick={onclick} >{tgt}</a></td>
+          <td><button onClick={dismiss}>Dismiss</button></td>
+          <td><a href="" onClick={onclick} >{tgt}</a></td>
           <td>{desc}</td>
         </tr>
       );
     });
 
-    return (<div>
-      <h3>Your Settings:</h3>
-      <div style={{ width: '100%', marginTop: 5, marginLeft: 5, padding: 6 }}>
-        <div style={{ width: '20%' }} >NickName: </div>
-        <input type="text" style={{ width: '60%' }} name="NickName" id="nickId" ref={(e) => this.ctrls.nickNameInput = e}
-          value={this.state.nickName} onChange={(e) => this.changeNickName()} />
-      </div>
-      <div style={{ width: '100%', marginTop: 5, marginLeft: 5, padding: 6 }}>
-        <div style={{ width: '20%' }} >Email: </div>
-        <input type="email" style={{ width: '60%' }} name="Email" id="emailId" ref={(e) => this.ctrls.emailInput = e}
-          value={this.state.email} onChange={(e) => this.changeEmail()} />
-      </div>
-      <div style={{ width: '100%', marginTop: 5, marginLeft: 5, padding: 6 }}>
-        <div style={{ width: '20%' }} >Deposit: </div>
-        <input type="number" style={{ width: 100 }} name="Deposit" id="depositId" ref={(e) => this.ctrls.depositInput = e}
-          value={this.state.deposit} onChange={(e) => this.changeDeposit()} />
-      </div>
-      <div style={{ width: '100%', marginTop: 5, marginLeft: 5, padding: 6 }}>
-        <Button onClick={this.saveSettings} >Save Settings</Button>
-      </div>
+    let vsp = <div style={{ height: 20 }} />;
+
+    return (
       <div>
-        <h2>Investments : </h2>
-        <Table striped bordered condensed hover>
-          <thead>
-            <tr>
-              <th></th>
-              <th>Content</th>
-              <th>Depth</th>
-              <th>Amplifications</th>
-              <th>Deliveries</th>
-              <th>Views</th>
-              <th>Balance</th>
-            </tr>
-          </thead>
-          <tbody>
-            {invrows}
-          </tbody>
-        </Table>
-      </div>
-      <div>
-        <h2>Amplified Links for you : </h2>
-        <Table striped bordered condensed hover>
-          <thead>
-            <tr>
-              <th></th>
-              <th>Link</th>
-              <th>Description</th>
-            </tr>
-          </thead>
-          <tbody>
-            {linkrows}
-          </tbody>
-        </Table>
-      </div>
-    </div>);
+        <h3>Synereo Amplitude Settings</h3>
+        {vsp}
+        <h5>Your Settings:</h5>
+        <div style={{ width: '100%', marginTop: 5, marginLeft: 5, padding: 6 }}>
+          <div style={{ width: '20%' }} >NickName: </div>
+          <input type="text" style={{ width: '60%' }} name="NickName" id="nickId" ref={(e) => this.ctrls.nickNameInput = e}
+            value={this.state.nickName} onChange={(e) => this.changeNickName()} />
+        </div>
+        <div style={{ width: '100%', marginTop: 5, marginLeft: 5, padding: 6 }}>
+          <div style={{ width: '20%' }} >Email: </div>
+          <input type="email" style={{ width: '60%' }} name="Email" id="emailId" ref={(e) => this.ctrls.emailInput = e}
+            value={this.state.email} onChange={(e) => this.changeEmail()} />
+        </div>
+        <div style={{ width: '100%', marginTop: 5, marginLeft: 5, padding: 6 }}>
+          <div style={{ width: '20%' }} >Deposit: </div>
+          <input type="number" style={{ width: 100 }} name="Deposit" id="depositId" ref={(e) => this.ctrls.depositInput = e}
+            value={this.state.deposit} onChange={(e) => this.changeDeposit()} />
+        </div>
+        <div style={{ width: '100%', marginTop: 5, marginLeft: 5, padding: 6 }}>
+          <button type="button" className="pt-intent-primary" onClick={this.saveSettings} >Save Settings</button>
+        </div>
+        {vsp}
+        <div>
+          <h4>Investments : </h4>
+          {vsp}
+          <h6>Your Current Wallet Balance is : {st.ampCredits}.</h6>
+          {vsp}
+          <table className="pt-table pt-striped pt-bordered" >
+            <thead>
+              <tr>
+                <th></th>
+                <th>Content</th>
+                <th>Depth</th>
+                <th>Amplifications</th>
+                <th>Deliveries</th>
+                <th>Views</th>
+                <th>Balance</th>
+              </tr>
+            </thead>
+            <tbody>
+              {invrows}
+            </tbody>
+          </table>
+        </div>
+        {vsp}
+        <div>
+          <h4>Amplified Links for you : </h4>
+          {vsp}
+          <table className="pt-table pt-striped pt-bordered">
+            <thead>
+              <tr>
+                <th></th>
+                <th>Link</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              {linkrows}
+            </tbody>
+          </table>
+        </div>
+      </div>);
   }
 }
 
