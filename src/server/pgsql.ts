@@ -11,6 +11,7 @@ import { IMain, IDatabase } from 'pg-promise';
 import * as pgPromise from 'pg-promise';
 import * as Dbt from '../lib/datatypes'
 import * as OxiGen from '../lib/oxigen';
+import * as uuid from '../lib/uuid.js';
 
 // your protocol extensions:
 //interface IExtensions {
@@ -74,17 +75,26 @@ export async function createDataTables() {
   let tbls = Array.from(oxb.tables.values())
   for (const t of tbls) {
     let stmt = OxiGen.genCreateTableStatement(t);
+    console.log("creating table: "+t.name);
     await db.none(stmt);
   };
   DbCache.init();
 }
 
 export async function recreateDataTables() {
+  console.log("recreating data tables");
   let tbls = Array.from(oxb.tables.values())
-  let drops = tbls.map(t => "DROP TABLE " + t.name + ";\n");
+  let drops = tbls.map(t => t.name);
   drops.reverse();
-  let dropall = drops.join("\n");
-  await db.none(dropall);
+  for (const t of drops) {
+    let stmt = "DROP TABLE " + t;
+    console.log(stmt);
+    try { await db.none(stmt); }
+    catch (e) {
+      console.log(e.message);
+    }
+  }
+  console.log("should all be dropped now");
   await createDataTables();
   DbCache.init();
 }
@@ -255,6 +265,15 @@ export namespace DbCache {
     if (rslt) rslt = users[rslt];
     return rslt;
   }
+
+  export function checkMonikerUsed(newName) {
+  return Object.keys(users).some(function (id) {
+    return users[id].userName === newName;
+  });
+
+};
+
+
 
 }
 
@@ -531,4 +550,21 @@ export async function payForView(viewerId: Dbt.userId, viewedLinkId: Dbt.linkId)
     DbCache.links.set(viewedLinkId, { ...viewedLink, amount: bal });
   }
 }
+
+export async function createUser(): Promise<Dbt.User> {
+  let o = DbCache.users;
+  let i = o.size;
+  let userName = ''
+  while (true) {
+    userName = "anonymous_" + i;
+    if (!DbCache.checkMonikerUsed(userName)) break;
+    ++i;
+  }
+  let userId = uuid.generate();
+  let usr = { ...emptyUser(), userId, userName };
+  let user = await upsert_user(usr);
+  console.log("created user : " + JSON.stringify(user));
+  return user;
+};
+
 

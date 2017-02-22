@@ -14,7 +14,7 @@
     "mksrv": "cd src/server && tsc",
     "mktest": "cd src/spec && tsc",
     "resetdb": "node src/scripts/resetdb.js",
-    "test": "npm run mktest && cd src/dist/spec && jasmine *.spec.js"
+    "test": "npm run mktest && cd dist/spec && jasmine *.spec.js"
   },
   "keywords": [],
   "author": "Gary Stephenson",
@@ -80,6 +80,7 @@
     "css-loader": "^0.26.1",
     "jasmine-core": "^2.5.2",
     "jasmine-node": "^1.14.5",
+    "jasmine-promise-wrapper": "0.0.2",
     "rimraf": "^2.5.4",
     "source-map-loader": "^0.1.5",
     "style-loader": "^0.13.1",

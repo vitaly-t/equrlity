@@ -12,7 +12,7 @@ import * as uuid from '../lib/uuid.js';
 import * as jwt from './jwt';
 //import passport from './auth';
 //import * as koastatic from 'koa2-static-files';
-import serve from './koa-static';
+//import serve from './koa-static';
 import * as send from 'koa-send';
 import clientIP from './clientIP.js';
 import { Url, parse } from 'url';
@@ -44,12 +44,6 @@ let getUserCount = function () {
   return cache.users.size;
 };
 
-let checkMonikerUsed = function (newName) {
-  return Object.keys(cache.users).some(function (id) {
-    return cache.users[id].userName === newName;
-  });
-};
-
 function readFileAsync(src: string): Promise<string> {
   return new Promise(function (resolve, reject) {
     fs.readFile(src, { 'encoding': 'utf8' }, function (err, data) {
@@ -59,23 +53,10 @@ function readFileAsync(src: string): Promise<string> {
   });
 }
 
-let createUser = async function (ctx) {
-  let o = cache.users;
-  let i = o.size;
-  let userName = ''
-  while (true) {
-    userName = "anonymous_" + i;
-    if (!checkMonikerUsed(userName)) break;
-    ++i;
-  }
-  let userId = uuid.generate();
-  let usr = { ...pg.emptyUser(), userId, userName };
-  let user = await pg.upsert_user(usr);
-  console.log("created user : " + JSON.stringify(user));
-  let rslt = { id: userId };
-  ctx.userId = rslt;
+async function createUser(ctx) {
+  let user = await pg.createUser();
+  ctx.userId = {id: user.userId} ;
   ctx.user = user;
-  return rslt;
 };
 
 /*
@@ -311,7 +292,7 @@ async function handleAmplify(userId, {publicKey, content, signature, linkDescrip
 
 async function changeMoniker(id: Dbt.userId, newName: string): Promise<boolean> {
   console.log("setting new Moniker : " + newName);
-  if (checkMonikerUsed(newName)) return false;
+  if (cache.checkMonikerUsed(newName)) return false;
   let prv = cache.users[id];
   let usr = { ...prv, userName: newName };
   console.log("updating user : " + JSON.stringify(usr));
@@ -434,7 +415,7 @@ router.post('/rpc', async function (ctx: any) {
         let usr = getUser(ctx.userId.id);
         if (!usr) throw new Error("Internal error getting user details");
         if (moniker && moniker !== usr.userName) {
-          if (checkMonikerUsed(moniker)) {
+          if (cache.checkMonikerUsed(moniker)) {
             ctx.body = { id, error: { message: "Nickname not available" } };
             return;
           }
