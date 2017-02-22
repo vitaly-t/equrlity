@@ -40,7 +40,7 @@ export default {
     },
     "created": {
       "tsType": "Date",
-      "sqlType": "timestamp",
+      "sqlType": "timestamptz",
       "sqlDefault": "CURRENT_TIMESTAMP"
     },
     "date": {
@@ -64,7 +64,7 @@ export default {
     },
     "linkDescription": {
       "tsType": "string",
-      "sqlType": "varchar(40)"
+      "sqlType": "varchar(100)"
     },
     "percentage": {
       "tsType": "number",
@@ -82,11 +82,11 @@ export default {
     },
     "timestamp": {
       "tsType": "Date",
-      "sqlType": "timestamp"
+      "sqlType": "timestamptz"
     },
     "updated": {
       "tsType": "Date",
-      "sqlType": "timestamp",
+      "sqlType": "timestamptz",
       "sqlDefault": "CURRENT_TIMESTAMP"
     },
     "userGroup": {
@@ -96,6 +96,9 @@ export default {
         "author",
         "member"
       ]
+    },
+    "urlString": {
+      "sqlType": "varchar(250)"
     },
     "userName": {
       "sqlType": "varchar(72)"
@@ -117,6 +120,9 @@ export default {
       { "name": "prevLink", "type": "linkId" },
       { "name": "hitCount", "type": "integer", "default": "0"},
       { "name": "amount", "type": "integer" },
+    ],
+    "Promotion": [ "linkId", "userId", "created",
+      { "name": "delivered", "type": "timestamp"}
     ],
     "User": [ "userId", "publicKey", "userName", "email", "created", "updated",
       { "name": "ampCredits", "type": "integer" },
@@ -172,6 +178,14 @@ export default {
         { "ref": "links", "columns": [ "prevLink" ] },
       ],
       "uniques": [ [ "contentId", "userId" ] ],
+    },
+    "promotions": {
+      "rowType": "Promotion",
+      "primaryKey": [ "linkId", "userId"],
+      "foreignKeys": [
+        { "ref": "users", "columns": [ "userId" ] },
+        { "ref": "links", "columns": [ "linkId" ] },
+      ],
     },
     "views": {
       "rowType": "View",

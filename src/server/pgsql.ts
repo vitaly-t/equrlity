@@ -1,6 +1,6 @@
 "use strict";
 
-import { isDev } from "../lib/utils.js";
+import { isDev, shuffle } from "../lib/utils.js";
 import { Url, parse } from 'url';
 
 let connectUrl: string = isDev() ? process.env.DEV_AMPLITUDE_URL : process.env.AMPLITUDE_URL;
@@ -37,7 +37,29 @@ import * as OxiGen from '../lib/oxigen';
 //db.findUser(123).then(...);
 
 const pgp: IMain = pgPromise({
-  // Initialization Options
+  error: (err, e) => {
+    // just for debugging ...
+    // e.dc = Database Context
+
+    if (e.cn) {
+      // this is a connection-related error
+      // cn = safe connection details passed into the library:
+      //      if password is present, it is masked by #
+    }
+
+    if (e.query) {
+      // query string is available
+      if (e.params) {
+        // query parameters are available
+      }
+    }
+
+    if (e.ctx) {
+      // occurred inside a task or transaction
+    }
+    console.log("pgPromise Error: " + err.toString());
+  }
+
 });
 
 const oxb: OxiGen.IDbSchema = OxiGen.dbSchema;
@@ -97,25 +119,27 @@ export namespace DbCache {
       await createDataTables();
       console.log(" ... finished creating data tables");
     }
-    oxb.tables.forEach(async t => {
-      if (tbls.findIndex(v => v.table_name === t.name) < 0) {
-        let stmt = OxiGen.genCreateTableStatement(t);
-        await db.none(stmt);
-      }
-      else {
-        let cols: Array<any> = await db.any(`
+    else {
+      oxb.tables.forEach(async t => {
+        if (tbls.findIndex(v => v.table_name === t.name) < 0) {
+          let stmt = OxiGen.genCreateTableStatement(t);
+          await db.none(stmt);
+        }
+        else {
+          let cols: Array<any> = await db.any(`
           SELECT column_name FROM information_schema.columns
           WHERE table_schema = 'public'
           AND table_name   = '${t.name}'`);
-        t.rowType.heading.forEach(async c => {
-          if (cols.findIndex(v => v.column_name === c.name) < 0) {
-            console.log(`Adding column ${c.name} to table ${t.name}`);
-            let stmt = `ALTER TABLE "${t.name}" ADD COLUMN "${c.name}" ${c.type.sqlType} `;
-            await db.none(stmt);
-          }
-        })
-      }
-    })
+          t.rowType.heading.forEach(async c => {
+            if (cols.findIndex(v => v.column_name === c.name) < 0) {
+              console.log(`Adding column ${c.name} to table ${t.name}`);
+              let stmt = `ALTER TABLE "${t.name}" ADD COLUMN "${c.name}" ${c.type.sqlType} `;
+              await db.none(stmt);
+            }
+          })
+        }
+      });
+    }
 
     let userRows: Array<Dbt.User> = await db.any("select * from users;");
     users.clear();
@@ -129,11 +153,17 @@ export namespace DbCache {
     contents.clear();
     contentRows.forEach(r => contents.set(r.contentId, r));
 
-    let linkRows = await db.any('select * from links order by "linkId" ');
+    let linkRows: Dbt.Link[] = await db.any('select * from links order by "linkId" ');
     links.clear();
     linkRows.forEach(r => {
       links.set(r.linkId, r);
-      //  if (!userlinks.has(r.userId))
+    });
+
+    linkRows.forEach(r => {
+      if (r.prevLink) {
+        let prev = links.get(r.prevLink);
+        connectUsers(r.userId, prev.userId);
+      }
     });
 
     // maybe later ...
@@ -142,6 +172,19 @@ export namespace DbCache {
 
   // all functions in cache (other than init) should be synchronous.  
   // async funcs that simply use the cache should go in the outer namespace
+
+  export function connectUsers(userA: Dbt.userId, userB: Dbt.userId): void {
+    if (!userlinks.has(userA)) userlinks.set(userA, [userB])
+    else {
+      let a = userlinks.get(userA);
+      if (a.indexOf(userB) < 0) a.push(userB);
+    }
+    if (!userlinks.has(userB)) userlinks.set(userB, [userA])
+    else {
+      let a = userlinks.get(userB);
+      if (a.indexOf(userA) < 0) a.push(userA);
+    }
+  }
 
   export function getChainFromLinkId(linkId: Dbt.linkId): Array<Dbt.Link> {
     let link = links.get(linkId);
@@ -193,9 +236,10 @@ export namespace DbCache {
     return getContentIdFromContent(content) != null;
   }
 
-  export function linkToUrl(linkId: Dbt.linkId): string {
+  export function linkToUrl(linkId: Dbt.linkId): Dbt.urlString {
     let desc = DbCache.links.get(linkId).linkDescription;
     let content = getContentFromLinkId(linkId);
+    if (desc) desc = desc.replace(/ /g, '_');
     return (isDev() ? "http://" : "https://") + domain + "/link/" + linkId.toString() + (desc ? "#" + desc : '')
   }
 
@@ -296,13 +340,59 @@ export async function getLinkFromContent(url: Dbt.content): Promise<Dbt.Link | n
 }
 
 export async function getLinkFromContentId(id: Dbt.contentId): Promise<Dbt.Link | null> {
-
   let recs: Dbt.Link[] = await db.manyOrNone(`select * from links where "contentId" = ${id} and "prevLink" is null`);
   let l = recs.length;
   if (l == 0) return null;
   if (l == 1) return recs[0];
   let i = Math.floor(Math.random() * l)
   return recs[i];
+}
+
+export async function is_promoted(userId: Dbt.userId, linkId: Dbt.linkId): Promise<boolean> {
+  let rslt = await db.any(`select created from promotions where "userId" = '${userId}' and "linkId" = ${linkId}`);
+  return rslt.length === 1;
+}
+
+export async function get_promotions_for_user(userId: Dbt.userId): Promise<Dbt.urlString[]> {
+  let links = await db.any(`select "linkId" from promotions where "userId" = '${userId}' and delivered is null `);
+  await db.none(`update promotions set delivered = CURRENT_TIMESTAMP where "userId" = '${userId}' `);
+  return links.map(l => DbCache.linkToUrl(l.linkId));
+}
+
+export async function promotions_count(linkId: Dbt.linkId): Promise<number> {
+  let rslt = await db.one(`select count(*) as cnt from promotions where "linkId" = ${linkId}`);
+  return parseInt(rslt.cnt);
+}
+
+export async function deliveries_count(linkId: Dbt.linkId): Promise<number> {
+  let rslt = await db.one(`select count(*) as cnt from promotions where "linkId" = ${linkId} and delivered is not null`);
+  return parseInt(rslt.cnt);
+}
+
+export async function promoteLink(link: Dbt.Link, amount: Dbt.integer) {
+  let grph = DbCache.userlinks;
+  if (!grph.has(link.userId)) return;
+  let inc = DbCache.getLinkDepth(link) + 1;
+  if (amount < inc) return;
+  let s = new Set<Dbt.userId>();
+  s.add(link.userId);
+  let q = shuffle(grph.get(link.userId));
+  let linkId = link.linkId
+  while (q.length > 0) {
+    let userId = q.shift();
+    let done = await is_promoted(userId, link.linkId);
+    if (!done) {
+      await insertRecord("promotions", { linkId, userId });
+      amount -= inc;
+    }
+    if (amount < inc) break;
+    s.add(userId);
+    if (grph.has(userId)) {
+      shuffle(grph.get(userId)).forEach(u => {
+        if (!s.has(u)) q.push(u);
+      })
+    }
+  }
 }
 
 export async function insert_content(userId: Dbt.userId, content: string, linkDescription: string, amount: Dbt.integer, contentType: Dbt.contentType = "url"): Promise<Dbt.Link> {
@@ -323,6 +413,7 @@ export async function insert_content(userId: Dbt.userId, content: string, linkDe
   DbCache.contents.set(contentId, { ...cont, contentId });
   DbCache.links.set(linkId, rslt);
   await adjust_user_balance(DbCache.users.get(userId), -amount);
+  await promoteLink(rslt, amount);
   return rslt;
 }
 
@@ -338,6 +429,7 @@ export async function amplify_content(userId: Dbt.userId, content: string, linkD
   let rslt = { ...link, linkId };
   DbCache.links.set(linkId, rslt);
   await adjust_user_balance(DbCache.users.get(userId), -amount);
+  await promoteLink(rslt, amount);
   return rslt;
 }
 
@@ -356,12 +448,12 @@ export async function invest_in_link(link: Dbt.Link, adj: Dbt.integer): Promise<
 }
 
 export async function get_links_for_user(userId: Dbt.userId): Promise<Dbt.Link[]> {
-  let links = await db.manyOrNone(`select * from links where "userId" = '${userId}'`);
+  let links = await db.any(`select * from links where "userId" = '${userId}'`);
   return links;
 }
 
 export async function redeem_link(link: Dbt.Link): Promise<void> {
-  let linkIdsToReParent = await db.manyOrNone(`select "linkId" from links where "prevLink" = ${link.linkId}`)
+  let linkIdsToReParent = await db.any(`select "linkId" from links where "prevLink" = ${link.linkId}`)
   let stmt = `update links set "prevLink" = ${link.prevLink ? link.prevLink.toString() : 'null'} 
               where "prevLink" = ${link.linkId}`;
   await db.none(stmt);
@@ -375,7 +467,7 @@ export async function redeem_link(link: Dbt.Link): Promise<void> {
 
 export async function has_viewed(userId: Dbt.userId, linkId: Dbt.linkId): Promise<boolean> {
   let rslt = await db.any(`select created from views where "userId" = '${userId}' and "linkId" = ${linkId}`);
-  return (rslt && rslt.length === 1);
+  return rslt.length === 1;
 }
 
 export async function view_count(linkId: Dbt.linkId): Promise<number> {
@@ -401,6 +493,9 @@ export async function payForView(viewerId: Dbt.userId, viewedLinkId: Dbt.linkId)
   // is viewer already in links?
   if (links.findIndex(l => l.userId == viewerId) >= 0) return bal;
 
+  await insertRecord("views", { userId: viewerId, linkId: viewedLinkId });
+  DbCache.connectUsers(viewerId, viewedLink.userId);
+
   // viewer gets paid 1
   let viewer = DbCache.users.get(viewerId);
   let ampCredits = viewer.ampCredits + 1;
@@ -408,8 +503,6 @@ export async function payForView(viewerId: Dbt.userId, viewedLinkId: Dbt.linkId)
   await updateRecord("users", viewer);
   DbCache.users.set(viewerId, viewer);
   bal -= 1
-
-  await insertRecord("views", { userId: viewerId, linkId: viewedLinkId });
 
   // each link in the parent chain gets paid 1
   let stmt = OxiGen.genUpdateStatement(oxb.tables.get("links"), { linkId: 0, amount: 0 });
@@ -420,7 +513,7 @@ export async function payForView(viewerId: Dbt.userId, viewedLinkId: Dbt.linkId)
     try {
       await db.none(stmt, { linkId, amount });
       let link = DbCache.links.get(linkId);
-      DbCache.links.set(linkId, {...link, amount});
+      DbCache.links.set(linkId, { ...link, amount });
       bal -= 1;
     }
     catch (e) {
@@ -435,7 +528,7 @@ export async function payForView(viewerId: Dbt.userId, viewedLinkId: Dbt.linkId)
   }
   else {
     await db.none(stmt, { linkId: viewedLinkId, amount: bal });
-    DbCache.links.set(viewedLinkId, {...viewedLink, amount: bal});
+    DbCache.links.set(viewedLinkId, { ...viewedLink, amount: bal });
   }
 }
 

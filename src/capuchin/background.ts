@@ -151,7 +151,14 @@ export async function handleMessage(event: Message, async: boolean = false): Pro
         break;
       case "ChangeSettings":
         st = await Handlers.ChangeSettings(st, event.settings);
-        st = { ...st, mode: "Amplify" };
+        break;
+      case "DismissPromotion":
+        let i = st.promotions.indexOf(event.url);
+        if (i >= 0) {
+          let promotions = st.promotions.slice(0)
+          promotions.splice(i,1);
+          st = {...st, promotions};          
+        }
         break;
       default:
         throw new Error("Unknown eventType: "+event.eventType);

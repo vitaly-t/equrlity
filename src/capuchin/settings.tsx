@@ -43,8 +43,8 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
 
   render() {
 
-    let links = this.props.appState.investments;
-    let rows = links.map(l => {
+    let invs = this.props.appState.investments;
+    let invrows = invs.map(l => {
       let linkId = l.linkId;
       let redeem = () => {
         chrome.runtime.sendMessage({ eventType: "RedeemLink", linkId, async: true });
@@ -55,8 +55,29 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
           <td><Button onClick={redeem}>Redeem</Button></td>
           <td>{l.contentUrl}</td>
           <td>{l.linkDepth}</td>
+          <td>{l.promotionsCount}</td>
+          <td>{l.deliveriesCount}</td>
           <td>{l.viewCount}</td>
           <td>{l.amount}</td>
+        </tr>
+      );
+    });
+
+    let links = this.props.appState.promotions;
+    let linkrows = links.map(url => {
+      let dismiss = () => {
+        chrome.runtime.sendMessage({ eventType: "DismissPromotion", url });
+      };
+      let onclick = () => {
+        chrome.tabs.create( { active: true, url } );
+      }
+      let [tgt,desc] = url.split('#'); 
+      if (desc) desc = desc.replace('_', ' ');
+      return (
+        <tr key={url} >
+          <td><Button onClick={dismiss}>Dismiss</Button></td>
+          <td><a href="dummy" onClick={onclick} >{tgt}</a></td>
+          <td>{desc}</td>
         </tr>
       );
     });
@@ -89,12 +110,29 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
               <th></th>
               <th>Content</th>
               <th>Depth</th>
+              <th>Amplifications</th>
+              <th>Deliveries</th>
               <th>Views</th>
               <th>Balance</th>
             </tr>
           </thead>
           <tbody>
-            {rows}
+            {invrows}
+          </tbody>
+        </Table>
+      </div>
+      <div>
+        <h2>Amplified Links for you : </h2>
+        <Table striped bordered condensed hover>
+          <thead>
+            <tr>
+              <th></th>
+              <th>Link</th>
+              <th>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            {linkrows}
           </tbody>
         </Table>
       </div>

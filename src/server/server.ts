@@ -236,7 +236,7 @@ app.use(async function (ctx, next) {
 
   let user: Dbt.User = getUser(ctx['userId'].id);
   if (user) {
-    console.log("Setting credits to : " + user.ampCredits.toString());
+    //console.log("Setting credits to : " + user.ampCredits.toString());
     ctx.set('x-syn-credits', user.ampCredits.toString());
     ctx.set('x-syn-moniker', user.userName);
 
@@ -328,13 +328,15 @@ async function GetUserLinks(id: Dbt.userId): Promise<Rpc.UserLinkItem[]> {
     let contentUrl = cache.contents.get(l.contentId).content;
     let linkDepth = cache.getLinkDepth(l);
     let viewCount = await pg.view_count(linkId);
+    let promotionsCount = await pg.promotions_count(linkId);
+    let deliveriesCount = await pg.deliveries_count(linkId);
     let amount = l.amount;
-    let rl: Rpc.UserLinkItem = { linkId, contentUrl, linkDepth, viewCount, amount };
+    let rl: Rpc.UserLinkItem = { linkId, contentUrl, linkDepth, viewCount, promotionsCount, deliveriesCount, amount };
     return rl;
   }));
   return links;
-
 }
+
 const router = new Router();
 router.post('/rpc', async function (ctx: any) {
   let {jsonrpc, method, params, id} = ctx.request.body;  // from bodyparser 
@@ -450,7 +452,8 @@ router.post('/rpc', async function (ctx: any) {
       }
       case "getUserLinks": {
         let links = await GetUserLinks(ctx.userId.id);
-        ctx.body = { id, result: { links } };
+        let promotions = await pg.get_promotions_for_user(ctx.userId.id);
+        ctx.body = { id, result: { links, promotions } };
         break;
       }
       case "redeemLink": {
@@ -465,6 +468,7 @@ router.post('/rpc', async function (ctx: any) {
     }
   }
   catch (e) {
+    console.log("returning rpc error: "+e.message);
     ctx.body = { id, error: { message: e.message } };
   }
 

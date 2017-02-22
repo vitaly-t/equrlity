@@ -62,10 +62,12 @@ export type UserLinkItem = {
   contentUrl: Dbt.content;
   linkDepth: Dbt.integer;
   viewCount: Dbt.integer;
+  promotionsCount: Dbt.integer;
+  deliveriesCount: Dbt.integer;
   amount: Dbt.integer;
 }
 
-export type GetUserLinksResponse = { links: UserLinkItem[]; }
+export type GetUserLinksResponse = { links: UserLinkItem[]; promotions: Dbt.urlString[]; }
 
 export type RedeemLinkRequest = { linkId: Dbt.linkId; }
 export type RedeemLinkResponse = { links: UserLinkItem[]; }

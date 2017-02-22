@@ -1,5 +1,6 @@
 import { Url, format, parse } from 'url';
 import {UserLinkItem} from '../lib/rpc';
+import * as Dbt from '../lib/datatypes';
 
 export interface LinkInfo { synereoUrl: Url, linkDepth: number, linkAmplifier: string };
 
@@ -16,13 +17,14 @@ export interface AppState {
   jwt: string;
   lastErrorMessage: string;
   investments: UserLinkItem[];
+  promotions: Dbt.urlString[];
 }
 
 export function initState(): AppState {
   console.log("initState called");
   return {
     publicKey: null, privateKey: null, links: new Map<string, LinkInfo>(), redirects: new Map<string, string>(),
-    activeUrl: null, moniker: 'unknown', ampCredits: 0, jwt: '', lastErrorMessage: '', investments: []
+    activeUrl: null, moniker: 'unknown', ampCredits: 0, jwt: '', lastErrorMessage: '', investments: [], promotions: []
   };
 }
 

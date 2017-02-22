@@ -20,6 +20,7 @@ export type text = string;
 export type timestamp = Date;
 export type updated = Date;
 export type userGroup = "admin" | "author" | "member";
+export type urlString = string;
 export type userName = string;
 export type uuid = string;
 export type userId = string;
@@ -62,6 +63,13 @@ export interface Link {
   readonly prevLink: linkId | null,
   readonly hitCount: integer | null,
   readonly amount: integer | null
+};
+
+export interface Promotion {
+  readonly linkId: linkId | null,
+  readonly userId: userId | null,
+  readonly created: created | null,
+  readonly delivered: timestamp | null
 };
 
 export interface View {

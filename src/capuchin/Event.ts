@@ -55,13 +55,18 @@ export interface GetUserLinks {
   eventType: "GetUserLinks";
 }
 
+export interface DismissPromotion {
+  eventType: "DismissPromotion";
+  url: Dbt.urlString;
+}
+
 export interface Thunk {
   eventType: "Thunk";
   fn: (st: AppState) => AppState;
 }
 
 export type Message = Save | Initialize | GetState | Load | ActivateTab | Render | ChangeSettings | LaunchSettingsPage 
-                    | RedeemLink | GetUserLinks | Thunk ;
+                    | RedeemLink | GetUserLinks | DismissPromotion |Thunk ;
 
 export function getTab(tabId: number): Promise<chrome.tabs.Tab> {
   return new Promise( resolve => {
@@ -171,8 +176,10 @@ export namespace AsyncHandlers {
       let rsp : Rpc.Response = response.data;
       if (rsp.error) throw new Error("Server returned error: " + rsp.error.message);
       let rslt: Rpc.GetUserLinksResponse = rsp.result;  
-      let investments = rslt.links;  
-      st = {...st, investments}
+      let investments = rslt.links; 
+      let promotions = st.promotions;  
+      if (rslt.promotions.length > 0) promotions = [...promotions, ...rslt.promotions];
+      st = {...st, investments, promotions}
       return st;
     };
   }

@@ -52,6 +52,7 @@
     "koa-send": "^3.3.0",
     "koa-session": "^3.1.0",
     "koa-static2": "^0.1.8",
+    "koa-websocket": "^3.0.1",
     "koa2-static-files": "^1.0.4",
     "localforage": "^1.4.3",
     "passport-facebook": "^2.1.1",

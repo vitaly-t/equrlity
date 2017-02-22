@@ -12,7 +12,7 @@ export class PopupPanel extends React.Component<PopupPanelProps, PopupPanelState
 
   constructor(props) {
     super(props);
-    this.state = { amplifyAmount: 20, description: '' };
+    this.state = { amplifyAmount: 20, description: props.appState.activeUrl };
   }
 
   ctrls: { amountInput?: HTMLInputElement, descriptionInput?: HTMLInputElement } = {}
@@ -44,10 +44,9 @@ export class PopupPanel extends React.Component<PopupPanelProps, PopupPanelState
     if (curl) {
       let tgt = expandedUrl(st);
       let desc = this.state.description;
-      if (!desc) desc = curl;
       console.log("rendering for target :" + tgt);
       let linkInfo = getLinked(st, curl);
-      let lbl = linkInfo ? "Re-Amplify" : "Amplify";
+      let lbl = linkInfo ? (linkInfo.linkAmplifier === st.moniker ? "Re-Invest" : "Re-Amplify") : "Amplify";
       let saveaction = () => {
         let amount = this.state.amplifyAmount;
         let linkDescription = this.state.description
