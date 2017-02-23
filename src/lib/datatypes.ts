@@ -71,13 +71,15 @@ export interface Promotion {
   readonly linkId: linkId | null,
   readonly userId: userId | null,
   readonly created: created | null,
+  readonly updated: updated | null,
   readonly delivered: timestamp | null
 };
 
 export interface View {
   readonly userId: userId | null,
   readonly linkId: linkId | null,
-  readonly created: created | null
+  readonly created: created | null,
+  readonly updated: updated | null
 };
 
 // end of generated types

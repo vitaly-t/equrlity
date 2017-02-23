@@ -274,19 +274,25 @@ export namespace DbCache {
 
   };
 
+
 }
 
-export async function updateRecord(tblnm: string, rec: Object): Promise<void> {
+export async function updateRecord<T>(tblnm: string, rec: Object): Promise<T> {
   let tbl = oxb.tables.get(tblnm);
   let stmt = OxiGen.genUpdateStatement(tbl, rec);
-  await db.none(stmt, rec);
+  return await db.one(stmt, rec);
 }
 
 export async function insertRecord<T>(tblnm: string, rec: Object): Promise<T> {
   let tbl = oxb.tables.get(tblnm);
   let stmt = OxiGen.genInsertStatement(tbl, rec);
-  let rslt = await db.one(stmt, rec);
-  return rslt;
+  return await db.one(stmt, rec);
+}
+
+export async function upsertRecord<T>(tblnm: string, rec: Object): Promise<T> {
+  let tbl = oxb.tables.get(tblnm);
+  let stmt = OxiGen.genUpsertStatement(tbl, rec);
+  return await db.one(stmt, rec);
 }
 
 export function emptyUser(): Dbt.User {
@@ -295,24 +301,21 @@ export function emptyUser(): Dbt.User {
 }
 
 const upsert_user_sql = OxiGen.genUpsertStatement(oxb.tables.get("users"));
-export async function upsert_user(usr: Dbt.User) {
+export async function upsert_user(usr: Dbt.User): Promise<Dbt.User> {
   //console.log('Inserting user : ' + userName ) ;
-  let updated = new Date();
-  let created = usr.created || updated
-  let newusr = { ...usr, created, updated };
-  await db.none(upsert_user_sql, newusr)
-  DbCache.users.set(usr.userId, newusr);
-  return newusr;
+  let rslt: Dbt.User[] = await db.any(upsert_user_sql, usr);
+  let r = rslt[0];
+  DbCache.users.set(r.userId, r);
+  return r;
 }
 
-export async function adjust_user_balance(usr: Dbt.User, adj: Dbt.integer) {
-  let tbl = oxb.tables.get("users");
+export async function adjust_user_balance(usr: Dbt.User, adj: Dbt.integer): Promise<Dbt.User> {
   let ampCredits = usr.ampCredits + adj;
   if (ampCredits < 0) throw new Error("Negative balances not allowed");
   let newusr = { ...usr, ampCredits }
-  let stmt = OxiGen.genUpdateStatement(tbl, newusr);
-  await db.none(stmt, newusr);
+  let r = updateRecord<Dbt.User>("users", newusr);
   DbCache.users.set(usr.userId, newusr);
+  return r;
 }
 
 export function emptyAuth(): Dbt.Auth {
@@ -320,12 +323,10 @@ export function emptyAuth(): Dbt.Auth {
 }
 
 const upsert_auth_sql = OxiGen.genUpsertStatement(oxb.tables.get("auths"))
-export async function upsert_auth(auth: Dbt.Auth) {
-  let updated = new Date();
-  let created = auth.created || updated
-  let newauth = { ...auth, created, updated };
-  await db.none(upsert_auth_sql, newauth);
-  DbCache.auths.set(auth.authId, newauth);
+export async function upsert_auth(auth: Dbt.Auth): Promise<Dbt.Auth> {
+  let r = await db.one(upsert_auth_sql, auth);
+  DbCache.auths.set(r.authId, r);
+  return r;
 };
 
 export async function touch_user(userId) {
@@ -359,7 +360,7 @@ export async function getLinkFromContent(url: Dbt.content): Promise<Dbt.Link | n
 }
 
 export async function getLinkFromContentId(id: Dbt.contentId): Promise<Dbt.Link | null> {
-  let recs: Dbt.Link[] = await db.manyOrNone(`select * from links where "contentId" = ${id} and "prevLink" is null`);
+  let recs: Dbt.Link[] = await db.any(`select * from links where "contentId" = ${id} and "prevLink" is null`);
   let l = recs.length;
   if (l == 0) return null;
   if (l == 1) return recs[0];
@@ -388,30 +389,42 @@ export async function deliveries_count(linkId: Dbt.linkId): Promise<number> {
   return parseInt(rslt.cnt);
 }
 
-export async function promoteLink(link: Dbt.Link, amount: Dbt.integer) {
+export async function getPromotionLinks(link: Dbt.Link, maxLen: Dbt.integer): Promise<Dbt.userId[]> {
   let grph = DbCache.userlinks;
   if (!grph.has(link.userId)) return;
-  let inc = DbCache.getLinkDepth(link) + 1;
-  if (amount < inc) return;
+  let rem = maxLen;
+  let rslt: Dbt.userId[] = [];
   let s = new Set<Dbt.userId>();
   s.add(link.userId);
-  let q = shuffle(grph.get(link.userId));
+  let q = shuffle<Dbt.userId>(grph.get(link.userId));
   let linkId = link.linkId
   while (q.length > 0) {
     let userId = q.shift();
     let done = await is_promoted(userId, link.linkId);
     if (!done) {
-      await insertRecord("promotions", { linkId, userId });
-      amount -= inc;
+      rslt.push(userId);
+      rem -= 1;
     }
-    if (amount < inc) break;
+    if (rem == 0) break;
     s.add(userId);
     if (grph.has(userId)) {
-      shuffle(grph.get(userId)).forEach(u => {
+      shuffle<Dbt.userId>(grph.get(userId)).forEach(u => {
         if (!s.has(u)) q.push(u);
       })
     }
   }
+  return rslt;
+}
+
+export async function promoteLink(link: Dbt.Link, amount: Dbt.integer): Promise<void> {
+  let linkId = link.linkId;
+  let grph = DbCache.userlinks;
+  if (!grph.has(link.userId)) return;
+  let inc = DbCache.getLinkDepth(link) + 1;
+  if (amount < inc) return;
+  let max = Math.floor(amount / inc);
+  let ids = await getPromotionLinks(link, max);
+  for (const userId of ids)  await insertRecord("promotions", { linkId, userId });
 }
 
 export async function insert_content(userId: Dbt.userId, content: string, linkDescription: string, amount: Dbt.integer, contentType: Dbt.contentType = "url"): Promise<Dbt.Link> {
@@ -454,9 +467,9 @@ export async function invest_in_link(link: Dbt.Link, adj: Dbt.integer): Promise<
   }
   await adjust_user_balance(DbCache.users.get(link.userId), -adj);
   let rslt = { ...link, amount };
-  await updateRecord("links", rslt);
-  DbCache.links.set(rslt.linkId, rslt);
-  return rslt;
+  let r = await updateRecord<Dbt.Link>("links", rslt);
+  DbCache.links.set(r.linkId, r);
+  return r;
 }
 
 export async function get_links_for_user(userId: Dbt.userId): Promise<Dbt.Link[]> {
@@ -498,7 +511,6 @@ export async function payForView(viewerId: Dbt.userId, viewedLinkId: Dbt.linkId)
   // a way of doing it safely without locking the whole cache or similar.
   // given the small amounts involved I figured this would probably be ok.
   let links = DbCache.getChainFromLinkId(viewedLinkId);
-  console.log("chain length: " + links.length);
   let viewedLink = links[0];
   let bal = viewedLink.amount;
   if (bal == 0) return;
@@ -513,26 +525,24 @@ export async function payForView(viewerId: Dbt.userId, viewedLinkId: Dbt.linkId)
   let viewer = DbCache.users.get(viewerId);
   let ampCredits = viewer.ampCredits + 1;
   viewer = { ...viewer, ampCredits }
-  await updateRecord("users", viewer);
-  DbCache.users.set(viewerId, viewer);
+  let u = await updateRecord<Dbt.User>("users", viewer);
+  DbCache.users.set(viewerId, u);
   bal -= 1
 
   // each link in the parent chain gets paid 1
-  let stmt = OxiGen.genUpdateStatement(oxb.tables.get("links"), { linkId: 0, amount: 0 });
-  let l = 1;
-  while (bal > 0 && l < links.length) {
-    let {linkId, amount} = links[l];
-    amount += 1;
+  let i = 1;
+  while (bal > 0 && i < links.length) {
+    let link = links[i];
+    let amount = link.amount + 1;
     try {
-      await db.none(stmt, { linkId, amount });
-      let link = DbCache.links.get(linkId);
-      DbCache.links.set(linkId, { ...link, amount });
+      let r = await updateRecord<Dbt.Link>("links", {...link, amount });
+      DbCache.links.set(r.linkId, r);
       bal -= 1;
     }
     catch (e) {
       console.log("error updating link: " + e.message);
     }
-    l += 1;
+    i += 1;
   }
   if (bal == 0) {
     let link = DbCache.links.get(viewedLinkId);
@@ -540,15 +550,15 @@ export async function payForView(viewerId: Dbt.userId, viewedLinkId: Dbt.linkId)
     DbCache.links.delete(viewedLinkId);
   }
   else {
-    await db.none(stmt, { linkId: viewedLinkId, amount: bal });
-    DbCache.links.set(viewedLinkId, { ...viewedLink, amount: bal });
+    let r = await updateRecord<Dbt.Link>("links", {...viewedLink, amount: bal });
+    DbCache.links.set(r.linkId, r);
   }
 }
 
 export async function createUser(): Promise<Dbt.User> {
   let o = DbCache.users;
   let i = o.size;
-  let userName = ''
+  let userName = '';
   while (true) {
     userName = "anonymous_" + i;
     if (!DbCache.checkMonikerUsed(userName)) break;
@@ -556,8 +566,8 @@ export async function createUser(): Promise<Dbt.User> {
   }
   let userId = uuid.generate();
   let usr = { ...emptyUser(), userId, userName };
-  let user = await upsert_user(usr);
-  console.log("created user : " + JSON.stringify(user));
+  let user = await insertRecord<Dbt.User>("users", usr);
+  DbCache.users.set(user.userId, user);
   return user;
 };
 

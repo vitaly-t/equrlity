@@ -40,6 +40,7 @@ export interface ITable {
   rowType: TupleType,
   primaryKey: string[],
   autoIncrement?: string,
+  updated?: string,    //  used to automagically maintain "last updated" columns
   foreignKeys: IForeignKey[],
   uniques: string[][],
 }
@@ -183,17 +184,18 @@ export function genRetrieveStatement(tbl: ITable, data: Object = null): string {
 export function genUpdateStatement(tbl: ITable, data: Object = null): string {
   if (data) {
     tbl.primaryKey.forEach(s => {if (data[s] == null || data[s] == undefined) throw new Error("Primary Key value(s) missing"); } );
+    if (tbl.updated) data[tbl.updated] = null;  
   }
   let where = tbl.primaryKey.map( c => cnm(c) + ' = ${'+c+'}' ).join(' AND ');
-  return "UPDATE "+ tbl.name + " SET " + columnSets(tbl, data).join() + " WHERE " + where ;
+  return "UPDATE "+ tbl.name + " SET " + columnSets(tbl, data).join() + " WHERE " + where + ' RETURNING '+columnNames(tbl).join();
 }
 
 export function genUpsertStatement(tbl: ITable, data: Object = null): string {
   if (tbl.autoIncrement)  throw new Error("Cannot use upsert: "+tbl.name+ "table has autoIncrement column");
   let istmt =  "INSERT INTO "+tbl.name + genInsertColumns(tbl, data) + " VALUES " + genInsertValues(tbl, data);
-  let ustmt = "UPDATE SET" + columnSets(tbl, data).join();
+  let ustmt = "UPDATE SET " + columnSets(tbl, data).join();
   let pk = tbl.primaryKey.map( cnm ).join();
-  return istmt + " on conflict(" + pk + ") do " + ustmt;
+  return istmt + " on conflict(" + pk + ") do " + ustmt + ' RETURNING '+columnNames(tbl).join();
 }
 
 export function genTypescriptType(tbl: ITable): string {

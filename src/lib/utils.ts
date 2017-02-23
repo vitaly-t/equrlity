@@ -29,12 +29,12 @@ export function printHexBinary(byteArray: Uint8Array): string {
   return outChars.join('');
 }
 
-export function shuffle(array) {
-  var rand, index = -1,
-    length = array.length,
-    result = Array(length);
+export function shuffle<T>(array): T[] {
+  let index = -1;
+  let length = array.length;
+  let result = Array(length);
   while (++index < length) {
-    rand = Math.floor(Math.random() * (index + 1));
+    let rand = Math.floor(Math.random() * (index + 1));
     result[index] = result[rand];
     result[rand] = array[index];
   }

@@ -74,10 +74,9 @@ it("should work", async () => {
     expect(cache.userlinks.get(u1.userId).length).toEqual(1,"social graph not correct");
     let rsp2 = await pg.handleAmplify(u3.userId, { publicKey: "", content: ok.link, signature: "", linkDescription: "yaal2", amount: 10 });
     let ok2 = rsp2 as Rpc.AddContentOk;
+    expect(ok2.link).toBeDefined("amplify call failed");
+    expect(cache.userlinks.get(u1.userId).length).toEqual(2,"social graph not extended");
     {
-      expect(ok2.link).toBeDefined("amplify call failed");
-      expect(cache.userlinks.get(u1.userId).length).toEqual(2,"social graph not extended");
-
       let url = parse(ok2.link);
       let linkId2 = cache.getLinkIdFromUrl(url);
       let bal = cache.links.get(linkId).amount;
@@ -88,6 +87,12 @@ it("should work", async () => {
       let newbal = cache.links.get(linkId).amount;
       expect(newbal).toEqual(bal + 1, "incorrect payment for chained view");
     }
+
+    // redeem link  testing - particularly re-grafting..
+    let rsp3 = await pg.handleAmplify(u4.userId, { publicKey: "", content: ok.link, signature: "", linkDescription: "yaal3", amount: 10 });
+    let ok3 = rsp3 as Rpc.AddContentOk;
+    expect(ok3.link).toBeDefined("amplify call failed");
+
 
   }
 });

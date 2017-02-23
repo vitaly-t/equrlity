@@ -121,7 +121,7 @@ export default {
       { "name": "hitCount", "type": "integer", "default": "0"},
       { "name": "amount", "type": "integer" },
     ],
-    "Promotion": [ "linkId", "userId", "created",
+    "Promotion": [ "linkId", "userId", "created", "updated",
       { "name": "delivered", "type": "timestamp"}
     ],
     "User": [ "userId", "publicKey", "userName", "email", "created", "updated",
@@ -134,13 +134,14 @@ export default {
       "created",
       "updated",
     ],
-    "View": [ "userId", "linkId", "created" ]
+    "View": [ "userId", "linkId", "created", "updated" ]
   },
   "tables": {
     "users": {
       "rowType": "User",
       "primaryKey": [ "userId" ],
       "uniques": [ ["userName"] ],
+      "updated": "updated",
     },
     /*  we will calculate these from the links table for the moment
     "userlinks": {
@@ -150,6 +151,7 @@ export default {
         { "ref": "users", "columns": [ "user_A" ] },
         { "ref": "users", "columns": [ "user_B" ] },
       ]
+      "updated": "updated",
     },
     */
     "auths": {
@@ -157,13 +159,15 @@ export default {
       "primaryKey": [ "authProvider","authId" ],
       "foreignKeys": [
         { "ref": "users", "columns": [ "userId" ] }
-      ]
+      ],
+      "updated": "updated",
     },
     "contents": {
       "rowType": "Content",
       "primaryKey": [ "contentId" ],
       "autoIncrement": "contentId",
       "uniques": [ [ "content" ] ],
+      "updated": "updated",
       "foreignKeys": [
         { "ref": "users", "columns": [ "userId" ]  },
       ],
@@ -172,6 +176,7 @@ export default {
       "rowType": "Link",
       "primaryKey": [ "linkId" ],
       "autoIncrement": "linkId",
+      "updated": "updated",
       "foreignKeys": [
         { "ref": "users", "columns": [ "userId" ]  },
         { "ref": "contents", "columns": [ "contentId" ]  },
@@ -182,6 +187,7 @@ export default {
     "promotions": {
       "rowType": "Promotion",
       "primaryKey": [ "linkId", "userId"],
+      "updated": "updated",
       "foreignKeys": [
         { "ref": "users", "columns": [ "userId" ] },
         { "ref": "links", "columns": [ "linkId" ], "onDelete": "CASCADE" },
@@ -190,6 +196,7 @@ export default {
     "views": {
       "rowType": "View",
       "primaryKey": [ "userId", "linkId"],
+      "updated": "updated",
       "foreignKeys": [
         { "ref": "users", "columns": [ "userId" ]  },
         { "ref": "links", "columns": [ "linkId" ], "onDelete": "CASCADE" },
