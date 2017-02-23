@@ -359,8 +359,12 @@ export async function getLinkFromContent(url: Dbt.content): Promise<Dbt.Link | n
   return await getLinkFromContentId(id);
 }
 
+export async function getRootLinkIdsForContentId(id: Dbt.contentId): Promise<Dbt.Link[]> {
+  return await db.any(`select * from links where "contentId" = ${id} and "prevLink" is null`);
+}
+
 export async function getLinkFromContentId(id: Dbt.contentId): Promise<Dbt.Link | null> {
-  let recs: Dbt.Link[] = await db.any(`select * from links where "contentId" = ${id} and "prevLink" is null`);
+  let recs = await getRootLinkIdsForContentId(id);
   let l = recs.length;
   if (l == 0) return null;
   if (l == 1) return recs[0];
