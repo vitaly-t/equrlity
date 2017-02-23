@@ -52,9 +52,11 @@ it("should work", async () => {
   expect(cache.userlinks.has(u3.userId)).toEqual(false);
 
   {  // new let namespace
-    let rsp = await pg.handleAddContent(u1.userId, { publicKey: "", content: "https://www.example.com/somethingelse", signature: "", linkDescription: "yaal (yet-another-awesome-link)", amount: 10 });
+    let content = "https://www.example.com/somethingelse";
+    let rsp = await pg.handleAddContent(u1.userId, { publicKey: "", content: content, signature: "", linkDescription: "yaal (yet-another-awesome-link)", amount: 10 });
     let ok = rsp as Rpc.AddContentOk;
     expect(ok.link).toBeDefined("add content call failed");
+    let contentId = cache.getContentIdFromContent(content);
     let url = parse(ok.link);
     expect(cache.isSynereo(url)).toEqual(true);
     let linkId = cache.getLinkIdFromUrl(url);
@@ -92,7 +94,15 @@ it("should work", async () => {
     let rsp3 = await pg.handleAmplify(u4.userId, { publicKey: "", content: ok.link, signature: "", linkDescription: "yaal3", amount: 10 });
     let ok3 = rsp3 as Rpc.AddContentOk;
     expect(ok3.link).toBeDefined("amplify call failed");
-
-
+    {
+      let bal = cache.users.get(u1.userId).ampCredits;
+      let link = cache.links.get(linkId);
+      let linkbal = link.amount;
+      await pg.redeem_link(link);
+      let newbal = cache.users.get(u1.userId).ampCredits;
+      expect(bal + linkbal).toEqual(newbal,"link balance not redeemed");
+      let rootLinkIds = await pg.getRootLinkIdsForContentId(contentId);
+      expect(rootLinkIds.length).toEqual(2);
+    }
   }
 });
