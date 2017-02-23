@@ -169,7 +169,14 @@ export function genInsertValues(tbl: ITable, data: Object = null): string {
 
 export function genInsertStatement(tbl: ITable, data: Object = null): string {
   let stmt = "INSERT INTO "+tbl.name + genInsertColumns(tbl, data) + " VALUES " + genInsertValues(tbl, data);
-  if (tbl.autoIncrement) stmt += ' RETURNING "'+tbl.autoIncrement+'"';
+  stmt += ' RETURNING '+columnNames(tbl).join();
+  return stmt;
+}
+
+export function genRetrieveStatement(tbl: ITable, data: Object = null): string {
+  let pk = tbl.primaryKey
+  let where = tbl.primaryKey.map( c => cnm(c) + ' = ${'+c+'}' ).join(' AND ');
+  let stmt = "SELECT * FROM "+ tbl.name + " WHERE " + where;
   return stmt;
 }
 
@@ -183,7 +190,7 @@ export function genUpdateStatement(tbl: ITable, data: Object = null): string {
 
 export function genUpsertStatement(tbl: ITable, data: Object = null): string {
   if (tbl.autoIncrement)  throw new Error("Cannot use upsert: "+tbl.name+ "table has autoIncrement column");
-  let istmt = genInsertStatement(tbl, data);
+  let istmt =  "INSERT INTO "+tbl.name + genInsertColumns(tbl, data) + " VALUES " + genInsertValues(tbl, data);
   let ustmt = "UPDATE SET" + columnSets(tbl, data).join();
   let pk = tbl.primaryKey.map( cnm ).join();
   return istmt + " on conflict(" + pk + ") do " + ustmt;

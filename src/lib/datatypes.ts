@@ -50,6 +50,8 @@ export interface Content {
   readonly contentType: contentType | null,
   readonly userId: userId | null,
   readonly content: content | null,
+  readonly created: created | null,
+  readonly updated: updated | null,
   readonly cryptHash: binary | null
 };
 

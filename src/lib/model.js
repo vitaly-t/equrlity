@@ -113,7 +113,7 @@ export default {
   },
   "tupleTypes": {
     "Auth": [ "authProvider", "authId", "userId", "created", "updated" ],
-    "Content": [ "contentId", "contentType", "userId", "content",
+    "Content": [ "contentId", "contentType", "userId", "content", "created", "updated",
       { "name": "cryptHash", "type": "binary" },
     ],
     "Link": [ "linkId", "userId", "contentId", "linkDescription", "created", "updated",

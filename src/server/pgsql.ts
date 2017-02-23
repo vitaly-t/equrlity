@@ -282,10 +282,11 @@ export async function updateRecord(tblnm: string, rec: Object): Promise<void> {
   await db.none(stmt, rec);
 }
 
-export async function insertRecord(tblnm: string, rec: Object): Promise<any> {
+export async function insertRecord<T>(tblnm: string, rec: Object): Promise<T> {
   let tbl = oxb.tables.get(tblnm);
   let stmt = OxiGen.genInsertStatement(tbl, rec);
-  return await db.oneOrNone(stmt, rec);
+  let rslt = await db.one(stmt, rec);
+  return rslt;
 }
 
 export function emptyUser(): Dbt.User {
@@ -371,7 +372,7 @@ export async function is_promoted(userId: Dbt.userId, linkId: Dbt.linkId): Promi
   return rslt.length === 1;
 }
 
-export async function get_promotions_for_user(userId: Dbt.userId): Promise<Dbt.urlString[]> {
+export async function deliver_new_promotions(userId: Dbt.userId): Promise<Dbt.urlString[]> {
   let links = await db.any(`select "linkId" from promotions where "userId" = '${userId}' and delivered is null `);
   await db.none(`update promotions set delivered = CURRENT_TIMESTAMP where "userId" = '${userId}' `);
   return links.map(l => DbCache.linkToUrl(l.linkId));
@@ -417,19 +418,13 @@ export async function insert_content(userId: Dbt.userId, content: string, linkDe
   let usr = DbCache.users.get(userId);
   if (amount > usr.ampCredits) throw new Error("Negative balances not allowed");
 
-  let cont: Dbt.Content = { ...emptyContent(), userId, content, contentType, amount };
-  let contents = oxb.tables.get("contents");
-  let stmt = OxiGen.genInsertStatement(contents, cont);
-  let rslt1 = await db.one(stmt, cont);
-  let {contentId} = rslt1;
-
+  let cont = await insertRecord<Dbt.Content>("contents", { ...emptyContent(), userId, content, contentType, amount });
+  let contentId = cont.contentId;
   let links = oxb.tables.get("links");
   let link: Dbt.Link = { ...emptyLink(), userId, contentId, linkDescription, amount };
-  let rslt2 = await db.one(OxiGen.genInsertStatement(links, link), link);
-  let {linkId} = rslt2;
-  let rslt = { ...link, linkId };
-  DbCache.contents.set(contentId, { ...cont, contentId });
-  DbCache.links.set(linkId, rslt);
+  let rslt = await insertRecord<Dbt.Link>("links", link);
+  DbCache.contents.set(cont.contentId, cont);
+  DbCache.links.set(rslt.linkId, rslt);
   await adjust_user_balance(DbCache.users.get(userId), -amount);
   await promoteLink(rslt, amount);
   return rslt;
@@ -443,9 +438,8 @@ export async function amplify_content(userId: Dbt.userId, content: string, linkD
   let prv = DbCache.links.get(prevLink);
   let links = oxb.tables.get("links");
   let link: Dbt.Link = { ...prv, userId, prevLink, linkDescription, amount };
-  let {linkId} = await db.one(OxiGen.genInsertStatement(links, link), link);
-  let rslt = { ...link, linkId };
-  DbCache.links.set(linkId, rslt);
+  let rslt = await insertRecord<Dbt.Link>("links", link);
+  DbCache.links.set(rslt.linkId, rslt);
   await adjust_user_balance(DbCache.users.get(userId), -amount);
   await promoteLink(rslt, amount);
   return rslt;
@@ -499,17 +493,18 @@ export async function getLinkAlreadyInvestedIn(userId: Dbt.userId, contentId: Db
   return null;
 }
 
-export async function payForView(viewerId: Dbt.userId, viewedLinkId: Dbt.linkId): Promise<Dbt.integer> {
+export async function payForView(viewerId: Dbt.userId, viewedLinkId: Dbt.linkId): Promise<void> {
   //@@GS  thought long and hard about using a transaction here, but couldn't see
   // a way of doing it safely without locking the whole cache or similar.
   // given the small amounts involved I figured this would probably be ok.
   let links = DbCache.getChainFromLinkId(viewedLinkId);
+  console.log("chain length: " + links.length);
   let viewedLink = links[0];
   let bal = viewedLink.amount;
-  if (bal == 0) return bal
+  if (bal == 0) return;
 
   // is viewer already in links?
-  if (links.findIndex(l => l.userId == viewerId) >= 0) return bal;
+  if (links.findIndex(l => l.userId === viewerId) >= 0) return;
 
   await insertRecord("views", { userId: viewerId, linkId: viewedLinkId });
   DbCache.connectUsers(viewerId, viewedLink.userId);
@@ -524,8 +519,8 @@ export async function payForView(viewerId: Dbt.userId, viewedLinkId: Dbt.linkId)
 
   // each link in the parent chain gets paid 1
   let stmt = OxiGen.genUpdateStatement(oxb.tables.get("links"), { linkId: 0, amount: 0 });
-  let l = links.length - 1
-  while (bal > 0 && l > 0) {
+  let l = 1;
+  while (bal > 0 && l < links.length) {
     let {linkId, amount} = links[l];
     amount += 1;
     try {
@@ -537,7 +532,7 @@ export async function payForView(viewerId: Dbt.userId, viewedLinkId: Dbt.linkId)
     catch (e) {
       console.log("error updating link: " + e.message);
     }
-    l -= 1;
+    l += 1;
   }
   if (bal == 0) {
     let link = DbCache.links.get(viewedLinkId);
@@ -582,18 +577,23 @@ export async function handleAddContent(userId, {publicKey, content, signature, l
 export async function handleAmplify(userId, {publicKey, content, signature, linkDescription, amount}): Promise<Rpc.AddContentOk> {
   let linkId = DbCache.getLinkIdFromUrl(parse(content));
   let link = DbCache.links.get(linkId);
-  if (link.userId == userId) {
-    await invest_in_link(link, amount);
+  let rslt = undefined;
+  if (link.userId === userId) {
+    rslt = await invest_in_link(link, amount);
   }
   else {
     let contentId = DbCache.getContentIdFromContent(content);
     let prevId = await getLinkAlreadyInvestedIn(userId, contentId);
     if (prevId) throw new Error("user has previously invested in this content");
-    await amplify_content(userId, content, linkDescription, amount);
+    rslt = await amplify_content(userId, content, linkDescription, amount);
+    // this call is really just to aid testing
+    // through the UI it should not be possible to amplify a link without first viewing it
+    DbCache.connectUsers(userId, link.userId);
   }
+
   let linkAmplifier = DbCache.users.get(userId).userName;
-  let linkDepth = DbCache.getLinkDepth(link);
-  return { link: DbCache.linkToUrl(link.linkId), linkDepth, linkAmplifier };
+  let linkDepth = DbCache.getLinkDepth(rslt);
+  return { link: DbCache.linkToUrl(rslt.linkId), linkDepth, linkAmplifier };
 
 }
 

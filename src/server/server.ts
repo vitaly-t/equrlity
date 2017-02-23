@@ -365,11 +365,11 @@ router.post('/rpc', async function (ctx: any) {
         if (cache.isSynereo(url)) {
           let linkId = cache.getLinkIdFromUrl(url);
           if (!linkId) throw new Error("invalid link");
-          contentUrl = cache.getContentFromLinkId(linkId);
           if (!(await pg.has_viewed(ctx.userId.id, linkId))) {
             console.log("attention gots to get paid for!!!");
             await pg.payForView(ctx.userId.id, linkId)
           }
+          contentUrl = cache.getContentFromLinkId(linkId);
           let link = cache.links.get(linkId);
           let linkDepth = cache.getLinkDepth(link)
           let linkAmplifier = cache.users.get(link.userId).userName;
@@ -403,7 +403,7 @@ router.post('/rpc', async function (ctx: any) {
       }
       case "getUserLinks": {
         let links = await GetUserLinks(ctx.userId.id);
-        let promotions = await pg.get_promotions_for_user(ctx.userId.id);
+        let promotions = await pg.deliver_new_promotions(ctx.userId.id);
         ctx.body = { id, result: { links, promotions } };
         break;
       }
