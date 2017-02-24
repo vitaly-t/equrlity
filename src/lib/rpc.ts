@@ -67,7 +67,12 @@ export type UserLinkItem = {
   amount: Dbt.integer;
 }
 
-export type GetUserLinksResponse = { links: UserLinkItem[]; promotions: Dbt.urlString[]; connectedUsers: Dbt.userName[] }
+export type GetUserLinksResponse = { 
+  links: UserLinkItem[]; 
+  promotions: Dbt.urlString[]; 
+  connectedUsers: Dbt.userName[]; 
+  reachableUserCount: Dbt.integer;
+}
 
 export type RedeemLinkRequest = { linkId: Dbt.linkId; }
 export type RedeemLinkResponse = { links: UserLinkItem[]; }

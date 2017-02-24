@@ -19,6 +19,7 @@ export interface AppState {
   investments: UserLinkItem[];
   promotions: Dbt.urlString[];
   connectedUsers: Dbt.userName[];
+  reachableUserCount: Dbt.integer;
 }
 
 export function initState(): AppState {
@@ -26,7 +27,7 @@ export function initState(): AppState {
   return {
     publicKey: null, privateKey: null, links: new Map<string, LinkInfo>(), redirects: new Map<string, string>(),
     activeUrl: null, moniker: 'unknown', ampCredits: 0, jwt: '', lastErrorMessage: '', 
-    investments: [], promotions: [], connectedUsers: []
+    investments: [], promotions: [], connectedUsers: [], reachableUserCount: 0
   };
 }
 

@@ -6,7 +6,7 @@
   "configurations": [
     
     {
-      "type": "node2",
+      "type": "node",
       "request": "launch",
       "name": "Launch Server",
       "program": "${workspaceRoot}/src/server/server.ts",

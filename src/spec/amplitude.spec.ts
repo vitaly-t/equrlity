@@ -1,19 +1,18 @@
 "use strict";
 
-const url = process.env.DATABASE_URL;
+import * as Utils from '../lib/utils';
+Utils.setTest(true);
 import * as pg from '../server/pgsql';
 import * as Dbt from '../lib/datatypes'
 import { Url, parse } from 'url';
 import * as Rpc from '../lib/rpc';
-import * as Utils from '../lib/utils';
 import { it } from 'jasmine-promise-wrapper';
-
-const cache = pg.DbCache;
+import * as cache from '../server/cache';
 
 it("should work", async () => {
   expect(Utils.isDev()).toEqual(true, "not a dev environment");
   await pg.recreateDataTables();
-  cache.init();
+  await pg.init();
   let u1 = await pg.createUser();
   expect(u1.userName).toEqual("anonymous_0", "not the first user");
   expect(u1.ampCredits).toEqual(1000);

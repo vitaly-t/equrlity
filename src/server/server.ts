@@ -17,13 +17,13 @@ import * as send from 'koa-send';
 import clientIP from './clientIP.js';
 import { Url, parse } from 'url';
 import * as Rpc from '../lib/rpc';
-import { capuchinVersion } from '../lib/utils';
+import { capuchinVersion, isDev } from '../lib/utils';
 import * as cors from 'kcors';
+import * as cache from './cache';
 
-const cache = pg.DbCache;
 const jwt_secret = process.env.JWT_AMPLITUDE_KEY;
 
-cache.init();
+pg.init();
 //pg.resetDataTables();
 //pg.recreateDataTables();
 
@@ -40,10 +40,6 @@ function getUser(id: Dbt.userId): Dbt.User {
   return cache.users.get(id);
 };
 
-let getUserCount = function () {
-  return cache.users.size;
-};
-
 function readFileAsync(src: string): Promise<string> {
   return new Promise(function (resolve, reject) {
     fs.readFile(src, { 'encoding': 'utf8' }, function (err, data) {
@@ -52,12 +48,6 @@ function readFileAsync(src: string): Promise<string> {
     });
   });
 }
-
-async function createUser(ctx) {
-  let user = await pg.createUser();
-  ctx.userId = {id: user.userId} ;
-  ctx.user = user;
-};
 
 /*
 let authent = async function (ctx, prov, authId) {
@@ -96,14 +86,10 @@ let authent = async function (ctx, prov, authId) {
 const app = new Koa();
 app.keys = ['amplitude'];  //@@GS what does this do again?
 
-
 const publicRouter = new Router();
-
 
 //app.use(koastatic.static(__dirname + '/assets')); 
 //app.use(serve("assets", "./assets"));
-
-
 //app.use(session(app));
 //app.use(passport.initialize());
 //app.use(passport.session());
@@ -111,12 +97,16 @@ const publicRouter = new Router();
 
 app.use(bodyParser());
 
-app.use(cors({
-  origin: "*",
-  allowMethods: 'GET,HEAD,PUT,POST,DELETE,PATCH',
-  allowHeaders: ["X-Requested-With", "Content-Type", "Authorization", "x-syn-client-version"],
-  exposeHeaders: ["x-syn-moniker", "x-syn-credits", "x-syn-token", "x-syn-authprov", "x-syn-groups"],
-}));
+let hdrs = ["X-Requested-With", "Content-Type", "Authorization", "x-syn-client-version"];
+
+app.use(
+  cors({
+    origin: "*",
+    allowMethods: 'GET,HEAD,PUT,POST,DELETE,PATCH',
+    allowHeaders: hdrs,
+    exposeHeaders: ["x-syn-moniker", "x-syn-credits", "x-syn-token", "x-syn-authprov", "x-syn-groups"],
+  })
+);
 
 // No idea why these are necessary, but I couldn't make it work any other way ...
 publicRouter.get('/download/synereo.zip', async function (ctx, next) {
@@ -187,8 +177,6 @@ app.use(async (ctx, next) => {
   }
 })
 
-app.use(jwt.jwt({ secret: jwt_secret, ignoreExpiration: true, key: 'userId' }));
-
 app.use(async (ctx, next) => {
   let client_ver = ctx.headers['x-syn-client-version'];
   if (!client_ver) {
@@ -210,10 +198,10 @@ app.use(async (ctx, next) => {
   await next();
 });
 
+app.use(jwt.jwt({ secret: jwt_secret, ignoreExpiration: true, key: 'userId' }));
 
 app.use(async function (ctx, next) {
   await next();
-
 
   let user: Dbt.User = getUser(ctx['userId'].id);
   if (user) {
@@ -221,7 +209,7 @@ app.use(async function (ctx, next) {
     ctx.set('x-syn-credits', user.ampCredits.toString());
     ctx.set('x-syn-moniker', user.userName);
 
-    pg.touch_user(user.userId);
+    await pg.touch_user(user.userId);
   }
 });
 
@@ -229,7 +217,9 @@ app.use(async function (ctx, next) {
   let userId = ctx['userId'];
   if (!userId) {
     console.log("jwt returned no key");
-    await createUser(ctx);
+    let user = await pg.createUser();
+    ctx['userId'] = { id: user.userId };
+    ctx.user = user;
   }
   else {
     let user = getUser(userId.id);
@@ -260,42 +250,10 @@ if (cxt.auth) {
 }
 */
 
-async function changeMoniker(id: Dbt.userId, newName: string): Promise<boolean> {
-  console.log("setting new Moniker : " + newName);
-  if (await pg.checkMonikerUsed(newName)) return false;
-  let prv = cache.users[id];
-  let usr = { ...prv, userName: newName };
-  console.log("updating user : " + JSON.stringify(usr));
-  let updt = await pg.upsert_user(usr);
-  console.log("user updated : " + JSON.stringify(updt));
-  cache.users.set(id, usr);
-  return true;
-}
-
-async function GetUserLinks(id: Dbt.userId): Promise<Rpc.UserLinkItem[]> {
-  let a = await pg.get_links_for_user(id);
-  let links = Promise.all( a.map( async l => {
-    let linkId = l.linkId;
-    let contentUrl = cache.contents.get(l.contentId).content;
-    let linkDepth = cache.getLinkDepth(l);
-    let viewCount = await pg.view_count(linkId);
-    let promotionsCount = await pg.promotions_count(linkId);
-    let deliveriesCount = await pg.deliveries_count(linkId);
-    let amount = l.amount;
-    let rl: Rpc.UserLinkItem = { linkId, contentUrl, linkDepth, viewCount, promotionsCount, deliveriesCount, amount };
-    return rl;
-  }));
-  return links;
-}
-
 const router = new Router();
 router.post('/rpc', async function (ctx: any) {
   let {jsonrpc, method, params, id} = ctx.request.body;  // from bodyparser 
   if (!ctx.header.authorization) {
-    //@@GS - I was unable to get the plugin popup to use cookies properly
-    // so instead we send the token as a header.
-    // on receipt we will get an Authorization: Bearer header from rpc calls.
-    // unfortunately, other routes will now have to manage without use of cookies.
     console.log("sending token");
     ctx.set('x-syn-token', ctx['token']);
   }
@@ -304,6 +262,7 @@ router.post('/rpc', async function (ctx: any) {
     if (id) ctx.body = { id, error: { code: -32600, message: "Invalid version" } };
     return;
   }
+  
   try {
     switch (method as Rpc.Method) {
       case "initialize": {
@@ -341,9 +300,9 @@ router.post('/rpc', async function (ctx: any) {
       }
       case "changeMoniker": {
         let newName = ctx.body.userName;  // from bodyparser 
-        let ok = await changeMoniker(ctx.userId.id, newName);
+        let ok = await pg.changeMoniker(ctx.userId.id, newName);
         if (ok) ctx.body = { id, result: { ok: true } };
-        else ctx.body = { id, error: { message: "taken" } };
+        else ctx.body = { id, error: { message: "userName is taken" } };
         break;
       }
       case "loadLink": {
@@ -402,18 +361,19 @@ router.post('/rpc', async function (ctx: any) {
         break;
       }
       case "getUserLinks": {
-        let links = await GetUserLinks(ctx.userId.id);
+        let links = await pg.GetUserLinks(ctx.userId.id);
         let promotions = await pg.deliver_new_promotions(ctx.userId.id);
-        let connectedUsers = await cache.getConnectedUserNames(ctx.userId.id);
-        let result: Rpc.GetUserLinksResponse = {links, promotions, connectedUsers};
+        let connectedUsers = cache.getConnectedUserNames(ctx.userId.id);
+        let reachableUserCount = cache.getReachableUserIds(ctx.userId.id).length;
+        let result: Rpc.GetUserLinksResponse = { links, promotions, connectedUsers, reachableUserCount };
         ctx.body = { id, result };
         break;
       }
       case "redeemLink": {
         let link = cache.links.get(params.linkId);
         await pg.redeem_link(link)
-        let links = await GetUserLinks(ctx.userId.id);
-        let result: Rpc.RedeemLinkResponse = {links};
+        let links = await pg.GetUserLinks(ctx.userId.id);
+        let result: Rpc.RedeemLinkResponse = { links };
         ctx.body = { id, result };
         break;
       }
@@ -422,7 +382,7 @@ router.post('/rpc', async function (ctx: any) {
     }
   }
   catch (e) {
-    console.log("returning rpc error: "+e.message);
+    console.log("returning rpc error: " + e.message);
     ctx.body = { id, error: { message: e.message } };
   }
 

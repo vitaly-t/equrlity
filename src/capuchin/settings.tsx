@@ -120,7 +120,9 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
     let vsp = <div style={{ height: 20 }} />;
     let divStyle = { width: '100%', marginTop: 5, marginLeft: 5, padding: 6 };
     let lhcolStyle = { width: '20%' };
-    let userp = userNames.length > 0 ?  <p>You are currently directly connected with another {userNames.length} Synereo users.</p>
+    let userp = userNames.length > 0 ? <div><p>You are currently directly connected with another {userNames.length} Synereo user{userNames.length > 1 ? "s" : ""}.</p>
+                                            <p>Your social graph currently extends to {st.reachableUserCount} reachable users.</p>
+                                       </div>     
                                      : <p>You are not currently connected with any other Synereo users. Hence, no promotions can be issued on your behalf.</p>;
 
     return (

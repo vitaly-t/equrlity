@@ -29,6 +29,7 @@ async function apiRequest(st: AppState) {
   let headers = { 'content-type': 'application/json', 'Accept': 'application/json'}
   if (st.jwt) headers['Authorization'] = 'Bearer '+st.jwt;
   headers['x-syn-client-version'] = 'capuchin-' +Utils.capuchinVersion();
+  //if (Utils.isDev()) headers['x-syn-moniker'] = st.moniker;
   return axios.create({
     timeout: 10000,
     //withCredentials: true,  // not needed since cookies didn't work...

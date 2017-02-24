@@ -176,12 +176,13 @@ export namespace AsyncHandlers {
       let rsp : Rpc.Response = response.data;
       if (rsp.error) throw new Error("Server returned error: " + rsp.error.message);
       let rslt: Rpc.GetUserLinksResponse = rsp.result;  
-      let investments = rslt.links; 
       let promotions = st.promotions;  
+      let investments = rslt.links; 
       let connectedUsers = rslt.connectedUsers;
+      let reachableUserCount = rslt.reachableUserCount
       console.log("connected users : "+connectedUsers.length);
       if (rslt.promotions.length > 0) promotions = [...promotions, ...rslt.promotions];
-      st = {...st, investments, promotions, connectedUsers};
+      st = {...st, investments, promotions, connectedUsers, reachableUserCount};
       return st;
     };
   }

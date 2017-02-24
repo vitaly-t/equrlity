@@ -10,6 +10,15 @@ export function isDev() {
     return process.env.NODE_ENV === 'development'
 }
 
+let _isTest = false;
+export function isTest() {
+    return _isTest
+}
+
+export function setTest(l : boolean) {
+    return _isTest = l;
+}
+
 export function capuchinVersion() {
 	return "0.8.1";
 }

@@ -13,7 +13,8 @@
     "mklib": "cd src/lib && tsc",
     "mksrv": "cd src/server && tsc",
     "mktest": "cd src/spec && tsc",
-    "resetdb": "node src/scripts/resetdb.js",
+    "resetTables": "node src/scripts/resetTables.js",
+    "recreateTables": "node src/scripts/recreateTables.js",
     "test": "npm run mktest && cd dist/spec && jasmine *.spec.js"
   },
   "keywords": [],
