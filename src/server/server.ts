@@ -404,14 +404,17 @@ router.post('/rpc', async function (ctx: any) {
       case "getUserLinks": {
         let links = await GetUserLinks(ctx.userId.id);
         let promotions = await pg.deliver_new_promotions(ctx.userId.id);
-        ctx.body = { id, result: { links, promotions } };
+        let connectedUsers = await cache.getConnectedUserNames(ctx.userId.id);
+        let result: Rpc.GetUserLinksResponse = {links, promotions, connectedUsers};
+        ctx.body = { id, result };
         break;
       }
       case "redeemLink": {
         let link = cache.links.get(params.linkId);
         await pg.redeem_link(link)
         let links = await GetUserLinks(ctx.userId.id);
-        ctx.body = { id, result: { links } };
+        let result: Rpc.RedeemLinkResponse = {links};
+        ctx.body = { id, result };
         break;
       }
       default:

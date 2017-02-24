@@ -267,15 +267,18 @@ export namespace DbCache {
     return rslt;
   }
 
-  export function checkMonikerUsed(newName) {
-    return Object.keys(users).some(function (id) {
-      return users[id].userName === newName;
-    });
+  export function getConnectedUserNames(userId): Dbt.userName[] {
+    if (!userlinks.has(userId)) return[];
+    return userlinks.get(userId).map(id => users.get(id).userName);
+  }
+}
 
+  export async function checkMonikerUsed(name: string): Promise<boolean> {
+    let rslt = await db.any(`select "userId" from users where "userName" = ${name}`);
+    return rslt.length > 0;
   };
 
 
-}
 
 export async function updateRecord<T>(tblnm: string, rec: Object): Promise<T> {
   let tbl = oxb.tables.get(tblnm);

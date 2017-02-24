@@ -18,13 +18,15 @@ export interface AppState {
   lastErrorMessage: string;
   investments: UserLinkItem[];
   promotions: Dbt.urlString[];
+  connectedUsers: Dbt.userName[];
 }
 
 export function initState(): AppState {
   console.log("initState called");
   return {
     publicKey: null, privateKey: null, links: new Map<string, LinkInfo>(), redirects: new Map<string, string>(),
-    activeUrl: null, moniker: 'unknown', ampCredits: 0, jwt: '', lastErrorMessage: '', investments: [], promotions: []
+    activeUrl: null, moniker: 'unknown', ampCredits: 0, jwt: '', lastErrorMessage: '', 
+    investments: [], promotions: [], connectedUsers: []
   };
 }
 

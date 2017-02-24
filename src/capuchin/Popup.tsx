@@ -53,11 +53,13 @@ export class PopupPanel extends React.Component<PopupPanelProps, PopupPanelState
         chrome.runtime.sendMessage({ eventType: "Save", amount, linkDescription, async: true });
       }
       let infoDiv = linkInfo ? <div>{`Amplified by: ${linkInfo.linkAmplifier}, Link depth : ${linkInfo.linkDepth}`}</div> : null;
+      let costPerView = linkInfo ? linkInfo.linkDepth + 1 : 1;
       pnl = (<div>
         <p>Target : <textarea style={{ width: 450 }}>{tgt}</textarea></p>
         {infoDiv}
         <p>Investment amount: <input type="number" ref={(e) => this.ctrls.amountInput = e} max={st.ampCredits}
           value={this.state.amplifyAmount} onChange={(e) => this.changeAmplifyAmount()} /></p>
+        <p>This will provide for a maximum of {Math.floor(this.state.amplifyAmount / costPerView)} promotions.</p>  
         <p>Description: <input type="string" style={{ width: 400 }} ref={(e) => this.ctrls.descriptionInput = e}
           value={desc} onChange={(e) => this.changeDescription()} /></p>
         <button onClick={saveaction} >{lbl}</button>

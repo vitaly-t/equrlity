@@ -44,6 +44,7 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
   render() {
     let st = this.props.appState;
     let invs = st.investments;
+    let userNames = st.connectedUsers;
     let invdiv = <p>You have no current investments</p>
     if (invs.length > 0) {
       let invrows = invs.map(l => {
@@ -117,28 +118,35 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
     }
 
     let vsp = <div style={{ height: 20 }} />;
+    let divStyle = { width: '100%', marginTop: 5, marginLeft: 5, padding: 6 };
+    let lhcolStyle = { width: '20%' };
+    let userp = userNames.length > 0 ?  <p>You are currently directly connected with another {userNames.length} Synereo users.</p>
+                                     : <p>You are not currently connected with any other Synereo users. Hence, no promotions can be issued on your behalf.</p>;
 
     return (
       <div>
         <h3>Synereo Amplitude Settings</h3>
+        <div style={divStyle}>
+          {userp}
+        </div>
         {vsp}
         <h5>Your Settings:</h5>
-        <div style={{ width: '100%', marginTop: 5, marginLeft: 5, padding: 6 }}>
-          <div style={{ width: '20%' }} >Nickname: </div>
+        <div style={ divStyle}>
+          <div style={lhcolStyle} >Nickname: </div>
           <input type="text" style={{ width: '60%' }} name="NickName" id="nickId" ref={(e) => this.ctrls.nickNameInput = e}
             value={this.state.nickName} onChange={(e) => this.changeNickName()} />
         </div>
-        <div style={{ width: '100%', marginTop: 5, marginLeft: 5, padding: 6 }}>
-          <div style={{ width: '20%' }} >Email: </div>
+        <div style={ divStyle}>
+          <div style={lhcolStyle} >Email: </div>
           <input type="email" style={{ width: '60%' }} name="Email" id="emailId" ref={(e) => this.ctrls.emailInput = e}
             value={this.state.email} onChange={(e) => this.changeEmail()} />
         </div>
-        <div style={{ width: '100%', marginTop: 5, marginLeft: 5, padding: 6 }}>
-          <div style={{ width: '20%' }} >Deposit: </div>
+        <div style={ divStyle}>
+          <div style={lhcolStyle} >Deposit: </div>
           <input type="number" style={{ width: 100 }} name="Deposit" id="depositId" ref={(e) => this.ctrls.depositInput = e}
             value={this.state.deposit} onChange={(e) => this.changeDeposit()} />
         </div>
-        <div style={{ width: '100%', marginTop: 5, marginLeft: 5, padding: 6 }}>
+        <div style={ divStyle}>
           <button type="button" className="pt-intent-primary" onClick={this.saveSettings} >Save Settings</button>
         </div>
         {vsp}

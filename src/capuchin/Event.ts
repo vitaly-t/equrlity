@@ -178,8 +178,10 @@ export namespace AsyncHandlers {
       let rslt: Rpc.GetUserLinksResponse = rsp.result;  
       let investments = rslt.links; 
       let promotions = st.promotions;  
+      let connectedUsers = rslt.connectedUsers;
+      console.log("connected users : "+connectedUsers.length);
       if (rslt.promotions.length > 0) promotions = [...promotions, ...rslt.promotions];
-      st = {...st, investments, promotions}
+      st = {...st, investments, promotions, connectedUsers};
       return st;
     };
   }
