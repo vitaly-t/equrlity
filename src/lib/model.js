@@ -74,7 +74,7 @@ export default {
     },
     "publicKey": {
       "sqlType": "bytea",
-      "tsType": "ArrayBuffer"
+      "tsType": "any"  // needs fixing
     },
     "text": {
       "tsType": "string",

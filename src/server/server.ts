@@ -97,13 +97,11 @@ const publicRouter = new Router();
 
 app.use(bodyParser());
 
-let hdrs = ["X-Requested-With", "Content-Type", "Authorization", "x-syn-client-version"];
-
 app.use(
   cors({
     origin: "*",
     allowMethods: 'GET,HEAD,PUT,POST,DELETE,PATCH',
-    allowHeaders: hdrs,
+    allowHeaders: ["X-Requested-With", "Content-Type", "Authorization", "x-syn-client-version"],
     exposeHeaders: ["x-syn-moniker", "x-syn-credits", "x-syn-token", "x-syn-authprov", "x-syn-groups"],
   })
 );
@@ -257,27 +255,30 @@ router.post('/rpc', async function (ctx: any) {
     console.log("sending token");
     ctx.set('x-syn-token', ctx['token']);
   }
-
+  
   if (jsonrpc != "2.0") {
-    if (id) ctx.body = { id, error: { code: -32600, message: "Invalid version" } };
+    let error: Rpc.Error = {id, error: { code: -32600, message: "Invalid version" } };
+    if (id) ctx.body = error;
     return;
   }
   
   try {
     switch (method as Rpc.Method) {
       case "initialize": {
-        // data goes back through the headers.
-        let {publicKey} = params
+        let req: Rpc.InitializeRequest = params;
+        let {publicKey} = req;
         let usr = getUser(ctx.userId.id);
         if (!usr) throw new Error("Internal error getting user details");
         usr = { ...usr, publicKey };
         await pg.upsert_user(usr);
-        ctx.body = { id, ok: true };
+        let result: Rpc.InitializeResponse = {ok: true};
+        ctx.body = { id, result };
         break;
       }
       case "addContent": {
-        let url = parse(params.content);
-        let result = null;
+        let req: Rpc.AddContentRequest = params;
+        let url = parse(req.content);
+        let result: Rpc.SendAddContentResponse = null;
         let {publicKey: any} = params;
         let usr = getUser(ctx.userId.id);
         /*  Julia - help!!!
@@ -298,17 +299,12 @@ router.post('/rpc', async function (ctx: any) {
         ctx.body = { id, result }
         break;
       }
-      case "changeMoniker": {
-        let newName = ctx.body.userName;  // from bodyparser 
-        let ok = await pg.changeMoniker(ctx.userId.id, newName);
-        if (ok) ctx.body = { id, result: { ok: true } };
-        else ctx.body = { id, error: { message: "userName is taken" } };
-        break;
-      }
       case "loadLink": {
-        let lnk = await pg.getLinkFromContent(params.url);
+        let req: Rpc.LoadLinkRequest = params;
+        let lnk = await pg.getLinkFromContent(req.url);
         if (!lnk) {
-          ctx.body = { id, result: { found: false } };
+          let result: Rpc.LoadLinkResponse = { found: false }
+          ctx.body = { id, result };
           return;
         }
         let url = cache.linkToUrl(lnk.linkId)
@@ -319,8 +315,9 @@ router.post('/rpc', async function (ctx: any) {
         break;
       }
       case "getRedirect": {
+        let req: Rpc.GetRedirectRequest = params;
         let contentUrl = null;
-        let url = parse(params.linkUrl);
+        let url = parse(req.linkUrl);
         if (cache.isSynereo(url)) {
           let linkId = cache.getLinkIdFromUrl(url);
           if (!linkId) throw new Error("invalid link");
@@ -336,11 +333,13 @@ router.post('/rpc', async function (ctx: any) {
           ctx.body = { id, result };
           break;
         }
-        ctx.body = { id, result: { found: false } }
+        let result: Rpc.GetRedirectResponse = { found: false };
+        ctx.body = { id, result }
         break;
       }
       case "changeSettings": {
-        let {moniker, deposit, email} = params;
+        let req: Rpc.ChangeSettingsRequest = params;
+        let {moniker, deposit, email} = req;
         let usr = getUser(ctx.userId.id);
         if (!usr) throw new Error("Internal error getting user details");
         if (moniker && moniker !== usr.userName) {
@@ -350,17 +349,18 @@ router.post('/rpc', async function (ctx: any) {
           }
           usr = { ...usr, userName: moniker };
         }
-        let idep = parseInt(deposit);
-        if (idep > 0) {
-          let ampCredits = usr.ampCredits + idep;
+        if (deposit > 0) {
+          let ampCredits = usr.ampCredits + deposit;
           usr = { ...usr, ampCredits };
         }
         if (email) usr = { ...usr, email };
         await pg.upsert_user(usr);
-        ctx.body = { id, result: { ok: true } };
+        let result: Rpc.ChangeSettingsResponse = {ok: true};
+        ctx.body = { id, result };
         break;
       }
       case "getUserLinks": {
+        //let req: Rpc.GetUserLinksRequest = params;
         let links = await pg.GetUserLinks(ctx.userId.id);
         let promotions = await pg.deliver_new_promotions(ctx.userId.id);
         let connectedUsers = cache.getConnectedUserNames(ctx.userId.id);
@@ -370,7 +370,8 @@ router.post('/rpc', async function (ctx: any) {
         break;
       }
       case "redeemLink": {
-        let link = cache.links.get(params.linkId);
+        let req: Rpc.RedeemLinkRequest = params;
+        let link = cache.links.get(req.linkId);
         await pg.redeem_link(link)
         let links = await pg.GetUserLinks(ctx.userId.id);
         let result: Rpc.RedeemLinkResponse = { links };
@@ -378,7 +379,8 @@ router.post('/rpc', async function (ctx: any) {
         break;
       }
       default:
-        if (id) ctx.body = { id, error: { code: -32601, message: "Invalid method: " + method } };
+        let error: Rpc.Error = { id, error: { code: -32601, message: "Invalid method: " + method } };
+        ctx.body = error;
     }
   }
   catch (e) {

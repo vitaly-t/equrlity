@@ -118,7 +118,7 @@ export namespace AsyncHandlers {
       st = extractHeadersToState(st, response);
       let rsp: Rpc.Response = response.data;
       if (rsp.error) throw new Error("Server returned error: " + rsp.error.message);
-      let rslt: Rpc.RecvAddContentResponse = rsp.result;
+      let rslt: Rpc.AddContentResponse = rsp.result;
       if (rslt.prevLink) {
         chrome.runtime.sendMessage({ eventType: 'RenderMessage', msg: "Content already registered." });
         // very naughty state mutation here ... so sue me!!

@@ -173,7 +173,6 @@ export async function getAllRecords<T>(tblnm: string): Promise<T[]> {
   return rslt;
 }
 
-
 export async function checkMonikerUsed(name: string): Promise<boolean> {
   let rslt = await db.any(`select "userId" from users where "userName" = '${name}' `);
   return rslt.length > 0;
@@ -207,7 +206,6 @@ export function emptyUser(): Dbt.User {
 
 const upsert_user_sql = OxiGen.genUpsertStatement(oxb.tables.get("users"));
 export async function upsert_user(usr: Dbt.User): Promise<Dbt.User> {
-  //console.log('Inserting user : ' + userName ) ;
   let rslt: Dbt.User[] = await db.any(upsert_user_sql, usr);
   let r = rslt[0];
   cache.users.set(r.userId, r);
