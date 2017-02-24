@@ -262,7 +262,7 @@ if (cxt.auth) {
 
 async function changeMoniker(id: Dbt.userId, newName: string): Promise<boolean> {
   console.log("setting new Moniker : " + newName);
-  if (cache.checkMonikerUsed(newName)) return false;
+  if (await pg.checkMonikerUsed(newName)) return false;
   let prv = cache.users[id];
   let usr = { ...prv, userName: newName };
   console.log("updating user : " + JSON.stringify(usr));
@@ -385,7 +385,7 @@ router.post('/rpc', async function (ctx: any) {
         let usr = getUser(ctx.userId.id);
         if (!usr) throw new Error("Internal error getting user details");
         if (moniker && moniker !== usr.userName) {
-          if (cache.checkMonikerUsed(moniker)) {
+          if (await pg.checkMonikerUsed(moniker)) {
             ctx.body = { id, error: { message: "Nickname not available" } };
             return;
           }

@@ -568,7 +568,8 @@ export async function createUser(): Promise<Dbt.User> {
   let userName = '';
   while (true) {
     userName = "anonymous_" + i;
-    if (!DbCache.checkMonikerUsed(userName)) break;
+    let used = await checkMonikerUsed(userName);
+    if (used) break;
     ++i;
   }
   let userId = uuid.generate();
