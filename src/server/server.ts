@@ -140,6 +140,13 @@ publicRouter.get('/link/:id', async (ctx, next) => {
   let linkId: Dbt.linkId = parseInt(ctx.params.id);
   let url = cache.getContentFromLinkId(linkId);
   let linkClause = url ? `<p>This is the link you were (probably) after: <a href="${url}">${url}</a></p>` : '';
+  let ip = clientIP(ctx);
+  cache.registerPossibleInvitation(ip, linkId);
+  // logic: if invitation is still there in 1 second it wasn't a redirect
+  setTimeout(() => {
+    if (cache.isPossibleInvitation(ip, linkId)) pg.registerInvitation(ip, linkId);
+  }, 1000);
+
   ctx.body = `
 ${header}
 <p>You have followed a Synereo link.  If you can see this message (for more than a second or so)
@@ -183,12 +190,12 @@ app.use(async (ctx, next) => {
     return;
   }
   let [client, version] = client_ver.split("-");
-  if (client !== 'capuchin') {
+  if (client !== 'capuchin' && client !== 'lizard') {
     ctx.status = 400;
     ctx.body = { error: { message: 'Invalid Client - not capuchin' } };
     return;
   }
-  if (version !== capuchinVersion()) {
+  if (client === 'capuchin' && version !== capuchinVersion()) {
     ctx.status = 400;
     ctx.body = { error: { message: 'Client is out-of-date and requires upgrade' } };
     return;
@@ -206,8 +213,7 @@ app.use(async function (ctx, next) {
     //console.log("Setting credits to : " + user.ampCredits.toString());
     ctx.set('x-syn-credits', user.ampCredits.toString());
     ctx.set('x-syn-moniker', user.userName);
-
-    await pg.touch_user(user.userId);
+    await pg.touch_user(user.userId, clientIP(ctx));
   }
 });
 
@@ -215,9 +221,16 @@ app.use(async function (ctx, next) {
   let userId = ctx['userId'];
   if (!userId) {
     console.log("jwt returned no key");
-    let user = await pg.createUser();
+    let ipAddress = clientIP(ctx);
+    let user = await pg.createUser(ipAddress);
     ctx['userId'] = { id: user.userId };
     ctx.user = user;
+    let inv = await pg.retrieveRecord<Dbt.Invitation>("invitations", {ipAddress});
+    if (inv && cache.links.has(inv.linkId)) {
+      let link = cache.links.get(inv.linkId);
+      cache.connectUsers(user.userId, link.userId);
+      ctx['redirectUrl'] = cache.linkToUrl(inv.linkId);
+    }
   }
   else {
     let user = getUser(userId.id);
@@ -255,13 +268,13 @@ router.post('/rpc', async function (ctx: any) {
     console.log("sending token");
     ctx.set('x-syn-token', ctx['token']);
   }
-  
+
   if (jsonrpc != "2.0") {
-    let error: Rpc.Error = {id, error: { code: -32600, message: "Invalid version" } };
+    let error: Rpc.Error = { id, error: { code: -32600, message: "Invalid version" } };
     if (id) ctx.body = error;
     return;
   }
-  
+
   try {
     switch (method as Rpc.Method) {
       case "initialize": {
@@ -271,7 +284,8 @@ router.post('/rpc', async function (ctx: any) {
         if (!usr) throw new Error("Internal error getting user details");
         usr = { ...usr, publicKey };
         await pg.upsert_user(usr);
-        let result: Rpc.InitializeResponse = {ok: true};
+        let redirectUrl = ctx['redirectUrl'];
+        let result: Rpc.InitializeResponse = { ok: true, redirectUrl };
         ctx.body = { id, result };
         break;
       }
@@ -321,6 +335,8 @@ router.post('/rpc', async function (ctx: any) {
         if (cache.isSynereo(url)) {
           let linkId = cache.getLinkIdFromUrl(url);
           if (!linkId) throw new Error("invalid link");
+          let ip = clientIP(ctx);
+          cache.cancelPossibleInvitation(ip);
           if (!(await pg.has_viewed(ctx.userId.id, linkId))) {
             console.log("attention gots to get paid for!!!");
             await pg.payForView(ctx.userId.id, linkId)
@@ -355,7 +371,7 @@ router.post('/rpc', async function (ctx: any) {
         }
         if (email) usr = { ...usr, email };
         await pg.upsert_user(usr);
-        let result: Rpc.ChangeSettingsResponse = {ok: true};
+        let result: Rpc.ChangeSettingsResponse = { ok: true };
         ctx.body = { id, result };
         break;
       }

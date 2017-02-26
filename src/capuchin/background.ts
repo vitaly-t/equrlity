@@ -3,7 +3,7 @@ import * as Crypto from '../lib/Crypto'
 
 import { AppState, initState, expandedUrl, isSeen, setLoading, setWaiting, prepareUrl, preSerialize } from './AppState';
 import { Url, parse, format } from 'url';
-import { Message, Handlers, AsyncHandlers, getTab } from './Event';
+import { Message, AsyncHandlers, getTab } from './Event';
 
 // no touchy!!  only to be set from within handleMessage
 let __state: AppState = initState();
@@ -23,7 +23,7 @@ async function createKeyPairIf(keys: string[]): Promise<void> {
   }
 }
 
-async function initialize(): Promise<AppState> {
+async function initialize() {
   console.log("initializing...");
   let state = currentState();
   localForage.config({ name: 'synereo-capuchin' })
@@ -34,11 +34,7 @@ async function initialize(): Promise<AppState> {
   const jwt = await localForage.getItem<string>('jwt');
   if (!jwt) console.log("No JWT found");
   state = { ...state, publicKey, privateKey, jwt };
-  let st = await handleMessage({ eventType: "Initialize", state });
-  if (!st.lastErrorMessage) {
-    if (!jwt) localForage.setItem<string>('jwt', st.jwt);
-  }
-  return st;
+  handleAsyncMessage({ eventType: "Initialize", state });
 }
 
 chrome.runtime.onStartup.addListener(initialize);
@@ -74,6 +70,12 @@ export async function handleAsyncMessage(event: Message) {
   let fn = null;
   try {
     switch (event.eventType) {
+      case "Initialize":
+        fn = await AsyncHandlers.Initialize(st, event.state);
+        break;
+      case "ChangeSettings":
+        fn = await AsyncHandlers.ChangeSettings(st, event.settings);
+        break;
       case "Save": {
         let curl = prepareUrl(st.activeUrl);
         if (!curl) return;
@@ -97,6 +99,9 @@ export async function handleAsyncMessage(event: Message) {
         fn = await AsyncHandlers.RedeemLink(st, event.linkId);
         break;
       }
+      case "LaunchSettingsPage":
+        chrome.tabs.create({ 'url': chrome.extension.getURL('settings.html'), 'selected': true });
+        // NO BREAK - intentional fall through 
       case "GetUserLinks": {
         fn = await AsyncHandlers.GetUserLinks(st);
         break;
@@ -138,19 +143,9 @@ export async function handleMessage(event: Message, async: boolean = false): Pro
     st.lastErrorMessage = '';
     switch (event.eventType) {
       case "Thunk":
-        st = event.fn(st);
-        break;
-      case "Initialize":
-        st = await Handlers.Initialize(st, event.state);
+       st = event.fn(st);
         break;
       case "GetState":
-        break;
-      case "LaunchSettingsPage":
-        chrome.tabs.create({ 'url': chrome.extension.getURL('settings.html'), 'selected': true });
-        handleAsyncMessage({ eventType: "GetUserLinks" })
-        break;
-      case "ChangeSettings":
-        st = await Handlers.ChangeSettings(st, event.settings);
         break;
       case "DismissPromotion":
         let i = st.promotions.indexOf(event.url);

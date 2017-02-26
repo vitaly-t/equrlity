@@ -29,7 +29,7 @@
  *
  *   - Authorization:  Used to implement JWT (see https://jwt.io). If no Authorization Header is provided, the user is assumed to be a
  *                     new user. A new account will be created, and a new token will be generated and returned in the response 'x-syn-token' header.
- *                     The client should from then on supply the generated token using the header value "Bearer " followed by the token string.
+ *                     The client should from then on supply the generated token using the Authorizatio header value "Bearer " followed by the token string.
  * 
  *   - x-syn-client-version: Used to identify the requesting client software. If not supplied the request is rejected (400).
  *                           If supplied it must be of the form {client-name}-{client-version}.
@@ -84,6 +84,7 @@ export type InitializeRequest = {
  */
 export type InitializeResponse = {
   ok: boolean;
+  redirectUrl?: UrlString;
 }
 
 /**
@@ -269,13 +270,6 @@ export type RedeemLinkResponse = { links: UserLinkItem[]; }
  * feel free to ignore it.
  */
 
-export type RpcMethod<Request,Response> = {
-  clientSendRequest: () => Request;
-  serverReceiveRequest: (req: Request) => Response;
-  serverSendResponse: () => Response;
-  clientReceiveResponse: (rsp: Response) => void;
-}
-
 export type RequestBody = AddContentRequest | InitializeRequest | LoadLinkRequest | GetRedirectRequest | ChangeSettingsRequest
   | GetUserLinksRequest | RedeemLinkRequest;
 
@@ -288,6 +282,15 @@ export type RecvRequestBody = AddContentRequest | InitializeRequest | LoadLinkRe
 
 export type SendResponseBody = AddContentResponse | SendAddContentResponse | InitializeResponse | LoadLinkResponse | GetRedirectResponse | ChangeSettingsResponse
   | GetUserLinksResponse | RedeemLinkResponse;
+
+export type RpcMethod<Request,Response> = {
+  clientSendRequest: () => Request;
+  serverReceiveRequest: (req: Request) => Response;
+  serverSendResponse: () => Response;
+  clientReceiveResponse: (rsp: Response) => void;
+}
+
+
 
 /**
  * the json-rpc 2.0 interface as per the spec.

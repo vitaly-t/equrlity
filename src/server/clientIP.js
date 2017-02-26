@@ -36,7 +36,6 @@ export default function clientIP(req) {
     else if (reqInfoRemoteAddress) ipAddress = reqInfoRemoteAddress
     else ipAddress = null;
 
-    console.log('ip : '+ipAddress);
     return ipAddress;
 }
 

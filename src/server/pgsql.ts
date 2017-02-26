@@ -168,6 +168,14 @@ export async function upsertRecord<T>(tblnm: string, rec: Object): Promise<T> {
   return await db.one(stmt, rec);
 }
 
+export async function retrieveRecord<T>(tblnm: string, pk: Object): Promise<T> {
+  let tbl = oxb.tables.get(tblnm);
+  let stmt = OxiGen.genRetrieveStatement(tbl, pk);
+  let rslt = await db.any(stmt, pk);
+  if (rslt.length > 0) return rslt[0];
+  return null;
+}
+
 export async function getAllRecords<T>(tblnm: string): Promise<T[]> {
   let rslt: T[] = await db.any("select * from " + tblnm);
   return rslt;
@@ -232,12 +240,11 @@ export async function upsert_auth(auth: Dbt.Auth): Promise<Dbt.Auth> {
   return r;
 };
 
-export async function touch_user(userId) {
+export async function touch_user(userId, ipAddress) {
   let usr = cache.users.get(userId);
-  let dt = new Date();
-  await db.none('update users set updated = $2 where "userId" = $1', [userId, dt])
-  usr = { ...usr, updated: dt };
-  cache.users.set(usr.userId, usr);
+  usr = {...usr, ipAddress};
+  let rslt = await updateRecord<Dbt.User>("users", usr)
+  cache.users.set(userId, rslt);
 }
 
 export async function touch_auth(prov, authId) {
@@ -462,7 +469,7 @@ export async function payForView(viewerId: Dbt.userId, viewedLinkId: Dbt.linkId)
   }
 }
 
-export async function createUser(): Promise<Dbt.User> {
+export async function createUser(ipAddress: string = ''): Promise<Dbt.User> {
   let o = cache.users;
   let i = o.size;
   let userName = '';
@@ -473,7 +480,7 @@ export async function createUser(): Promise<Dbt.User> {
     ++i;
   }
   let userId = uuid.generate();
-  let usr = { ...emptyUser(), userId, userName };
+  let usr = { ...emptyUser(), userId, userName, ipAddress };
   let user = await insertRecord<Dbt.User>("users", usr);
   console.log("user created : " + user.userName);
   if (cache.users.has(user.userId)) {
@@ -535,4 +542,7 @@ export async function GetUserLinks(id: Dbt.userId): Promise<Rpc.UserLinkItem[]> 
   return links;
 }
 
-
+export async function registerInvitation(ipAddress: string, linkId: Dbt.linkId ): Promise<Dbt.Invitation> {
+  console.log("registering inv "+ipAddress);
+  return await upsertRecord<Dbt.Invitation>("invitations", {ipAddress, linkId});
+}

@@ -1,5 +1,9 @@
-import { AppState, initState, setLink, expandedUrl, isSeen, setLoading, 
-        getRedirectUrl, prepareUrl, isSynereoLink, PopupMode } from './AppState';
+import {
+  AppState, initState, setLink, expandedUrl, isSeen, setLoading,
+  getRedirectUrl, prepareUrl, isSynereoLink, PopupMode
+} from './AppState';
+
+import * as localForage from "localforage";
 import * as Comms from './Comms';
 import { Url, parse, format } from 'url';
 import { AxiosResponse } from 'axios';
@@ -65,29 +69,30 @@ export interface Thunk {
   fn: (st: AppState) => AppState;
 }
 
-export type Message = Save | Initialize | GetState | Load | ActivateTab | Render | ChangeSettings | LaunchSettingsPage 
-                    | RedeemLink | GetUserLinks | DismissPromotion |Thunk ;
+export type Message = Save | Initialize | GetState | Load | ActivateTab | Render | ChangeSettings | LaunchSettingsPage
+  | RedeemLink | GetUserLinks | DismissPromotion | Thunk;
 
 export function getTab(tabId: number): Promise<chrome.tabs.Tab> {
-  return new Promise( resolve => {
+  return new Promise(resolve => {
     chrome.tabs.get(tabId, t => resolve(t));
   });
 }
 
 function updateTab(tabId: number, props: chrome.tabs.UpdateProperties): Promise<chrome.tabs.Tab> {
-  return new Promise( resolve => {
+  return new Promise(resolve => {
     chrome.tabs.update(tabId, props, t => resolve(t));
   });
 }
 
 function tabsQuery(q: chrome.tabs.QueryInfo): Promise<chrome.tabs.Tab[]> {
-  return new Promise( resolve => {
+  return new Promise(resolve => {
     chrome.tabs.query(q, a => resolve(a));
   });
 }
 
-function currentTab(): Promise<chrome.tabs.Tab> {
-  return tabsQuery({ active: true, currentWindow: true }).then(a => a[0]);
+async function currentTab(): Promise<chrome.tabs.Tab> {
+  let a = await tabsQuery({ active: true, currentWindow: true })
+  return a[0];
 }
 
 function extractHeadersToState(st: AppState, rsp: AxiosResponse): AppState {
@@ -100,7 +105,30 @@ function extractHeadersToState(st: AppState, rsp: AxiosResponse): AppState {
   return { ...st, ampCredits, moniker, jwt };
 }
 
+type rspBody = Rpc.ResponseBody; // no idea why this is necessary :-(
+function extractResult<rspBody>(response: AxiosResponse): Rpc.ResponseBody {
+  let rsp: Rpc.Response = response.data;
+  if (rsp.error) throw new Error("Server returned error: " + rsp.error.message);
+  return rsp.result;
+}
+
 export namespace AsyncHandlers {
+
+  export async function Initialize(init: AppState, state_: AppState): Promise<(st: AppState) => AppState> {
+    let state = { ...init, ...state_ };
+    const rsp = await Comms.sendInitialize(state)
+    let jwt = rsp.headers['x-syn-token'];
+    if (jwt && !state.jwt) await localForage.setItem<string>('jwt', jwt);
+    let activeTab = await currentTab()
+    let thunk = (st: AppState) => {
+      st = extractHeadersToState(st, rsp);
+      let rslt: Rpc.InitializeResponse = extractResult(rsp);
+ 
+      if (rslt.redirectUrl) chrome.tabs.update(activeTab.id, { url: rslt.redirectUrl });
+      return { ...st, activeTab }
+    }
+    return thunk;
+  }
 
   export async function Save(state: AppState, linkDescription: string, amount: number): Promise<(st: AppState) => AppState> {
     let curTab = await currentTab();
@@ -116,16 +144,14 @@ export namespace AsyncHandlers {
     let response = await Comms.sendAddContent(state, url, linkDescription, amount)
     let thunk = (st: AppState) => {
       st = extractHeadersToState(st, response);
-      let rsp: Rpc.Response = response.data;
-      if (rsp.error) throw new Error("Server returned error: " + rsp.error.message);
-      let rslt: Rpc.AddContentResponse = rsp.result;
+      let rslt: Rpc.AddContentResponse = extractResult(response);
       if (rslt.prevLink) {
         chrome.runtime.sendMessage({ eventType: 'RenderMessage', msg: "Content already registered." });
         // very naughty state mutation here ... so sue me!!
         // this is to prevent an immediate render from instantaneously wiping out the above message.
         let synereoUrl = parse(rslt.prevLink);
         let linkAmplifier = rslt.linkAmplifier
-        st.links.set(url, {synereoUrl, linkDepth: 0, linkAmplifier });
+        st.links.set(url, { synereoUrl, linkDepth: 0, linkAmplifier });
         return st;
       }
       else {  //  a new link has been generated 
@@ -140,12 +166,8 @@ export namespace AsyncHandlers {
     let response = await Comms.sendGetRedirect(state, curl);
     let tab = await currentTab();
     return (st: AppState) => {
-      let prv = st.ampCredits;
       st = extractHeadersToState(st, response);
-      if (st.ampCredits !== prv) console.log("credits changed from : "+prv+" to "+st.ampCredits);
-      let rsp : Rpc.Response = response.data;
-      if (rsp.error) throw new Error("Server returned error: " + rsp.error.message);
-      let rslt: Rpc.GetRedirectResponse = rsp.result;  
+      let rslt: Rpc.GetRedirectResponse = extractResult(response);
       if (rslt.found) {
         st = setLink(st, rslt.contentUrl, curl, rslt.linkDepth, rslt.linkAmplifier);
         st = { ...st, activeUrl: rslt.contentUrl };
@@ -160,11 +182,9 @@ export namespace AsyncHandlers {
     let response = await Comms.sendRedeemLink(state, linkId);
     return (st: AppState) => {
       st = extractHeadersToState(st, response);
-      let rsp : Rpc.Response = response.data;
-      if (rsp.error) throw new Error("Server returned error: " + rsp.error.message);
-      let rslt: Rpc.RedeemLinkResponse = rsp.result;  
-      let investments = rslt.links;  
-      st = {...st, investments}
+      let rslt: Rpc.RedeemLinkResponse = extractResult(response);
+      let investments = rslt.links;
+      st = { ...st, investments }
       return st;
     };
   }
@@ -173,16 +193,14 @@ export namespace AsyncHandlers {
     let response = await Comms.sendGetUserLinks(state);
     return (st: AppState) => {
       st = extractHeadersToState(st, response);
-      let rsp : Rpc.Response = response.data;
-      if (rsp.error) throw new Error("Server returned error: " + rsp.error.message);
-      let rslt: Rpc.GetUserLinksResponse = rsp.result;  
-      let promotions = st.promotions;  
-      let investments = rslt.links; 
+      let rslt: Rpc.GetUserLinksResponse = extractResult(response);
+      let promotions = st.promotions;
+      let investments = rslt.links;
       let connectedUsers = rslt.connectedUsers;
       let reachableUserCount = rslt.reachableUserCount
-      console.log("connected users : "+connectedUsers.length);
+      console.log("connected users : " + connectedUsers.length);
       if (rslt.promotions.length > 0) promotions = [...promotions, ...rslt.promotions];
-      st = {...st, investments, promotions, connectedUsers, reachableUserCount};
+      st = { ...st, investments, promotions, connectedUsers, reachableUserCount };
       return st;
     };
   }
@@ -190,45 +208,33 @@ export namespace AsyncHandlers {
   export async function Load(state: AppState, curl_: string): Promise<(st: AppState) => AppState> {
     let curl = prepareUrl(curl_);
     if (!curl) return (st => { return { ...st, activeUrl: null }; });
-    let tgt =  getRedirectUrl(state, curl)
+    let tgt = getRedirectUrl(state, curl)
     if (tgt) {
       let tab = await currentTab();
       console.log("redirecting to: " + tgt);
       chrome.tabs.update(tab.id, { url: tgt });
     }
     if (isSeen(state, curl)) return (st => { return { ...st, activeUrl: curl }; });
-    if (isSynereoLink(parse(curl))) return GetRedirect(state,curl)
+    if (isSynereoLink(parse(curl))) return GetRedirect(state, curl)
     let response = await Comms.sendLoadLink(state, curl);
     let thunk = (st: AppState) => {
       st = extractHeadersToState(st, response);
-      let rsp : Rpc.Response = response.data;
-      if (rsp.error) throw new Error("Server returned error: " + rsp.error.message);
+      let rslt: Rpc.LoadLinkResponse = extractResult(response);
       st = { ...st, activeUrl: curl };
-      let rslt: Rpc.LoadLinkResponse = rsp.result;  
       if (rslt.found) st = setLink(st, curl, rslt.url, rslt.linkDepth, rslt.linkAmplifier);
       return st;
     };
     return thunk;
   }
-  
-}
 
-export namespace Handlers {
-
-  export async function Initialize(init: AppState, state_: AppState): Promise<AppState> {
-    let state = {...init, ...state_};
-    const rsp = await Comms.sendInitialize(state)
-    state = extractHeadersToState(state, rsp);
-    let activeTab = await currentTab()
-    return { ...state, activeTab }
-  }
-
-  export async function ChangeSettings(state: AppState, settings: Rpc.ChangeSettingsRequest): Promise<AppState> {
+  export async function ChangeSettings(state: AppState, settings: Rpc.ChangeSettingsRequest): Promise<(st: AppState) => AppState> {
     const response = await Comms.sendChangeSettings(state, settings);
-    let rsp : Rpc.Response = response.data;
-    if (rsp.error) throw new Error("Server returned error: " + rsp.error.message);
-    state = extractHeadersToState(state, response);
-    return state;
+    let thunk = (st: AppState) => {
+      st = extractHeadersToState(state, response);
+      let rslt: Rpc.ChangeSettingsResponse = extractResult(response);
+      return st;
+    }
+    return thunk;
   }
 
 }

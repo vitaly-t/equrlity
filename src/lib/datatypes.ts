@@ -11,6 +11,7 @@ export type created = Date;
 export type date = Date;
 export type email = string;
 export type integer = number;
+export type ipAddress = string;
 export type json = string;
 export type linkId = number;
 export type linkDescription = string;
@@ -65,6 +66,13 @@ export interface Link {
   readonly prevLink: linkId | null,
   readonly hitCount: integer | null,
   readonly amount: integer | null
+};
+
+export interface Invitation {
+  readonly ipAddress: ipAddress | null,
+  readonly linkId: linkId | null,
+  readonly created: created | null,
+  readonly updated: updated | null
 };
 
 export interface Promotion {

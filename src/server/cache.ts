@@ -6,6 +6,7 @@ import * as OxiGen from '../lib/oxigen';
 import * as uuid from '../lib/uuid.js';
 
 // ahem ... cache (almost) the whole db in memory 
+// probably shouldn't have exported these -- 20/20 hindsight
 export const users = new Map<Dbt.userId, Dbt.User>();
 export const auths = new Map<Dbt.authId, Dbt.Auth>();
 export const contents = new Map<Dbt.contentId, Dbt.Content>();
@@ -59,6 +60,7 @@ export function init(userRows, authRows, contentRows, linkRows, ) {
 // async funcs that simply use the cache should go in the outer namespace
 
 export function connectUsers(userA: Dbt.userId, userB: Dbt.userId): void {
+  if (userA === userB) return;
   if (!userlinks.has(userA)) userlinks.set(userA, [userB])
   else {
     let a = userlinks.get(userA);
@@ -167,3 +169,20 @@ export function getReachableUserIds(userId): Dbt.userId[] {
   return rslt;
 }
 
+//not exported
+const invitations = new Map<string, Dbt.linkId>();
+
+export function registerPossibleInvitation(ip: string, linkId: Dbt.linkId) {
+  console.log("registering possible inv :"+ip)
+  invitations.set(ip,linkId);
+}
+
+export function cancelPossibleInvitation(ip: string) {
+  console.log("cancelling possible inv :"+ip)
+  invitations.set(ip);
+}
+
+export function isPossibleInvitation(ip, linkId) {
+  let id = invitations.get(ip);
+  return (id && id === linkId);
+}

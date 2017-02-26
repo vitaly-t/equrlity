@@ -55,6 +55,10 @@ export default {
       "tsType": "number",
       "sqlType": "integer"
     },
+    "ipAddress": {
+      "tsType": "string",
+      "sqlType": "varchar(30)"
+    },
     "json": {
       "sqlType": "jsonb"
     },
@@ -116,6 +120,7 @@ export default {
     "Content": [ "contentId", "contentType", "userId", "content", "created", "updated",
       { "name": "cryptHash", "type": "binary" },
     ],
+    "Invitation": ["ipAddress", "linkId", "created", "updated" ],
     "Link": [ "linkId", "userId", "contentId", "linkDescription", "created", "updated",
       { "name": "prevLink", "type": "linkId" },
       { "name": "hitCount", "type": "integer", "default": "0"},
@@ -124,7 +129,7 @@ export default {
     "Promotion": [ "linkId", "userId", "created", "updated",
       { "name": "delivered", "type": "timestamp"}
     ],
-    "User": [ "userId", "publicKey", "userName", "email", "created", "updated",
+    "User": [ "userId", "publicKey", "userName", "email", "ipAddress", "created", "updated",
       { "name": "ampCredits", "type": "integer" },
       { "name": "groups", "type": "userGroup", "multiValued": true }
     ],
@@ -136,7 +141,7 @@ export default {
     ],
     "View": [ "userId", "linkId", "created", "updated" ]
   },
-  "tables": {
+  "tables": {   // the order of entries here is significant.  foreign keys can only reference preceding entries
     "users": {
       "rowType": "User",
       "primaryKey": [ "userId" ],
@@ -176,13 +181,20 @@ export default {
       "rowType": "Link",
       "primaryKey": [ "linkId" ],
       "autoIncrement": "linkId",
-      "updated": "updated",
       "foreignKeys": [
         { "ref": "users", "columns": [ "userId" ]  },
         { "ref": "contents", "columns": [ "contentId" ]  },
         { "ref": "links", "columns": [ "prevLink" ] },
       ],
       "uniques": [ [ "contentId", "userId" ] ],
+    },
+    "invitations": {
+      "rowType": "Invitation",
+      "primaryKey": [ "ipAddress" ],
+      "updated": "updated",
+      "foreignKeys": [
+        { "ref": "links", "columns": [ "linkId" ]  },
+      ],
     },
     "promotions": {
       "rowType": "Promotion",
