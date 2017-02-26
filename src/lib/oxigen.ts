@@ -181,6 +181,13 @@ export function genRetrieveStatement(tbl: ITable, data: Object = null): string {
   return stmt;
 }
 
+export function genDeleteStatement(tbl: ITable, data: Object = null): string {
+  let pk = tbl.primaryKey
+  let where = tbl.primaryKey.map( c => cnm(c) + ' = ${'+c+'}' ).join(' AND ');
+  let stmt = "DELETE FROM "+ tbl.name + " WHERE " + where;
+  return stmt;
+}
+
 export function genUpdateStatement(tbl: ITable, data: Object = null): string {
   if (data) {
     tbl.primaryKey.forEach(s => {if (data[s] == null || data[s] == undefined) throw new Error("Primary Key value(s) missing"); } );

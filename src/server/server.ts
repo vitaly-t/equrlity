@@ -225,11 +225,14 @@ app.use(async function (ctx, next) {
     let user = await pg.createUser(ipAddress);
     ctx['userId'] = { id: user.userId };
     ctx.user = user;
-    let inv = await pg.retrieveRecord<Dbt.Invitation>("invitations", {ipAddress});
-    if (inv && cache.links.has(inv.linkId)) {
-      let link = cache.links.get(inv.linkId);
-      cache.connectUsers(user.userId, link.userId);
-      ctx['redirectUrl'] = cache.linkToUrl(inv.linkId);
+    let inv = await pg.retrieveRecord<Dbt.Invitation>("invitations", { ipAddress });
+    if (inv) {
+      await pg.deleteRecord("invitations", inv);
+      if (cache.links.has(inv.linkId)) {
+        let link = cache.links.get(inv.linkId);
+        cache.connectUsers(user.userId, link.userId);
+        ctx['redirectUrl'] = cache.linkToUrl(inv.linkId);
+      }
     }
   }
   else {

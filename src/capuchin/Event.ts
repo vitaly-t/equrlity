@@ -101,7 +101,8 @@ function extractHeadersToState(st: AppState, rsp: AxiosResponse): AppState {
   let jwt = rsp.headers['x-syn-token'];
   if (jwt && st.jwt) throw new Error("Unexpected token received");
   if (!st.jwt && !jwt) throw new Error("Expected token but none received");
-  if (!jwt) jwt = st.jwt;
+  if (jwt) localForage.setItem<string>('jwt', st.jwt);
+  else jwt = st.jwt;
   return { ...st, ampCredits, moniker, jwt };
 }
 
@@ -117,13 +118,11 @@ export namespace AsyncHandlers {
   export async function Initialize(init: AppState, state_: AppState): Promise<(st: AppState) => AppState> {
     let state = { ...init, ...state_ };
     const rsp = await Comms.sendInitialize(state)
-    let jwt = rsp.headers['x-syn-token'];
-    if (jwt && !state.jwt) await localForage.setItem<string>('jwt', jwt);
     let activeTab = await currentTab()
     let thunk = (st: AppState) => {
       st = extractHeadersToState(st, rsp);
       let rslt: Rpc.InitializeResponse = extractResult(rsp);
- 
+
       if (rslt.redirectUrl) chrome.tabs.update(activeTab.id, { url: rslt.redirectUrl });
       return { ...st, activeTab }
     }

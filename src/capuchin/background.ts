@@ -101,7 +101,8 @@ export async function handleAsyncMessage(event: Message) {
       }
       case "LaunchSettingsPage":
         chrome.tabs.create({ 'url': chrome.extension.getURL('settings.html'), 'selected': true });
-        // NO BREAK - intentional fall through 
+        fn = await AsyncHandlers.GetUserLinks(st);
+        break;
       case "GetUserLinks": {
         fn = await AsyncHandlers.GetUserLinks(st);
         break;

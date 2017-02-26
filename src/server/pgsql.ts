@@ -176,6 +176,13 @@ export async function retrieveRecord<T>(tblnm: string, pk: Object): Promise<T> {
   return null;
 }
 
+export async function deleteRecord<T>(tblnm: string, pk: Object): Promise<boolean> {
+  let tbl = oxb.tables.get(tblnm);
+  let stmt = OxiGen.genDeleteStatement(tbl, pk);
+  await db.none(stmt, pk);
+  return true;
+}
+
 export async function getAllRecords<T>(tblnm: string): Promise<T[]> {
   let rslt: T[] = await db.any("select * from " + tblnm);
   return rslt;
