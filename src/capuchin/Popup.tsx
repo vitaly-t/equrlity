@@ -65,7 +65,7 @@ export class PopupPanel extends React.Component<PopupPanelProps, PopupPanelState
         <button onClick={saveaction} >{lbl}</button>
       </div>);
     }
-    let settingsAction = () => chrome.runtime.sendMessage({ eventType: "LaunchSettingsPage" });
+    let settingsAction = () => chrome.runtime.sendMessage({ eventType: "LaunchSettingsPage", async: true });
     return <div>
       <p>Using Server Url: {serverUrl} </p>
       <p>Your Synereo Nickname is: {st.moniker}</p>
