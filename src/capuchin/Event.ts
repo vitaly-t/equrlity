@@ -19,11 +19,6 @@ export interface Save {
 
 export interface Initialize {
   eventType: "Initialize";
-  state: AppState;
-}
-
-export interface GetState {
-  eventType: "GetState";
 }
 
 export interface Load {
@@ -69,7 +64,7 @@ export interface Thunk {
   fn: (st: AppState) => AppState;
 }
 
-export type Message = Save | Initialize | GetState | Load | ActivateTab | Render | ChangeSettings | LaunchSettingsPage
+export type Message = Save | Initialize | Load | ActivateTab | Render | ChangeSettings | LaunchSettingsPage
   | RedeemLink | GetUserLinks | DismissPromotion | Thunk;
 
 export function getTab(tabId: number): Promise<chrome.tabs.Tab> {
@@ -118,8 +113,7 @@ function extractResult<rspBody>(response: AxiosResponse): Rpc.ResponseBody {
 
 export namespace AsyncHandlers {
 
-  export async function Initialize(init: AppState, state_: AppState): Promise<(st: AppState) => AppState> {
-    let state = { ...init, ...state_ };
+  export async function Initialize(state: AppState): Promise<(st: AppState) => AppState> {
     const rsp = await Comms.sendInitialize(state)
     let activeTab = await currentTab()
     let thunk = (st: AppState) => {

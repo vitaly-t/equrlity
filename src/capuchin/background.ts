@@ -25,7 +25,6 @@ async function createKeyPairIf(keys: string[]): Promise<void> {
 
 async function initialize() {
   console.log("initializing...");
-  let state = currentState();
   localForage.config({ name: 'synereo-capuchin' })
   const keys: string[] = await localForage.keys();
   await createKeyPairIf(keys);
@@ -33,8 +32,8 @@ async function initialize() {
   const privateKey = await localForage.getItem<JsonWebKey>('privateKey');
   const jwt = await localForage.getItem<string>('jwt');
   if (!jwt) console.log("No JWT found");
-  state = { ...state, publicKey, privateKey, jwt };
-  handleAsyncMessage({ eventType: "Initialize", state });
+  await handleMessage({ eventType: "Thunk", fn: ((st: AppState) => { return { ...st, publicKey, privateKey, jwt } }) });
+  handleAsyncMessage({ eventType: "Initialize" });
 }
 
 chrome.runtime.onStartup.addListener(initialize);
@@ -68,10 +67,11 @@ chrome.tabs.onActivated.addListener(({tabId, windowId}) => {
 export async function handleAsyncMessage(event: Message) {
   let st = currentState();
   let fn = null;
+  //console.log("Async Handling :" + event.eventType);
   try {
     switch (event.eventType) {
       case "Initialize":
-        fn = await AsyncHandlers.Initialize(st, event.state);
+        fn = await AsyncHandlers.Initialize(st);
         break;
       case "ChangeSettings":
         fn = await AsyncHandlers.ChangeSettings(st, event.settings);
@@ -134,7 +134,7 @@ export async function handleMessage(event: Message, async: boolean = false): Pro
   }
 
   let st = currentState();
-  //console.log("handleMessage called for: " + event.eventType);
+  //console.log("Handling: " + event.eventType);
   try {
     if (__handling) {
       if (async) setTimeout(() => handleMessage(event, true), 1);
@@ -144,9 +144,7 @@ export async function handleMessage(event: Message, async: boolean = false): Pro
     st.lastErrorMessage = '';
     switch (event.eventType) {
       case "Thunk":
-       st = event.fn(st);
-        break;
-      case "GetState":
+        st = event.fn(st);
         break;
       case "DismissPromotion":
         let i = st.promotions.indexOf(event.url);
