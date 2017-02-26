@@ -101,7 +101,10 @@ function extractHeadersToState(st: AppState, rsp: AxiosResponse): AppState {
   let jwt = rsp.headers['x-syn-token'];
   if (jwt && st.jwt) throw new Error("Unexpected token received");
   if (!st.jwt && !jwt) throw new Error("Expected token but none received");
-  if (jwt) localForage.setItem<string>('jwt', st.jwt);
+  if (jwt) {
+    console.log("storing token");
+    localForage.setItem<string>('jwt', jwt);
+  }
   else jwt = st.jwt;
   return { ...st, ampCredits, moniker, jwt };
 }
