@@ -21,10 +21,6 @@ export default {
       "tsType": "boolean",
       "sqlType": "boolean"
     },
-    "contentId": {
-      "tsType": "number",
-      "sqlType": "integer"
-    },
     "contentCryptId": {
       "tsType": "ArrayBuffer",
       "sqlType": "bytea"
@@ -33,9 +29,9 @@ export default {
       "sqlType": "varchar(10)",
       "enum": [
         "url",
-        "yt_video",
-        "text",
-        "mp3"
+        "video",
+        "post",
+        "audio"
       ]
     },
     "created": {
@@ -102,7 +98,7 @@ export default {
       ]
     },
     "urlString": {
-      "sqlType": "varchar(250)"
+      "sqlType": "varchar(2000)"
     },
     "userName": {
       "sqlType": "varchar(72)"
@@ -111,41 +107,48 @@ export default {
       "sqlType": "varchar(36)"
     }
   },
-  "typeAliases": { 
+  "typeAliases": {
+    "postId": "integer",
+    "content": "urlString",
+    "contentId": "integer",
     "userId": "uuid",
-    "content": "text",
   },
   "tupleTypes": {
-    "Auth": [ "authProvider", "authId", "userId", "created", "updated" ],
-    "Content": [ "contentId", "contentType", "userId", "content", "created", "updated",
+    "Auth": ["authProvider", "authId", "userId", "created", "updated"],
+    "Content": ["contentId", "contentType", "userId", "content", "created", "updated",
       { "name": "cryptHash", "type": "binary" },
     ],
-    "Invitation": ["ipAddress", "linkId", "created", "updated" ],
-    "Link": [ "linkId", "userId", "contentId", "linkDescription", "created", "updated",
+    "Invitation": ["ipAddress", "linkId", "created", "updated"],
+    "Link": ["linkId", "userId", "contentId", "linkDescription", "created", "updated",
       { "name": "prevLink", "type": "linkId" },
-      { "name": "hitCount", "type": "integer", "default": "0"},
+      { "name": "hitCount", "type": "integer", "default": "0" },
       { "name": "amount", "type": "integer" },
     ],
-    "Promotion": [ "linkId", "userId", "created", "updated",
-      { "name": "delivered", "type": "timestamp"}
+    "Post": ["postId", "userId", "created", "updated", "contentId",
+      { "name": "title", "type": "varchar(160)" },
+      { "name": "body", "type": "text" },
+      { "name": "tags", "type": "varchar(20)", "multiValued": true },
     ],
-    "User": [ "userId", "publicKey", "userName", "email", "ipAddress", "created", "updated",
+    "Promotion": ["linkId", "userId", "created", "updated",
+      { "name": "delivered", "type": "timestamp" }
+    ],
+    "User": ["userId", "publicKey", "userName", "email", "ipAddress", "created", "updated",
       { "name": "ampCredits", "type": "integer" },
       { "name": "groups", "type": "userGroup", "multiValued": true }
     ],
     "UserLink": [
-      { "name": "user_A", "type": "userId"},
-      { "name": "user_B", "type": "userId"},
+      { "name": "user_A", "type": "userId" },
+      { "name": "user_B", "type": "userId" },
       "created",
       "updated",
     ],
-    "View": [ "userId", "linkId", "created", "updated" ]
+    "View": ["userId", "linkId", "created", "updated"]
   },
   "tables": {   // the order of entries here is significant.  foreign keys can only reference preceding entries
     "users": {
       "rowType": "User",
-      "primaryKey": [ "userId" ],
-      "uniques": [ ["userName"] ],
+      "primaryKey": ["userId"],
+      "uniques": [["userName"]],
       "updated": "updated",
     },
     /*  we will calculate these from the links table for the moment
@@ -161,57 +164,67 @@ export default {
     */
     "auths": {
       "rowType": "Auth",
-      "primaryKey": [ "authProvider","authId" ],
-      "foreignKeys": [
-        { "ref": "users", "columns": [ "userId" ] }
-      ],
+      "primaryKey": ["authProvider", "authId"],
       "updated": "updated",
+      "foreignKeys": [
+        { "ref": "users", "columns": ["userId"] }
+      ],
     },
     "contents": {
       "rowType": "Content",
-      "primaryKey": [ "contentId" ],
+      "primaryKey": ["contentId"],
       "autoIncrement": "contentId",
-      "uniques": [ [ "content" ] ],
+      "uniques": [["content"]],
       "updated": "updated",
       "foreignKeys": [
-        { "ref": "users", "columns": [ "userId" ]  },
+        { "ref": "users", "columns": ["userId"] },
       ],
     },
     "links": {
       "rowType": "Link",
-      "primaryKey": [ "linkId" ],
+      "primaryKey": ["linkId"],
       "autoIncrement": "linkId",
       "foreignKeys": [
-        { "ref": "users", "columns": [ "userId" ]  },
-        { "ref": "contents", "columns": [ "contentId" ]  },
-        { "ref": "links", "columns": [ "prevLink" ] },
+        { "ref": "users", "columns": ["userId"] },
+        { "ref": "contents", "columns": ["contentId"] },
+        { "ref": "links", "columns": ["prevLink"] },
       ],
-      "uniques": [ [ "contentId", "userId" ] ],
+      "uniques": [["contentId", "userId"]],
+    },
+    "posts": {
+      "rowType": "Post",
+      "primaryKey": ["postId"],
+      "autoIncrement": "postId",
+      "updated": "updated",
+      "foreignKeys": [
+        { "ref": "users", "columns": ["userId"] },
+        { "ref": "contents", "columns": ["contentId"] },
+      ],
     },
     "invitations": {
       "rowType": "Invitation",
-      "primaryKey": [ "ipAddress" ],
+      "primaryKey": ["ipAddress"],
       "updated": "updated",
       "foreignKeys": [
-        { "ref": "links", "columns": [ "linkId" ]  },
+        { "ref": "links", "columns": ["linkId"] },
       ],
     },
     "promotions": {
       "rowType": "Promotion",
-      "primaryKey": [ "linkId", "userId"],
+      "primaryKey": ["linkId", "userId"],
       "updated": "updated",
       "foreignKeys": [
-        { "ref": "users", "columns": [ "userId" ] },
-        { "ref": "links", "columns": [ "linkId" ], "onDelete": "CASCADE" },
+        { "ref": "users", "columns": ["userId"] },
+        { "ref": "links", "columns": ["linkId"], "onDelete": "CASCADE" },
       ],
     },
     "views": {
       "rowType": "View",
-      "primaryKey": [ "userId", "linkId"],
+      "primaryKey": ["userId", "linkId"],
       "updated": "updated",
       "foreignKeys": [
-        { "ref": "users", "columns": [ "userId" ]  },
-        { "ref": "links", "columns": [ "linkId" ], "onDelete": "CASCADE" },
+        { "ref": "users", "columns": ["userId"] },
+        { "ref": "links", "columns": ["linkId"], "onDelete": "CASCADE" },
       ],
     }
   }

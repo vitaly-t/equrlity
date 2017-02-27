@@ -57,8 +57,10 @@ import * as Dbt from './datatypes';
 /**
  * The available json-rpc methods of the Amplitude API.  
  */
+
+//TODO: rename "getUserLinks" to "loadSettingsPage"
 export type Method = "addContent" | "initialize" | "changeMoniker" | "loadLink" | "getRedirect" | "changeSettings"
-  | "getUserLinks" | "redeemLink";
+  | "getUserLinks" | "redeemLink" | "getPostBody" | "savePost" ;
 
 /**
  * Informational type tags used to indicate intended usage.
@@ -182,10 +184,10 @@ export type GetRedirectRequest = { linkUrl: UrlString; }
  * linkDepth: the number of parents of the link.
  * linkAmplifier: the moniker of the user who owns the link.
  */
-export type GetRedirectResponse = { 
-  found: boolean; 
-  contentUrl?: UrlString; 
-  linkDepth?: Integer; 
+export type GetRedirectResponse = {
+  found: boolean;
+  contentUrl?: UrlString;
+  linkDepth?: Integer;
   linkAmplifier?: string;
 }
 
@@ -213,20 +215,23 @@ export type ChangeSettingsResponse = { ok: boolean; }
  * getUserLinks method
  * 
  * used when the client wishes to display the user's current status.
+ * (should be renamed to "loadSettingsPageRequest")
  */
 export type GetUserLinksRequest = {}
 
 /**
- * links: an array of link information items owned by the user (see below).
- * promotions: a list of links promoted by others system users to the current user, and have not previously been delivered.
+ * links: an array of information items for links owned by the user (see below).
+ * promotions: a list of links promoted by other system users to the current user, that have not previously been delivered.
  * connectedUsers: a list of other users' monikers to which the user is directly connected.
  * reachableUserCount: the number of others user's that the user is directly or indirectly connected to by transitive closure.
+ * posts: an array of information items for posts uploaded by the user.
  */
 export type GetUserLinksResponse = {
   links: UserLinkItem[];
   promotions: Dbt.urlString[];
   connectedUsers: Dbt.userName[];
   reachableUserCount: Dbt.integer;
+  posts: PostInfoItem[];
 }
 
 /**
@@ -252,6 +257,42 @@ export type UserLinkItem = {
 }
 
 /**
+ * a line item in the posts array above.
+ * 
+ * postId: the id of the post.
+ * title: the post title.
+ * tags: array of string tags assigned to the post.
+ * published: the timestamp of when the post was published.
+ * contentUrl: the content url of the post (if published).
+ * rootLinkUrl: the url of the root link 
+ */
+export type PostInfoItem = {
+  postId: Dbt.postId;
+  title: string;
+  tags: string[];
+  published: Dbt.timestamp;
+  contentUrl: Dbt.urlString;
+  created: Dbt.created;
+  updated: Dbt.updated;
+};
+
+export type GetPostBodyRequest = { postId: Dbt.postId };
+export type GetPostBodyResponse = { body: string };
+
+export type SavePostRequest = {
+  postId: Dbt.postId;
+  title: string;
+  body: string;
+  tags: string[];
+  publish: boolean;
+  investment?: Dbt.integer;
+}
+
+export type SavePostResponse = {
+  posts: PostInfoItem[];
+};
+
+/**
  * redeemLink method.
  * 
  * used to remove a link from the system, and return the balance remaining in the link back to the user's account.
@@ -265,30 +306,32 @@ export type RedeemLinkRequest = { linkId: Dbt.linkId; }
 */
 export type RedeemLinkResponse = { links: UserLinkItem[]; }
 
+export type RequestBody = AddContentRequest | InitializeRequest | LoadLinkRequest | GetRedirectRequest | ChangeSettingsRequest
+  | GetUserLinksRequest | RedeemLinkRequest | GetPostBodyRequest;
+
+export type ResponseBody = AddContentResponse & SendAddContentResponse & InitializeResponse & LoadLinkResponse & GetRedirectResponse & ChangeSettingsResponse
+  & GetUserLinksResponse & RedeemLinkResponse & GetPostBodyResponse;
+
 /**
  * the follow is basically a thought bubble about how this api might be further improved.
  * feel free to ignore it.
  */
 
-export type RequestBody = AddContentRequest | InitializeRequest | LoadLinkRequest | GetRedirectRequest | ChangeSettingsRequest
-  | GetUserLinksRequest | RedeemLinkRequest;
-
-export type ResponseBody = AddContentResponse & SendAddContentResponse & InitializeResponse & LoadLinkResponse & GetRedirectResponse & ChangeSettingsResponse
-  & GetUserLinksResponse & RedeemLinkResponse;
-
 // internal to server.
-export type RecvRequestBody = AddContentRequest | InitializeRequest | LoadLinkRequest | GetRedirectRequest | ChangeSettingsRequest
-  | GetUserLinksRequest | RedeemLinkRequest;
+export type RecvRequestBody = AddContentRequest & InitializeRequest & LoadLinkRequest & GetRedirectRequest & ChangeSettingsRequest
+  & GetUserLinksRequest & RedeemLinkRequest & GetPostBodyRequest;
 
 export type SendResponseBody = AddContentResponse | SendAddContentResponse | InitializeResponse | LoadLinkResponse | GetRedirectResponse | ChangeSettingsResponse
-  | GetUserLinksResponse | RedeemLinkResponse;
+  | GetUserLinksResponse | RedeemLinkResponse | GetPostBodyResponse;
 
+/*
 export type RpcMethod<Request,Response> = {
   clientSendRequest: () => Request;
   serverReceiveRequest: (req: Request) => Response;
   serverSendResponse: () => Response;
   clientReceiveResponse: (rsp: Response) => void;
 }
+*/
 
 
 
@@ -299,7 +342,7 @@ export type Request = {
   jsonrpc: string,  // always "2.0"
   id: number
   method: Method,  // statically enforced by the compiler to be one of constituent values
-  params: RequestBody, 
+  params: RequestBody,
 }
 
 export type Error = {

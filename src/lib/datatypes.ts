@@ -4,9 +4,8 @@
 export type authId = string;
 export type authProvider = "ip" | "facebook" | "github" | "twitter" | "linkedin";
 export type binary = ArrayBuffer;
-export type contentId = number;
 export type contentCryptId = ArrayBuffer;
-export type contentType = "url" | "yt_video" | "text" | "mp3";
+export type contentType = "url" | "video" | "post" | "audio";
 export type created = Date;
 export type date = Date;
 export type email = string;
@@ -24,14 +23,19 @@ export type userGroup = "admin" | "author" | "member";
 export type urlString = string;
 export type userName = string;
 export type uuid = string;
-export type userId = string;
+export type postId = number;
 export type content = string;
+export type contentId = number;
+export type userId = string;
+export type varchar_160 = string;
+export type varchar_20 = string;
 
 export interface User {
   readonly userId: userId | null,
   readonly publicKey: publicKey | null,
   readonly userName: userName | null,
   readonly email: email | null,
+  readonly ipAddress: ipAddress | null,
   readonly created: created | null,
   readonly updated: updated | null,
   readonly ampCredits: integer | null,
@@ -66,6 +70,17 @@ export interface Link {
   readonly prevLink: linkId | null,
   readonly hitCount: integer | null,
   readonly amount: integer | null
+};
+
+export interface Post {
+  readonly postId: postId | null,
+  readonly userId: userId | null,
+  readonly created: created | null,
+  readonly updated: updated | null,
+  readonly contentId: contentId | null,
+  readonly title: varchar_160 | null,
+  readonly body: text | null,
+  readonly tags: varchar_20[] | null
 };
 
 export interface Invitation {

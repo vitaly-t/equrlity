@@ -1,7 +1,7 @@
 "use strict";
 
-import { isDev, isTest, shuffle } from "../lib/utils.js";
-import { Url, parse } from 'url';
+import { isDev, isTest, shuffle, serverUrl } from "../lib/utils.js";
+import { Url, parse, format } from 'url';
 import * as Rpc from '../lib/rpc';
 import * as cache from './cache';
 
@@ -547,6 +547,40 @@ export async function GetUserLinks(id: Dbt.userId): Promise<Rpc.UserLinkItem[]> 
     return rl;
   }));
   return links;
+}
+
+export async function GetUserPosts(id: Dbt.userId): Promise<Rpc.PostInfoItem[]> {
+  let a: Dbt.Post[] = await db.any(`select * from posts where "userId" = '${id}' order by updated desc`);
+  let posts = Promise.all(a.map(async p => {
+    let {postId, created, updated, title, tags} = p;
+    let cont = cache.contents.get(p.contentId);
+    let contentUrl = cont ? cont.content : null;
+    let published = cont ? cont.created : null;
+    let itm: Rpc.PostInfoItem = { postId, title, tags, published, contentUrl, created, updated };
+    return itm;
+  }));
+  return posts;
+}
+
+export async function GetPostBody(id: Dbt.postId): Promise<string> {
+  let rslt = await db.one(`select body from posts where "postId" = '${id}' `);
+  return rslt.body;
+}
+
+export async function SavePost(userId: Dbt.userId, req: Rpc.SavePostRequest): Promise<Dbt.Post> {
+  let {postId, title, body, tags} = req;
+  let p = {userId, postId, title, body, tags};
+  let post: Dbt.Post;
+  if (req.publish && req.investment > 0) {
+    let url = parse(serverUrl);
+    url.pathname = '/post/' + postId.toString();
+    let content =  format(url);
+    await handleAddContent(userId, {publicKey: '', content, signature: '', linkDescription: title, amount: req.investment});
+    p['published'] = new Date(); 
+  }
+  if (p.postId) post = await updateRecord<Dbt.Post>("posts", p);
+  else post = await insertRecord<Dbt.Post>("posts", p);
+  return post;
 }
 
 export async function registerInvitation(ipAddress: string, linkId: Dbt.linkId ): Promise<Dbt.Invitation> {

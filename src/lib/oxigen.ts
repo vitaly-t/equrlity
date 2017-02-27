@@ -189,12 +189,16 @@ export function genDeleteStatement(tbl: ITable, data: Object = null): string {
 }
 
 export function genUpdateStatement(tbl: ITable, data: Object = null): string {
+  let updtd = '';
   if (data) {
     tbl.primaryKey.forEach(s => {if (data[s] == null || data[s] == undefined) throw new Error("Primary Key value(s) missing"); } );
-    if (tbl.updated) data[tbl.updated] = null;  
+    if (tbl.updated) {
+      data[tbl.updated] = undefined;  
+      updtd = `, "${tbl.updated}" = DEFAULT`; 
+    }
   }
   let where = tbl.primaryKey.map( c => cnm(c) + ' = ${'+c+'}' ).join(' AND ');
-  return "UPDATE "+ tbl.name + " SET " + columnSets(tbl, data).join() + " WHERE " + where + ' RETURNING '+columnNames(tbl).join();
+  return "UPDATE "+ tbl.name + " SET " + columnSets(tbl, data).join()  + updtd + " WHERE " + where + ' RETURNING '+columnNames(tbl).join();
 }
 
 export function genUpsertStatement(tbl: ITable, data: Object = null): string {

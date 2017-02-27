@@ -476,6 +476,7 @@ export function toFormat(date: Date, format: string): string {
 }
 
 var getReplaceMap = function (date: Date): Map<string, string> {
+  if (typeof date.getHours !== "function") throw new Error("Not a Date: "+date);
   let hours = (date.getHours() % 12) ? date.getHours() % 12 : 12;
   let m = new Map<string, string>()
   m.set('YYYY', date.getFullYear().toString());

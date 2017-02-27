@@ -20,7 +20,7 @@ export function setTest(l : boolean) {
 }
 
 export function capuchinVersion() {
-	return "0.8.2";
+	return "0.8.3";
 }
 
 export const serverUrl = isDev() ? "http://localhost:8080/rpc" 

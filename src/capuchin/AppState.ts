@@ -1,5 +1,5 @@
 import { Url, format, parse } from 'url';
-import {UserLinkItem} from '../lib/rpc';
+import {UserLinkItem, PostInfoItem} from '../lib/rpc';
 import * as Dbt from '../lib/datatypes';
 
 export interface LinkInfo { synereoUrl: Url, linkDepth: number, linkAmplifier: string };
@@ -20,6 +20,8 @@ export interface AppState {
   promotions: Dbt.urlString[];
   connectedUsers: Dbt.userName[];
   reachableUserCount: Dbt.integer;
+  posts: PostInfoItem[];
+  currentPost: PostInfoItem;  // used to pass the target post to edit from settings page to postedit page. It is ephemeral!!
 }
 
 export function initState(): AppState {
@@ -27,7 +29,7 @@ export function initState(): AppState {
   return {
     publicKey: null, privateKey: null, links: new Map<string, LinkInfo>(), redirects: new Map<string, string>(),
     activeUrl: null, moniker: 'unknown', ampCredits: 0, jwt: '', lastErrorMessage: '', 
-    investments: [], promotions: [], connectedUsers: [], reachableUserCount: 0
+    investments: [], promotions: [], connectedUsers: [], reachableUserCount: 0, posts: [], currentPost: null
   };
 }
 

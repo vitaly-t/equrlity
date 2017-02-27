@@ -37,6 +37,7 @@
     "@types/react-dom": "^0.14.20",
     "@types/text-encoding": "0.0.30",
     "@types/webcrypto": "0.0.27",
+    "auto-prefixer": "^0.4.2",
     "autoprefixer": "^6.7.4",
     "axios": "^0.15.3",
     "dotenv": "^2.0.0",

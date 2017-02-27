@@ -83,7 +83,7 @@ export async function handleAsyncMessage(event: Message) {
         // we can't do storeState from here. 
         // so instead we just lie by calling render with temporary state; (so much for source of truth!!)
         chrome.runtime.sendMessage({ eventType: 'Render', appState: preSerialize(setWaiting(st, st.activeUrl)) });
-        // force a refresh with correct state in 10 seconds
+        // force a refresh with correct state in 5 seconds
         setTimeout(() => {
           //console.log("refreshing with correct state");
           chrome.runtime.sendMessage({ eventType: 'Render', appState: preSerialize(currentState()) });
@@ -110,6 +110,10 @@ export async function handleAsyncMessage(event: Message) {
       case "ActivateTab": {
         let t = await getTab(event.tabId);
         fn = await AsyncHandlers.Load(st, t.url);
+        break;
+      }
+      case "SavePost": {
+        fn = await AsyncHandlers.SavePost(st, event.req);
         break;
       }
     }
@@ -153,6 +157,14 @@ export async function handleMessage(event: Message, async: boolean = false): Pro
           promotions.splice(i, 1);
           st = { ...st, promotions };
         }
+        break;
+      case "CreatePost":
+        chrome.tabs.create({ 'url': chrome.extension.getURL('post.html'), 'selected': true });
+        st = { ...st, currentPost: { postId: 0, title: '', tags: [], published: null, contentUrl: null, created: null, updated: null } };
+        break;
+      case "LaunchPostEditPage":
+        chrome.tabs.create({ 'url': chrome.extension.getURL('post.html'), 'selected': true });
+        st = { ...st, currentPost: event.post };
         break;
       default:
         throw new Error("Unknown eventType: " + event.eventType);

@@ -20,6 +20,8 @@ import * as Rpc from '../lib/rpc';
 import { capuchinVersion, isDev } from '../lib/utils';
 import * as cors from 'kcors';
 import * as cache from './cache';
+import * as Remarkable from 'remarkable';
+const md = new Remarkable({ html: true });
 
 const jwt_secret = process.env.JWT_AMPLITUDE_KEY;
 
@@ -156,6 +158,20 @@ ${linkClause}
 ${footer}
 `;
 })
+
+publicRouter.get('/post/:id', async (ctx, next) => {
+  let postId = parseInt(ctx.params.id);
+  let post = await pg.retrieveRecord<Dbt.Post>("posts", {postId})
+  let body = md.render(post.body);
+  ctx.body = `
+<h2>${post.title}</h2>  
+<p/>
+<div>
+${body}
+</div>
+ `
+})
+
 
 publicRouter.get('/', async (ctx, next) => {
   ctx.body = `
@@ -380,11 +396,13 @@ router.post('/rpc', async function (ctx: any) {
       }
       case "getUserLinks": {
         //let req: Rpc.GetUserLinksRequest = params;
-        let links = await pg.GetUserLinks(ctx.userId.id);
-        let promotions = await pg.deliver_new_promotions(ctx.userId.id);
-        let connectedUsers = cache.getConnectedUserNames(ctx.userId.id);
-        let reachableUserCount = cache.getReachableUserIds(ctx.userId.id).length;
-        let result: Rpc.GetUserLinksResponse = { links, promotions, connectedUsers, reachableUserCount };
+        let uid = ctx.userId.id
+        let links = await pg.GetUserLinks(uid);
+        let promotions = await pg.deliver_new_promotions(uid);
+        let connectedUsers = cache.getConnectedUserNames(uid);
+        let reachableUserCount = cache.getReachableUserIds(uid).length;
+        let posts = await pg.GetUserPosts(uid);
+        let result: Rpc.GetUserLinksResponse = { links, promotions, connectedUsers, reachableUserCount, posts };
         ctx.body = { id, result };
         break;
       }
@@ -396,6 +414,22 @@ router.post('/rpc', async function (ctx: any) {
         let result: Rpc.RedeemLinkResponse = { links };
         ctx.body = { id, result };
         break;
+      }
+      case "getPostBody": {
+        let req: Rpc.GetPostBodyRequest = params;
+        let body = await pg.GetPostBody(req.postId);
+        let result: Rpc.GetPostBodyResponse = { body };
+        ctx.body = { id, result };
+        break;
+      }
+      case "savePost": {
+        let req: Rpc.SavePostRequest = params;
+        await pg.SavePost(ctx.userId.id, req);
+        let posts = await pg.GetUserPosts(ctx.userId.id);
+        let result: Rpc.SavePostResponse = { posts };
+        ctx.body = { id, result };
+        break;
+
       }
       default:
         let error: Rpc.Error = { id, error: { code: -32601, message: "Invalid method: " + method } };

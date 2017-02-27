@@ -45,6 +45,20 @@ export interface LaunchSettingsPage {
   eventType: "LaunchSettingsPage";
 }
 
+export interface LaunchPostEditPage {
+  eventType: "LaunchPostEditPage";
+  post: Rpc.PostInfoItem;
+}
+
+export interface SavePost {
+  eventType: "SavePost";
+  req: Rpc.SavePostRequest;
+}
+
+export interface CreatePost {
+  eventType: "CreatePost";
+}
+
 export interface RedeemLink {
   eventType: "RedeemLink";
   linkId: Dbt.linkId;
@@ -65,7 +79,7 @@ export interface Thunk {
 }
 
 export type Message = Save | Initialize | Load | ActivateTab | Render | ChangeSettings | LaunchSettingsPage
-  | RedeemLink | GetUserLinks | DismissPromotion | Thunk;
+  | LaunchPostEditPage | SavePost | CreatePost | RedeemLink | GetUserLinks | DismissPromotion | Thunk;
 
 export function getTab(tabId: number): Promise<chrome.tabs.Tab> {
   return new Promise(resolve => {
@@ -192,11 +206,9 @@ export namespace AsyncHandlers {
       let rslt: Rpc.GetUserLinksResponse = extractResult(response);
       let promotions = st.promotions;
       let investments = rslt.links;
-      let connectedUsers = rslt.connectedUsers;
-      let reachableUserCount = rslt.reachableUserCount
-      console.log("connected users : " + connectedUsers.length);
+      let {connectedUsers, reachableUserCount, posts} = rslt;
       if (rslt.promotions.length > 0) promotions = [...promotions, ...rslt.promotions];
-      st = { ...st, investments, promotions, connectedUsers, reachableUserCount };
+      st = { ...st, investments, promotions, connectedUsers, reachableUserCount, posts };
       return st;
     };
   }
@@ -228,6 +240,19 @@ export namespace AsyncHandlers {
     let thunk = (st: AppState) => {
       st = extractHeadersToState(state, response);
       let rslt: Rpc.ChangeSettingsResponse = extractResult(response);
+      return st;
+    }
+    return thunk;
+  }
+
+  export async function SavePost(state: AppState, req: Rpc.SavePostRequest): Promise<(st: AppState) => AppState> {
+    const response = await Comms.sendSavePost(state, req);
+    if (req.publish) return await GetUserLinks(state);
+    let thunk = (st: AppState) => {
+      st = extractHeadersToState(state, response);
+      let rslt: Rpc.SavePostResponse = extractResult(response);
+      let posts = rslt.posts;
+      st = { ...st, posts };
       return st;
     }
     return thunk;

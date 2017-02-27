@@ -92,3 +92,11 @@ export async function sendGetUserLinks(st: AppState): Promise<AxiosResponse> {
 export async function sendRedeemLink(st: AppState, linkId: Dbt.linkId): Promise<AxiosResponse> {
   return await sendApiRequest(st, "redeemLink", {linkId} );
 }
+
+export async function sendGetPostBody(st: AppState): Promise<AxiosResponse> {
+  return await sendApiRequest(st, "getPostBody", {postId: st.currentPost.postId} );
+}
+
+export async function sendSavePost(st: AppState, req: Rpc.SavePostRequest): Promise<AxiosResponse> {
+  return await sendApiRequest(st, "savePost", req );
+}
