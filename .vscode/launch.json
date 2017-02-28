@@ -9,7 +9,7 @@
       "type": "node",
       "request": "launch",
       "name": "Launch Server",
-      "program": "${workspaceRoot}/src/server/server.ts",
+      "program": "${workspaceRoot}/src/server/server.tsx",
       "cwd": "${workspaceRoot}",
       "outFiles": [
         "${workspaceRoot}/dist/server/*.js"

@@ -128,6 +128,7 @@ export default {
       { "name": "title", "type": "varchar(160)" },
       { "name": "body", "type": "text" },
       { "name": "tags", "type": "varchar(20)", "multiValued": true },
+      { "name": "published", "type": "timestamp" },
     ],
     "Promotion": ["linkId", "userId", "created", "updated",
       { "name": "delivered", "type": "timestamp" }

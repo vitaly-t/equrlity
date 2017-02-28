@@ -132,11 +132,11 @@ export function isWaiting(state: AppState, curl_: string): boolean {
 }
 
 function prePrepareUrl(curl: string): Url | null {
-  let url = parse(curl, false, false);  // parse query string???
+  let url = parse(curl, true, false);  // parse query string???
   if (!url) return null;
   if (url.protocol.startsWith("chrome")) return null;
-  url.query = "";
-  url.search = "";
+  //url.query = "";
+  //url.search = "";
   return url
 }
 

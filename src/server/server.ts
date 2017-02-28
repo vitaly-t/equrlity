@@ -23,6 +23,12 @@ import * as cache from './cache';
 import * as Remarkable from 'remarkable';
 const md = new Remarkable({ html: true });
 
+// server-side rendering a bust - boo-hoo!
+import * as React from 'react';
+//import * as ReactDOM from 'react-dom';
+import * as ReactDOMServer from 'react-dom/server'
+import {PostView} from '../lib/postview';
+
 const jwt_secret = process.env.JWT_AMPLITUDE_KEY;
 
 pg.init();
@@ -159,6 +165,7 @@ ${footer}
 `;
 })
 
+// raw approach - works but butt ugly due to no css etc
 publicRouter.get('/post/:id', async (ctx, next) => {
   let postId = parseInt(ctx.params.id);
   let post = await pg.retrieveRecord<Dbt.Post>("posts", {postId})
@@ -172,6 +179,59 @@ ${body}
  `
 })
 
+
+/* webpack approach - couldn't figure out why this failed
+publicRouter.get('/post/:id', async (ctx, next) => {
+  let postId = parseInt(ctx.params.id);
+  let post = await pg.retrieveRecord<Dbt.Post>("posts", {postId})
+  let p = JSON.stringify(post);
+  let body = `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+   <link href="./node_modules/normalize.css/normalize.css" rel="stylesheet" />
+   <link href="./path/to/node_modules/@blueprintjs/core/dist/blueprint.css" rel="stylesheet" />
+
+</head>
+<body>
+    <h2>${post.title}</h2>  
+    <p/>
+    <div id="app"></div>
+    <script>var post = ${p}</script>
+    <script type="text/javascript" src="viewpost_bndl.js"></script>
+</body>
+</html>
+ `
+ ctx.body = body;
+})
+*/
+
+// ssr approach -fails due to problems loading css modules without webpack
+/*
+publicRouter.get('/post/:id', async (ctx, next) => {
+  let postId = parseInt(ctx.params.id);
+  let post = await pg.retrieveRecord<Dbt.Post>("posts", {postId})
+  let view = <PostView post={post} />
+  let el = ReactDOMServer.renderToStaticMarkup(view);
+  let body = `
+<!DOCTYPE html>
+<html>
+<head>
+   <meta charset="UTF-8">
+   <link href="./node_modules/normalize.css/normalize.css" rel="stylesheet" />
+   <link href="./path/to/node_modules/@blueprintjs/core/dist/blueprint.css" rel="stylesheet" />
+</head>
+<body>
+    <h2>${post.title}</h2>  
+    <p/>
+    ${el}
+</body>
+</html>
+ `
+ ctx.body = body;
+})
+*/
 
 publicRouter.get('/', async (ctx, next) => {
   ctx.body = `

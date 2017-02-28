@@ -38,7 +38,7 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
   saveSettings = () => {
     console.log("saving settings");
     let settings: Rpc.ChangeSettingsRequest = { moniker: this.state.nickName, email: this.state.email, deposit: this.state.deposit };
-    chrome.runtime.sendMessage({ eventType: "ChangeSettings", settings });
+    chrome.runtime.sendMessage({ eventType: "ChangeSettings", settings, async: true });
     this.setState({ deposit: 0 });
   }
 

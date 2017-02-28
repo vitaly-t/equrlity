@@ -20,11 +20,10 @@ export function setTest(l : boolean) {
 }
 
 export function capuchinVersion() {
-	return "0.8.3";
+	return "0.8.4";
 }
 
-export const serverUrl = isDev() ? "http://localhost:8080/rpc" 
-                          : "https://synereo-amplitude.herokuapp.com/rpc";
+export const serverUrl = isDev() ? "http://localhost:8080/rpc" : "https://synereo-amplitude.herokuapp.com/rpc";
 
 export function printBase64Binary(byteArray: Uint8Array): string {
   return btoa(String.fromCharCode(...byteArray));

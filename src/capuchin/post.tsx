@@ -10,6 +10,7 @@ import * as React from 'react';
 import * as ReactDOM from 'react-dom';
 import { sendGetPostBody, sendSavePost } from './Comms';
 import * as Rpc from '../lib/rpc';
+import * as Dbt from '../lib/datatypes';
 
 import * as Remarkable from 'remarkable';
 const md = new Remarkable({ html: true });
@@ -18,6 +19,8 @@ import * as Blueprint from "@blueprintjs/core";
 import '@blueprintjs/core/dist/blueprint.css';
 
 import { AppState, postDeserialize } from "./AppState";
+
+import {PostView, rowStyle, btnStyle, lhcolStyle} from "../lib/postview";
 
 interface PostProps { appState: AppState };
 interface PostState { title: string, body: string, tags: string, editing: boolean, isError: boolean, prevBody: string, investment: number };
@@ -81,8 +84,8 @@ export class Post extends React.Component<PostProps, PostState> {
   render() {
     let post = this.props.appState.currentPost;
     if (!post) return null;
-    let rowStyle = { width: '100%', marginTop: 5, marginLeft: 5, padding: 6 };
-    let btnStyle= { height: '100%', marginTop: 0, marginRight: 10, display: 'inline-block' }; 
+    let rowStyle = { width: '100%', marginTop: 2, marginLeft: 5, padding: 6 };
+    let btnStyle= { height: '24', marginTop: 2, marginLeft: 5, marginRight: 5, display: 'inline-block' }; 
     let lhcolStyle = { width: '20%' };
     if (this.state.editing) {
 
@@ -107,27 +110,18 @@ export class Post extends React.Component<PostProps, PostState> {
         </div>
       );
     } else {
-      let h = { __html: md.render(this.ctrls.body.value) };
-      let lstedit = post.updated ? oxiDate.toFormat(new Date(post.updated), "DDDD, MMMM D @ HH:MIP") : 'never';
-      let pub = post.published ? oxiDate.toFormat(new Date(post.published), "DDDD, MMMM D @ HH:MIP") : 'never';
-      let edits = null;
-      let tags = this.ctrls.tags.value.split(',');
-      let tagbtns = tags.map(t => <Tag key={'tag:' + t} >{t}</Tag>);
+      let p: Dbt.Post = {...post, body: this.ctrls.body.value, userId: '', contentId: 0 };
       let pubdiv = null;
       if (!post.published) {
-          pubdiv = <div>
-            <input type="text" style={{ height: 30, marginTop: 6, width: '100%' }} ref={(e) => this.ctrls.investment = e} value={this.state.investment} onChange={e => this.changeInvestment(e)} />
+          pubdiv = <div style={rowStyle} >
+            <div style={{display: 'inline'}}>Investment: </div>
+            <input type="text" style={{display: 'inline', height: 24, marginTop: 6, width: '100' }} ref={(e) => this.ctrls.investment = e} value={this.state.investment} onChange={e => this.changeInvestment(e)} />
             <button key='publish' className="pt-intent-primary" style={btnStyle} onClick={() => this.publish()} >Publish</button>
            </div>;
       }
       return (
         <div>
-          <h2>{this.ctrls.title.value}</h2>
-          <div style={rowStyle} dangerouslySetInnerHTML={h} />
-          <div style={rowStyle} >
-            {tagbtns}
-          </div>
-          <div style={rowStyle} >Published: {pub},  Last Edited: {lstedit}.</div>
+          <PostView post={p} />
           <div style={rowStyle} >
             <button key='edit' className="pt-intent-primary" style={btnStyle} onClick={() => this.startEdit()} >Edit</button>
             <button key='save' className="pt-intent-primary" style={btnStyle} onClick={() => this.save()} >Save</button>
@@ -138,7 +132,6 @@ export class Post extends React.Component<PostProps, PostState> {
     }
   }
 }
-
 
 function render(state: AppState) {
   console.log("render called");

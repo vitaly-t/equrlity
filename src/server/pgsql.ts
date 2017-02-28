@@ -571,15 +571,17 @@ export async function SavePost(userId: Dbt.userId, req: Rpc.SavePostRequest): Pr
   let {postId, title, body, tags} = req;
   let p = {userId, postId, title, body, tags};
   let post: Dbt.Post;
-  if (req.publish && req.investment > 0) {
-    let url = parse(serverUrl);
-    url.pathname = '/post/' + postId.toString();
-    let content =  format(url);
-    await handleAddContent(userId, {publicKey: '', content, signature: '', linkDescription: title, amount: req.investment});
-    p['published'] = new Date(); 
-  }
+  if (req.publish && req.investment > 0) p['published'] = new Date(); 
   if (p.postId) post = await updateRecord<Dbt.Post>("posts", p);
   else post = await insertRecord<Dbt.Post>("posts", p);
+  if (req.publish && req.investment > 0) {
+    let url = parse(serverUrl);
+    url.pathname = '/post/' + post.postId.toString();
+    let content =  format(url);
+    await handleAddContent(userId, {publicKey: '', content, signature: '', linkDescription: title, amount: req.investment});
+    let contentId = cache.getContentIdFromContent(content);
+    post = await updateRecord<Dbt.Post>("posts", {...post, contentId}); 
+  }
   return post;
 }
 

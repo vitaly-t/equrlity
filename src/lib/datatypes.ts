@@ -80,7 +80,8 @@ export interface Post {
   readonly contentId: contentId | null,
   readonly title: varchar_160 | null,
   readonly body: text | null,
-  readonly tags: varchar_20[] | null
+  readonly tags: varchar_20[] | null,
+  readonly published: timestamp | null
 };
 
 export interface Invitation {
