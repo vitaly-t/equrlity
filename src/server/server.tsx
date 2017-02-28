@@ -11,8 +11,7 @@ import * as OxiDate from '../lib/oxidate';
 import * as uuid from '../lib/uuid.js';
 import * as jwt from './jwt';
 //import passport from './auth';
-//import * as koastatic from 'koa2-static-files';
-//import serve from './koa-static';
+import {serve} from './koa-static';
 import * as send from 'koa-send';
 import clientIP from './clientIP.js';
 import { Url, parse } from 'url';
@@ -27,7 +26,8 @@ const md = new Remarkable({ html: true });
 import * as React from 'react';
 //import * as ReactDOM from 'react-dom';
 import * as ReactDOMServer from 'react-dom/server'
-import {PostView} from '../lib/postview';
+import { PostView } from '../lib/postview';
+import { LinkLandingPage, HomePage } from '../lib/landingPages';
 
 const jwt_secret = process.env.JWT_AMPLITUDE_KEY;
 
@@ -96,8 +96,6 @@ app.keys = ['amplitude'];  //@@GS what does this do again?
 
 const publicRouter = new Router();
 
-//app.use(koastatic.static(__dirname + '/assets')); 
-//app.use(serve("assets", "./assets"));
 //app.use(session(app));
 //app.use(passport.initialize());
 //app.use(passport.session());
@@ -114,7 +112,7 @@ app.use(
   })
 );
 
-// No idea why these are necessary, but I couldn't make it work any other way ...
+// These are necessary because we are not serving static files yet.
 publicRouter.get('/download/synereo.zip', async function (ctx, next) {
   await send(ctx, './assets/synereo-plugin.zip');
 });
@@ -123,31 +121,10 @@ publicRouter.get('/download/synereo.tar.gz', async function (ctx, next) {
   await send(ctx, './assets/synereo-plugin.tar.gz');
 });
 
-/* @@GS - Wasted an entire weekend trying to get the download thing to work.  Still no idea why it fails
-let pluginClause = ` 
-<p>You can download the latest release of our Chrome plugin by clicking either of these links:</p> 
-   <p><a href="assets/synereo-plugin.zip" download >Zip file (Windows)</a></p>
-   <p><a href="assets/synereo-plugin.tar.gz" download >Tar.gz file (Linux  / Mac)</a></p>
-`;
-*/
-
-let pluginClause = ` 
-<p>You can download the latest release of our Chrome plugin by clicking either of these links:</p> 
-   <p><a href="/download/synereo.zip" download >Zip file (Windows)</a></p>
-   <p><a href="/download/synereo.tar.gz" download >Tar.gz file (Linux  / Mac)</a></p>
-<p>To install it you will have to unzip/untar the file into a directory, then go in to your
-Chrome extensions page, and select "Load unpacked extension".</p>
-<p>You may need to first tick the "Developer Mode" box (top right) to allow unpacked extensions to load. 
-If you wish, you can also untick it after installing the extension.)</p>         
-<p>To upgrade an existing installation, simply overwrite the existing files with the new ones, and select "Reload" in the extensions page.</p>         
-`;
-const header = `<h2>CALL TO ACTION - JOIN SYNEREO - YOU KNOW YOU WANT TO - WHAT COULD GO WRONG???</h2>`;
-const footer = `<p>Proudly brought to you by UglyAsF*ck Interfaces Ltd. (C) 1996. All rights reserved</p>`;
 
 publicRouter.get('/link/:id', async (ctx, next) => {
   let linkId: Dbt.linkId = parseInt(ctx.params.id);
   let url = cache.getContentFromLinkId(linkId);
-  let linkClause = url ? `<p>This is the link you were (probably) after: <a href="${url}">${url}</a></p>` : '';
   let ip = clientIP(ctx);
   cache.registerPossibleInvitation(ip, linkId);
   // logic: if invitation is still there in 1 second it wasn't a redirect
@@ -155,95 +132,38 @@ publicRouter.get('/link/:id', async (ctx, next) => {
     if (cache.isPossibleInvitation(ip, linkId)) pg.registerInvitation(ip, linkId);
   }, 1000);
 
-  ctx.body = `
-${header}
-<p>You have followed a Synereo link.  If you can see this message (for more than a second or so)
-it probably means you do not have the Synereo browser plugin installed.</p>
-${pluginClause}
-${linkClause}
-${footer}
-`;
+  let view = <LinkLandingPage url={url} />;
+  let ins = ReactDOMServer.renderToStaticMarkup(view);
+  let html = await readFileAsync('./assets/index.htmpl');
+  let body = html.replace('{{{__BODY__}}}', ins)
+  ctx.body = body;
+
 })
 
-// raw approach - works but butt ugly due to no css etc
 publicRouter.get('/post/:id', async (ctx, next) => {
   let postId = parseInt(ctx.params.id);
-  let post = await pg.retrieveRecord<Dbt.Post>("posts", {postId})
-  let body = md.render(post.body);
-  ctx.body = `
-<h2>${post.title}</h2>  
-<p/>
-<div>
-${body}
-</div>
- `
+  let post = await pg.retrieveRecord<Dbt.Post>("posts", { postId })
+  let view = <PostView post={post} />;
+  let ins = ReactDOMServer.renderToStaticMarkup(view);
+  let html = await readFileAsync('./assets/index.htmpl');
+  let body = html.replace('{{{__BODY__}}}', ins)
+  ctx.body = body;
 })
 
-
-/* webpack approach - couldn't figure out why this failed
-publicRouter.get('/post/:id', async (ctx, next) => {
-  let postId = parseInt(ctx.params.id);
-  let post = await pg.retrieveRecord<Dbt.Post>("posts", {postId})
-  let p = JSON.stringify(post);
-  let body = `
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-   <link href="./node_modules/normalize.css/normalize.css" rel="stylesheet" />
-   <link href="./path/to/node_modules/@blueprintjs/core/dist/blueprint.css" rel="stylesheet" />
-
-</head>
-<body>
-    <h2>${post.title}</h2>  
-    <p/>
-    <div id="app"></div>
-    <script>var post = ${p}</script>
-    <script type="text/javascript" src="viewpost_bndl.js"></script>
-</body>
-</html>
- `
- ctx.body = body;
-})
-*/
-
-// ssr approach -fails due to problems loading css modules without webpack
-/*
-publicRouter.get('/post/:id', async (ctx, next) => {
-  let postId = parseInt(ctx.params.id);
-  let post = await pg.retrieveRecord<Dbt.Post>("posts", {postId})
-  let view = <PostView post={post} />
-  let el = ReactDOMServer.renderToStaticMarkup(view);
-  let body = `
-<!DOCTYPE html>
-<html>
-<head>
-   <meta charset="UTF-8">
-   <link href="./node_modules/normalize.css/normalize.css" rel="stylesheet" />
-   <link href="./path/to/node_modules/@blueprintjs/core/dist/blueprint.css" rel="stylesheet" />
-</head>
-<body>
-    <h2>${post.title}</h2>  
-    <p/>
-    ${el}
-</body>
-</html>
- `
- ctx.body = body;
-})
-*/
-
+// need to serve this route before static files are enabled
 publicRouter.get('/', async (ctx, next) => {
-  ctx.body = `
-${header};
-<p>You have landed on the home page of Synereo Chrome plugin extension.</p>
-<p>(This page is currently in serious contention for the world's ugliest webpage!  Support our bid, vote for us!!! ... )</p>
-${pluginClause}
-${footer}
-`;
+  let view = <HomePage />;
+  let ins = ReactDOMServer.renderToStaticMarkup(view);
+  let html = await readFileAsync('./assets/index.htmpl');
+  let body = html.replace('{{{__BODY__}}}', ins)
+  ctx.body = body;
+
 })
 
 app.use(publicRouter.routes());
+
+// currently this needs to come after the public routes
+app.use(serve("assets", "./assets"));
 
 //app.use(publicRouter.allowedMethods());
 
@@ -268,7 +188,7 @@ app.use(async (ctx, next) => {
   let [client, version] = client_ver.split("-");
   if (client !== 'capuchin' && client !== 'lizard') {
     ctx.status = 400;
-    ctx.body = { error: { message: 'Invalid Client - not capuchin' } };
+    ctx.body = { error: { message: 'Unknown Client' } };
     return;
   }
   if (client === 'capuchin' && version !== capuchinVersion()) {

@@ -16,7 +16,7 @@ import * as Remarkable from 'remarkable';
 const md = new Remarkable({ html: true });
 
 import * as Blueprint from "@blueprintjs/core";
-import '@blueprintjs/core/dist/blueprint.css';
+//import '@blueprintjs/core/dist/blueprint.css';
 
 import { AppState, postDeserialize } from "./AppState";
 

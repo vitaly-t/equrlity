@@ -12,7 +12,6 @@ module.exports = function (env) {
       background: './src/capuchin/background.ts',
       settings: './src/capuchin/settings.tsx',
       post: './src/capuchin/post.tsx',
-      viewpost: './src/capuchin/viewpost.tsx'
     },
     output: {
       path: path.resolve(__dirname, tgtdir),
@@ -56,6 +55,9 @@ module.exports = function (env) {
             var rslt = str.replace("__CAPUCHIN_VERSION__", capuchinVersion());
             return (new TextEncoder()).encode(rslt);
           }
+        },
+        {
+          from: 'assets/*.css',
         }
       ]),
       new webpack.DefinePlugin({

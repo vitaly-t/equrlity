@@ -1,7 +1,7 @@
 import * as React from 'react';
 import * as ReactDOM from "react-dom";
 import * as Blueprint from "@blueprintjs/core";
-import '@blueprintjs/core/dist/blueprint.css';
+//import '@blueprintjs/core/dist/blueprint.css';
 import * as OxiDate from '../lib/oxidate';
 
 import { AppState, postDeserialize } from "./AppState";
