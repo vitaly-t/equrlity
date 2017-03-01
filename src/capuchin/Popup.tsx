@@ -38,7 +38,8 @@ export class PopupPanel extends React.Component<PopupPanelProps, PopupPanelState
       return <div>Waiting for response from Server</div>;
     }
     console.log("rendering popup...");
-    let versionDiv = (<p>Version: {capuchinVersion()}. Proudly brought to you by UglyAsF*ck Interfaces Ltd. (C) 1996. All rights reserved</p>);
+    let versionDiv = (<p>Version: {capuchinVersion()}. Proudly brought to you by NotQuiteAsUglyAsOnceItWas Interfaces Ltd. (C) 2005. All rights reserved</p>);
+
     if (st.lastErrorMessage) return <div>Error: {st.lastErrorMessage}</div>
     let pnl = <div>No active URL found</div>
     if (curl) {

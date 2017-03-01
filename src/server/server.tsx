@@ -355,7 +355,7 @@ router.post('/rpc', async function (ctx: any) {
       }
       case "changeSettings": {
         let req: Rpc.ChangeSettingsRequest = params;
-        let {moniker, deposit, email} = req;
+        let {moniker, email} = req;
         let usr = getUser(ctx.userId.id);
         if (!usr) throw new Error("Internal error getting user details");
         if (moniker && moniker !== usr.userName) {
@@ -364,10 +364,6 @@ router.post('/rpc', async function (ctx: any) {
             return;
           }
           usr = { ...usr, userName: moniker };
-        }
-        if (deposit > 0) {
-          let ampCredits = usr.ampCredits + deposit;
-          usr = { ...usr, ampCredits };
         }
         if (email) usr = { ...usr, email };
         await pg.upsert_user(usr);

@@ -113,7 +113,6 @@ export class Post extends React.Component<PostProps, PostState> {
     } else {
       let tags = this.state.tags.split(',').map(t => t.trim());
       let p: Dbt.Post = {...post, body: this.state.body, title: this.state.title, tags, userId: '', contentId: 0 };
-      let creator 
       let pubdiv = null;
       if (!post.published) {
           pubdiv = <div style={rowStyle} >

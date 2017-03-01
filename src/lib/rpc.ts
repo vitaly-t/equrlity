@@ -202,7 +202,6 @@ export type GetRedirectResponse = {
  */
 export type ChangeSettingsRequest = {
   moniker: string;
-  deposit: Integer;
   email: string;
 }
 

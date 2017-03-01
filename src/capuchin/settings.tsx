@@ -12,13 +12,13 @@ import * as Rpc from '../lib/rpc'
 import * as Utils from '../lib/utils';
 
 interface SettingsPageProps { appState?: AppState };
-interface SettingsPageState { nickName: string, email: string, deposit: number };
+interface SettingsPageState { nickName: string, email: string };
 
 export class SettingsPage extends React.Component<SettingsPageProps, SettingsPageState> {
 
   constructor(props) {
     super(props);
-    this.state = { nickName: props.appState.moniker, email: '', deposit: 0 };
+    this.state = { nickName: props.appState.moniker, email: '' };
   }
 
   ctrls: { nickNameInput?: HTMLInputElement, emailInput?: HTMLInputElement, depositInput?: HTMLInputElement } = {}
@@ -31,15 +31,10 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
     this.setState({ email: this.ctrls.emailInput.value });
   }
 
-  changeDeposit() {
-    this.setState({ deposit: parseInt(this.ctrls.depositInput.value) });
-  }
-
   saveSettings = () => {
     console.log("saving settings");
-    let settings: Rpc.ChangeSettingsRequest = { moniker: this.state.nickName, email: this.state.email, deposit: this.state.deposit };
+    let settings: Rpc.ChangeSettingsRequest = { moniker: this.state.nickName, email: this.state.email };
     chrome.runtime.sendMessage({ eventType: "ChangeSettings", settings, async: true });
-    this.setState({ deposit: 0 });
   }
 
   render() {
@@ -185,11 +180,6 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
           <div style={lhcolStyle} >Email: </div>
           <input type="email" style={{ width: '60%' }} name="Email" id="emailId" ref={(e) => this.ctrls.emailInput = e}
             value={this.state.email} onChange={(e) => this.changeEmail()} />
-        </div>
-        <div style={divStyle}>
-          <div style={lhcolStyle} >Deposit: </div>
-          <input type="number" style={{ width: 100 }} name="Deposit" id="depositId" ref={(e) => this.ctrls.depositInput = e}
-            value={this.state.deposit} onChange={(e) => this.changeDeposit()} />
         </div>
         <div style={divStyle}>
           <button type="button" className="pt-intent-primary" onClick={this.saveSettings} >Save Settings</button>
