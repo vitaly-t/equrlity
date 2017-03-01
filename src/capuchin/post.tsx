@@ -93,10 +93,6 @@ export class Post extends React.Component<PostProps, PostState> {
       return (
         <div>
           <div style={rowStyle} >
-            <button key='review' className="pt-intent-primary" style={btnStyle} onClick={() => this.stopEdit()} >Review</button>
-            <button key='stop' className="pt-intent-primary" style={btnStyle} onClick={() => this.abandonEdit()} >Abandon</button>
-          </div>
-          <div style={rowStyle} >
             <div style={lhcolStyle}>Title:</div>
             <input type="text" style={{ marginTop: 6, height: 30, width: '100%' }} ref={(e) => this.ctrls.title = e} value={this.state.title} onChange={e => this.changeTitle(e)} />
           </div>
@@ -108,10 +104,15 @@ export class Post extends React.Component<PostProps, PostState> {
             <div style={lhcolStyle}>Tags:</div>
             <input type="text" style={{ height: 30, marginTop: 6, width: '100%' }} ref={(e) => this.ctrls.tags = e} value={this.state.tags} onChange={e => this.changeTags(e)} />
           </div>
+          <div style={rowStyle} >
+            <button key='review' className="pt-intent-primary" style={btnStyle} onClick={() => this.stopEdit()} >Review</button>
+            <button key='stop' className="pt-intent-primary" style={btnStyle} onClick={() => this.abandonEdit()} >Abandon</button>
+          </div>
         </div>
       );
     } else {
-      let p: Dbt.Post = {...post, body: this.ctrls.body.value, userId: '', contentId: 0 };
+      let tags = this.state.tags.split(',').map(t => t.trim());
+      let p: Dbt.Post = {...post, body: this.state.body, title: this.state.title, tags, userId: '', contentId: 0 };
       let creator 
       let pubdiv = null;
       if (!post.published) {
