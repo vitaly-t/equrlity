@@ -22,7 +22,7 @@ export const btnStyle= { height: '24', marginTop: 2, marginLeft: 5, marginRight:
 export const lhcolStyle = { width: '20%' };
 
 
-interface PostViewProps { post: Dbt.Post };
+interface PostViewProps { post: Dbt.Post, creator: string };
 interface PostViewState { };
 
 let Tag = (props) => {
@@ -32,7 +32,7 @@ let Tag = (props) => {
 export class PostView extends React.Component<PostViewProps, PostViewState> {
 
   render() {
-    let {post} = this.props;
+    let {post,creator} = this.props;
     let h = { __html: md.render(post.body) };
     let lstedit = post.updated ? oxiDate.toFormat(new Date(post.updated), "DDDD, MMMM D @ HH:MIP") : 'never';
     let pub = post.published ? oxiDate.toFormat(new Date(post.published), "DDDD, MMMM D @ HH:MIP") : 'never';
@@ -46,7 +46,9 @@ export class PostView extends React.Component<PostViewProps, PostViewState> {
           <div style={{ display: 'inline' }}>Tags: </div>
           {tagbtns}
         </div>
-        <div style={rowStyle} >Published: {pub},  Last Edited: {lstedit}.</div>
+        <div style={rowStyle} >Created by: {creator}.</div>
+        <div style={rowStyle} >Published: {pub}.</div>
+        <div style={rowStyle} >Last Edited: {lstedit}.</div>
       </div>
     );
   }

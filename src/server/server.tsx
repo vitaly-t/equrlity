@@ -143,7 +143,8 @@ publicRouter.get('/link/:id', async (ctx, next) => {
 publicRouter.get('/post/:id', async (ctx, next) => {
   let postId = parseInt(ctx.params.id);
   let post = await pg.retrieveRecord<Dbt.Post>("posts", { postId })
-  let view = <PostView post={post} />;
+  let creator = cache.users.get(post.userId).userName
+  let view = <PostView post={post} creator={creator} />;
   let ins = ReactDOMServer.renderToStaticMarkup(view);
   let html = await readFileAsync('./assets/index.htmpl');
   let body = html.replace('{{{__BODY__}}}', ins)

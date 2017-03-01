@@ -83,6 +83,7 @@ export class Post extends React.Component<PostProps, PostState> {
 
   render() {
     let post = this.props.appState.currentPost;
+    let creator = this.props.appState.moniker
     if (!post) return null;
     let rowStyle = { width: '100%', marginTop: 2, marginLeft: 5, padding: 6 };
     let btnStyle= { height: '24', marginTop: 2, marginLeft: 5, marginRight: 5, display: 'inline-block' }; 
@@ -111,6 +112,7 @@ export class Post extends React.Component<PostProps, PostState> {
       );
     } else {
       let p: Dbt.Post = {...post, body: this.ctrls.body.value, userId: '', contentId: 0 };
+      let creator 
       let pubdiv = null;
       if (!post.published) {
           pubdiv = <div style={rowStyle} >
@@ -121,7 +123,7 @@ export class Post extends React.Component<PostProps, PostState> {
       }
       return (
         <div>
-          <PostView post={p} />
+          <PostView post={p} creator={creator} />
           <div style={rowStyle} >
             <button key='edit' className="pt-intent-primary" style={btnStyle} onClick={() => this.startEdit()} >Edit</button>
             <button key='save' className="pt-intent-primary" style={btnStyle} onClick={() => this.save()} >Save</button>
