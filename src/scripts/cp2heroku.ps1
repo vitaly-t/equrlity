@@ -13,4 +13,6 @@ Copy-Item dist/server -Destination $tgtdir/dist -Recurse -Force -Exclude *.map
 Copy-Item dist/lib -Destination $tgtdir/dist -Recurse -Force -Exclude *.map
 Copy-Item assets/synereo-plugin.zip -Destination $tgtdir/assets 
 Copy-Item assets/synereo-plugin.tar.gz -Destination $tgtdir/assets 
+Copy-Item assets/index.htmpl -Destination $tgtdir/assets 
+Copy-Item assets/*.css -Destination $tgtdir/assets 
 
