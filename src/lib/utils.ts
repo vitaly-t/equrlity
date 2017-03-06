@@ -20,10 +20,13 @@ export function setTest(l : boolean) {
 }
 
 export function capuchinVersion() {
-	return "0.8.4";
+	return "0.8.5";
 }
 
 export const serverUrl = isDev() ? "http://localhost:8080/rpc" : "https://synereo-amplitude.herokuapp.com/rpc";
+export const authUrl = isDev() ? "http://localhost:8080/auth"
+    : "https://synereo-amplitude.herokuapp.com/auth";
+export const chromeAuthUrl = "https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=";
 
 export function printBase64Binary(byteArray: Uint8Array): string {
   return btoa(String.fromCharCode(...byteArray));

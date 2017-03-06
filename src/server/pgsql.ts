@@ -14,6 +14,7 @@ import * as pgPromise from 'pg-promise';
 import * as Dbt from '../lib/datatypes'
 import * as OxiGen from '../lib/oxigen';
 import * as uuid from '../lib/uuid.js';
+import {genInsertStatement} from "../lib/oxigen";
 
 // your protocol extensions:
 //interface IExtensions {
@@ -240,17 +241,28 @@ export function emptyAuth(): Dbt.Auth {
   return OxiGen.emptyRec<Dbt.Auth>(oxb.tables.get("auths"));
 }
 
-const upsert_auth_sql = OxiGen.genUpsertStatement(oxb.tables.get("auths"))
+const upsert_auth_sql = OxiGen.genUpsertStatement(oxb.tables.get("auths"));
 export async function upsert_auth(auth: Dbt.Auth): Promise<Dbt.Auth> {
   let r = await db.one(upsert_auth_sql, auth);
   cache.auths.set(r.authId, r);
   return r;
-};
+}
+
+export async function createAuth(authId, userId, provider): Promise<Dbt.Auth> {
+  let obj = {... emptyAuth(), authId: authId, userId: userId, created: new Date(), authProvider: provider};
+  let r = await db.one(genInsertStatement(oxb.tables.get("auths")), obj);
+  cache.auths.set(r.authId, r);
+  return r;
+}
+
+export async function getUserIdByAuth(authId): Promise<any[]> {
+  return await db.any(`select "userId" from auths where "authId" = '${authId}' `);
+}
 
 export async function touch_user(userId, ipAddress) {
   let usr = cache.users.get(userId);
   usr = {...usr, ipAddress};
-  let rslt = await updateRecord<Dbt.User>("users", usr)
+  let rslt = await updateRecord<Dbt.User>("users", usr);
   cache.users.set(userId, rslt);
 }
 
@@ -476,15 +488,19 @@ export async function payForView(viewerId: Dbt.userId, viewedLinkId: Dbt.linkId)
   }
 }
 
-export async function createUser(ipAddress: string = ''): Promise<Dbt.User> {
+export async function createUser(ipAddress: string = '', email?: string): Promise<Dbt.User> {
   let o = cache.users;
   let i = o.size;
   let userName = '';
-  let used = await getAllAnonymousMonikers();
-  while (true) {
-    userName = "anonymous_" + i;
-    if (used.indexOf(userName) < 0) break;
-    ++i;
+  if(email) {
+    userName = email.split("@")[0];
+  } else {
+    let used = await getAllAnonymousMonikers();
+    while (true) {
+      userName = "anonymous_" + i;
+      if (used.indexOf(userName) < 0) break;
+      ++i;
+    }
   }
   let userId = uuid.generate();
   let usr = { ...emptyUser(), userId, userName, ipAddress };

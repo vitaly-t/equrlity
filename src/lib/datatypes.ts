@@ -2,7 +2,7 @@
 
 
 export type authId = string;
-export type authProvider = "ip" | "facebook" | "github" | "twitter" | "linkedin";
+export type authProvider = "ip" | "facebook" | "github" | "twitter" | "linkedin" | "chrome";
 export type binary = ArrayBuffer;
 export type contentCryptId = ArrayBuffer;
 export type contentType = "url" | "video" | "post" | "audio";
