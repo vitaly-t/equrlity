@@ -24,14 +24,14 @@ async function createKeyPairIf(keys: string[]): Promise<void> {
 }
 
 function getProfile(): Promise<chrome.identity.UserInfo> {
-  return new Promise((resolve, reject) => {
+  return new Promise(resolve => {
     chrome.identity.getProfileUserInfo(uin => resolve(uin));
   });
 }
 
 function getChromeAccessToken(): Promise<string> {
-  return new Promise((resolve, reject) => {
-    chrome.identity.getAuthToken({interactive: true}, token => resolve(token))
+  return new Promise(resolve => {
+    chrome.identity.getAuthToken({ interactive: true }, token => resolve(token))
   });
 }
 
@@ -45,15 +45,9 @@ async function initialize() {
   const publicKey = await localForage.getItem<JsonWebKey>('publicKey');
   const privateKey = await localForage.getItem<JsonWebKey>('privateKey');
   const jwt = await AsyncHandlers.Authenticate(userInfo, chromeToken, publicKey);
-  console.log("JWT: " + jwt);
-  if (!jwt) {
-    await handleMessage({ eventType: "Thunk", fn: ((st: AppState) => { return { ...st, publicKey, privateKey } }) });
-    console.log("No JWT received");
-  } else {
-    await localForage.setItem<string>('jwt', jwt);
-    await handleMessage({ eventType: "Thunk", fn: ((st: AppState) => { return { ...st, publicKey, privateKey, jwt } }) });
-    handleAsyncMessage({ eventType: "Initialize" });
-  }
+  if (!jwt) throw new Error("Unable to authenticate");
+  await handleMessage({ eventType: "Thunk", fn: ((st: AppState) => { return { ...st, publicKey, privateKey, jwt } }) });
+  handleAsyncMessage({ eventType: "Initialize" });
 }
 
 chrome.runtime.onStartup.addListener(initialize);
@@ -79,7 +73,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   }
 });
 
-chrome.tabs.onActivated.addListener(({tabId, windowId}) => {
+chrome.tabs.onActivated.addListener(({ tabId, windowId }) => {
   handleAsyncMessage({ eventType: "ActivateTab", tabId });
 });
 

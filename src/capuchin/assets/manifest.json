@@ -20,10 +20,18 @@
   ],
   "oauth2": {
     "client_id": "1046837153851-12v7fe2tbmmlu4qnm1n6jnhuc71htkfk.apps.googleusercontent.com",
-    "scopes": ["https://www.googleapis.com/auth/plus.login"]
+    "scopes": [
+      "https://www.googleapis.com/auth/plus.login"
+    ]
   },
   "background": {
     "persistent": true,
-    "scripts": ["background_bndl.js"]
+    "scripts": [
+      "background_bndl.js"
+    ]
+  },
+  "icons": {
+    "128": "images/icon.png",
+    "16": "images/icon.png"
   }
 }

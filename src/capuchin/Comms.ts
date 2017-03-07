@@ -3,47 +3,17 @@ import * as Crypto from '../lib/Crypto';
 import { Url, parse } from 'url';
 import axios, { AxiosResponse, AxiosError } from 'axios';
 import * as Rpc from '../lib/rpc';
-import {AppState} from './AppState';
+import { AppState } from './AppState';
 import * as Utils from '../lib/utils';
 import * as Dbt from '../lib/datatypes';
 
-export function isDev(): boolean {
-  return process.env.NODE_ENV === "development"
-}
-
-/*  couldn't get this to work for reasons unfathomable
-async function getCookie() {
-  return new Promise( (resolve, reject) => {
-    chrome.cookies.get({url: serverUrl,  name: "syn_user" }, c => {
-      if (c) resolve(c);
-      else {
-        console.log("unable to locate cookie");
-        reject("unable to find cookie");
-      }
-    });
-  });
-}
-*/
-
-export async function sendAuthRequest(data: Object, authHeader: string): Promise<AxiosResponse> {
-  let headers = { 'content-type': 'application/json', 'Accept': 'application/json'};
-  headers['Authorization'] = authHeader;
-  headers['x-syn-client-version'] = 'capuchin-' + Utils.capuchinVersion();
-  let req =  await axios.create({
-    headers,
-    responseType: 'json'
-  });
-  return await req.post(Utils.authUrl, data);
-}
-
 async function apiRequest(st: AppState) {
-  let headers = { 'content-type': 'application/json', 'Accept': 'application/json'};
-  if (st.jwt) headers['Authorization'] = 'Bearer '+st.jwt;
-  headers['x-syn-client-version'] = 'capuchin-' +Utils.capuchinVersion();
+  let headers = { 'content-type': 'application/json', 'Accept': 'application/json' };
+  if (st.jwt) headers['Authorization'] = 'Bearer ' + st.jwt;
+  headers['x-syn-client-version'] = 'capuchin-' + Utils.capuchinVersion();
   //if (Utils.isDev()) headers['x-syn-moniker'] = st.moniker;
   return axios.create({
     timeout: 10000,
-    //withCredentials: true,  // not needed since cookies didn't work...
     headers,
     responseType: 'json',
     //transformRequest: (data) => {
@@ -53,6 +23,16 @@ async function apiRequest(st: AppState) {
   });
 }
 
+export async function sendAuthRequest(data: Object, authHeader: string): Promise<AxiosResponse> {
+  let headers = { 'content-type': 'application/json', 'Accept': 'application/json' };
+  headers['Authorization'] = authHeader;
+  headers['x-syn-client-version'] = 'capuchin-' + Utils.capuchinVersion();
+  let req = await axios.create({
+    headers,
+    responseType: 'json'
+  });
+  return await req.post(Utils.serverUrl + '/auth', data);
+}
 
 let id = 0;
 export async function sendApiRequest(st: AppState, method: Rpc.Method, params: any): Promise<AxiosResponse> {
@@ -60,15 +40,15 @@ export async function sendApiRequest(st: AppState, method: Rpc.Method, params: a
   id += 1;
   let data: Rpc.Request = { jsonrpc: "2.0", method, params, id };
   try {
-     return await xhr.post(Utils.serverUrl, data );
+    return await xhr.post(Utils.serverUrl + "/rpc", data);
   }
   catch (e) {
     if (!e.response) throw e;
     let msg = "Invalid response from server";
     try { msg = e.response.data.error.message; }
-    catch (e) {}
+    catch (e) { }
     throw new Error(msg + " (" + e.response.status.toString() + ")");
-  } 
+  }
 }
 
 export async function sendAddContent(st: AppState, url: string, linkDescription: string, amount: number): Promise<AxiosResponse> {
@@ -76,8 +56,8 @@ export async function sendAddContent(st: AppState, url: string, linkDescription:
   const signature: ArrayBuffer = await Crypto.signData(privateCryptoKey, UTF8.stringToUtf8ByteArray(url).buffer);
   const uint8ArraySignature = new Uint8Array(signature);
   const sig = Utils.printBase64Binary(new Uint8Array(signature));
-  let req: Rpc.AddContentRequest =  { publicKey: st.publicKey, content: url, signature: sig, linkDescription, amount };
-  return await sendApiRequest(st, "addContent", req );
+  let req: Rpc.AddContentRequest = { publicKey: st.publicKey, content: url, signature: sig, linkDescription, amount };
+  return await sendApiRequest(st, "addContent", req);
 }
 
 export async function sendInitialize(st: AppState): Promise<AxiosResponse> {
@@ -97,17 +77,17 @@ export async function sendChangeSettings(st: AppState, settings: Rpc.ChangeSetti
 }
 
 export async function sendGetUserLinks(st: AppState): Promise<AxiosResponse> {
-  return await sendApiRequest(st, "getUserLinks", {} );
+  return await sendApiRequest(st, "getUserLinks", {});
 }
 
 export async function sendRedeemLink(st: AppState, linkId: Dbt.linkId): Promise<AxiosResponse> {
-  return await sendApiRequest(st, "redeemLink", {linkId} );
+  return await sendApiRequest(st, "redeemLink", { linkId });
 }
 
 export async function sendGetPostBody(st: AppState): Promise<AxiosResponse> {
-  return await sendApiRequest(st, "getPostBody", {postId: st.currentPost.postId} );
+  return await sendApiRequest(st, "getPostBody", { postId: st.currentPost.postId });
 }
 
 export async function sendSavePost(st: AppState, req: Rpc.SavePostRequest): Promise<AxiosResponse> {
-  return await sendApiRequest(st, "savePost", req );
+  return await sendApiRequest(st, "savePost", req);
 }

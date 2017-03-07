@@ -105,17 +105,16 @@ async function currentTab(): Promise<chrome.tabs.Tab> {
 }
 
 function extractHeadersToState(st: AppState, rsp: AxiosResponse): AppState {
-  let ampCredits = parseInt(rsp.headers['x-syn-credits']);
+  let credits = parseInt(rsp.headers['x-syn-credits']);
   let moniker = rsp.headers['x-syn-moniker'];
+
   let jwt = rsp.headers['x-syn-token'];
-  if (jwt && st.jwt) throw new Error("Unexpected token received");
   if (!st.jwt && !jwt) throw new Error("Expected token but none received");
-  if (jwt) {
-    console.log("storing token");
-    localForage.setItem<string>('jwt', jwt);
-  }
-  else jwt = st.jwt;
-  return { ...st, ampCredits, moniker, jwt };
+  jwt = jwt || st.jwt;
+  let email = rsp.headers['x-syn-email'] || st.email;
+  let authprov = rsp.headers['x-syn-authprov'] || st.authprov;
+
+  return { ...st, credits, moniker, jwt, email, authprov };
 }
 
 type rspBody = Rpc.ResponseBody; // no idea why this is necessary :-(
@@ -127,11 +126,10 @@ function extractResult<rspBody>(response: AxiosResponse): Rpc.ResponseBody {
 
 export namespace AsyncHandlers {
 
-  export async function Authenticate(
-      userInfo: chrome.identity.UserInfo, authToken: string, publicKey: JsonWebKey): Promise<string> {
-    const response = await Comms.sendAuthRequest({userInfo: userInfo, publicKey: publicKey}, "Bearer " + authToken);
+  export async function Authenticate(userInfo: chrome.identity.UserInfo, authToken: string, publicKey: JsonWebKey): Promise<string> {
+    const response = await Comms.sendAuthRequest({ userInfo, publicKey }, "Bearer " + authToken);
     let result = "";
-    if(response.status === 200) {
+    if (response.status === 200) {
       console.log(response);
       result = response.data.jwt;
     }
@@ -217,7 +215,7 @@ export namespace AsyncHandlers {
       let rslt: Rpc.GetUserLinksResponse = extractResult(response);
       let promotions = st.promotions;
       let investments = rslt.links;
-      let {connectedUsers, reachableUserCount, posts} = rslt;
+      let { connectedUsers, reachableUserCount, posts } = rslt;
       if (rslt.promotions.length > 0) promotions = [...promotions, ...rslt.promotions];
       st = { ...st, investments, promotions, connectedUsers, reachableUserCount, posts };
       return st;

@@ -1,31 +1,29 @@
 "use strict";
 
 export function isMember(grp) {
-	let grps = localStorage.getItem('pseudoq.groups');
-	return grps && grps.indexOf(grp+',') >= 0;
+  let grps = localStorage.getItem('pseudoq.groups');
+  return grps && grps.indexOf(grp + ',') >= 0;
 
 }
 
 export function isDev() {
-    return process.env.NODE_ENV === 'development'
+  return process.env.NODE_ENV === 'development'
 }
 
 let _isTest = false;
 export function isTest() {
-    return _isTest
+  return _isTest
 }
 
-export function setTest(l : boolean) {
-    return _isTest = l;
+export function setTest(l: boolean) {
+  return _isTest = l;
 }
 
 export function capuchinVersion() {
-	return "0.8.5";
+  return "0.8.5";
 }
 
-export const serverUrl = isDev() ? "http://localhost:8080/rpc" : "https://synereo-amplitude.herokuapp.com/rpc";
-export const authUrl = isDev() ? "http://localhost:8080/auth"
-    : "https://synereo-amplitude.herokuapp.com/auth";
+export const serverUrl = isDev() ? "http://localhost:8080" : "https://synereo-amplitude.herokuapp.com";
 export const chromeAuthUrl = "https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=";
 
 export function printBase64Binary(byteArray: Uint8Array): string {

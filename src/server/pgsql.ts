@@ -14,7 +14,7 @@ import * as pgPromise from 'pg-promise';
 import * as Dbt from '../lib/datatypes'
 import * as OxiGen from '../lib/oxigen';
 import * as uuid from '../lib/uuid.js';
-import {genInsertStatement} from "../lib/oxigen";
+import { genInsertStatement } from "../lib/oxigen";
 
 // your protocol extensions:
 //interface IExtensions {
@@ -75,7 +75,7 @@ if (!connectUrl.startsWith('postgres:')) connectUrl = 'postgres:' + connectUrl;
 export const db: IDatabase<any> = pgp(connectUrl);
 
 export async function init() {
-  console.log("pg init called. connected to:"+connectUrl);
+  console.log("pg init called. connected to:" + connectUrl);
   let tbls: Array<any> = await db.any("select table_name from information_schema.tables where table_schema = 'public'");
   if (tbls.length == 0) {
     console.log("Creating data tables");
@@ -217,7 +217,7 @@ export async function findUserByName(name: string): Promise<Dbt.User | null> {
 
 export function emptyUser(): Dbt.User {
   let rec = OxiGen.emptyRec<Dbt.User>(oxb.tables.get("users"));
-  return { ...rec, ampCredits: 1000 };
+  return { ...rec, credits: 1000 };
 }
 
 const upsert_user_sql = OxiGen.genUpsertStatement(oxb.tables.get("users"));
@@ -229,9 +229,9 @@ export async function upsert_user(usr: Dbt.User): Promise<Dbt.User> {
 }
 
 export async function adjust_user_balance(usr: Dbt.User, adj: Dbt.integer): Promise<Dbt.User> {
-  let ampCredits = usr.ampCredits + adj;
-  if (ampCredits < 0) throw new Error("Negative balances not allowed");
-  let newusr = { ...usr, ampCredits }
+  let credits = usr.credits + adj;
+  if (credits < 0) throw new Error("Negative balances not allowed");
+  let newusr = { ...usr, credits }
   let r = updateRecord<Dbt.User>("users", newusr);
   cache.users.set(usr.userId, newusr);
   return r;
@@ -249,19 +249,26 @@ export async function upsert_auth(auth: Dbt.Auth): Promise<Dbt.Auth> {
 }
 
 export async function createAuth(authId, userId, provider): Promise<Dbt.Auth> {
-  let obj = {... emptyAuth(), authId: authId, userId: userId, created: new Date(), authProvider: provider};
+  let obj = { ...emptyAuth(), authId: authId, userId: userId, created: new Date(), authProvider: provider };
   let r = await db.one(genInsertStatement(oxb.tables.get("auths")), obj);
   cache.auths.set(r.authId, r);
   return r;
 }
 
-export async function getUserIdByAuth(authId): Promise<any[]> {
-  return await db.any(`select "userId" from auths where "authId" = '${authId}' `);
+export async function getUserIdByAuthId(provider: Dbt.authProvider, authId: Dbt.authId): Promise<Dbt.userId | null> {
+  let rslt = await db.oneOrNone(`select "userId" from auths where "authId" = '${authId}' `);
+  if (rslt) return rslt.userId;
+  return null;
 }
 
-export async function touch_user(userId, ipAddress) {
+export async function getUserByAuthId(authId: string, provider: Dbt.authProvider): Promise<Dbt.User | null> {
+  let userId = await getUserIdByAuthId(provider, authId);
+  if (userId) return cache.users.get(userId);
+  return null;
+}
+
+export async function touch_user(userId) {
   let usr = cache.users.get(userId);
-  usr = {...usr, ipAddress};
   let rslt = await updateRecord<Dbt.User>("users", usr);
   cache.users.set(userId, rslt);
 }
@@ -362,7 +369,7 @@ export async function promoteLink(link: Dbt.Link, amount: Dbt.integer): Promise<
 
 export async function insert_content(userId: Dbt.userId, content: string, linkDescription: string, amount: Dbt.integer, contentType: Dbt.contentType = "url"): Promise<Dbt.Link> {
   let usr = cache.users.get(userId);
-  if (amount > usr.ampCredits) throw new Error("Negative balances not allowed");
+  if (amount > usr.credits) throw new Error("Negative balances not allowed");
 
   let cont = await insertRecord<Dbt.Content>("contents", { ...emptyContent(), userId, content, contentType, amount });
   let contentId = cont.contentId;
@@ -378,7 +385,7 @@ export async function insert_content(userId: Dbt.userId, content: string, linkDe
 
 export async function amplify_content(userId: Dbt.userId, content: string, linkDescription, amount: Dbt.integer, contentType: Dbt.contentType = "url"): Promise<Dbt.Link> {
   let usr = cache.users.get(userId);
-  if (amount > usr.ampCredits) throw new Error("Negative balances not allowed");
+  if (amount > usr.credits) throw new Error("Negative balances not allowed");
 
   let prevLink = cache.getLinkIdFromUrl(parse(content));
   let prv = cache.links.get(prevLink);
@@ -417,7 +424,7 @@ export async function redeem_link(link: Dbt.Link): Promise<void> {
   await db.none(stmt);
   await db.none(`delete from links where "linkId" = ${link.linkId}`);
   if (link.amount > 0) await adjust_user_balance(cache.users.get(link.userId), link.amount);
-  linkIdsToReParent.forEach(({linkId}) => {
+  linkIdsToReParent.forEach(({ linkId }) => {
     let l = cache.links.get(linkId);
     cache.links.set(linkId, { ...l, prevLink: link.prevLink });
   });
@@ -456,8 +463,8 @@ export async function payForView(viewerId: Dbt.userId, viewedLinkId: Dbt.linkId)
 
   // viewer gets paid 1
   let viewer = cache.users.get(viewerId);
-  let ampCredits = viewer.ampCredits + 1;
-  viewer = { ...viewer, ampCredits }
+  let credits = viewer.credits + 1;
+  viewer = { ...viewer, credits }
   let u = await updateRecord<Dbt.User>("users", viewer);
   cache.users.set(viewerId, u);
   bal -= 1
@@ -488,11 +495,11 @@ export async function payForView(viewerId: Dbt.userId, viewedLinkId: Dbt.linkId)
   }
 }
 
-export async function createUser(ipAddress: string = '', email?: string): Promise<Dbt.User> {
+export async function createUser(email?: string): Promise<Dbt.User> {
   let o = cache.users;
   let i = o.size;
   let userName = '';
-  if(email) {
+  if (email) {
     userName = email.split("@")[0];
   } else {
     let used = await getAllAnonymousMonikers();
@@ -503,7 +510,7 @@ export async function createUser(ipAddress: string = '', email?: string): Promis
     }
   }
   let userId = uuid.generate();
-  let usr = { ...emptyUser(), userId, userName, ipAddress };
+  let usr = { ...emptyUser(), userId, userName };
   let user = await insertRecord<Dbt.User>("users", usr);
   console.log("user created : " + user.userName);
   if (cache.users.has(user.userId)) {
@@ -513,7 +520,7 @@ export async function createUser(ipAddress: string = '', email?: string): Promis
   return user;
 };
 
-export async function handleAddContent(userId, {publicKey, content, signature, linkDescription, amount}): Promise<Rpc.SendAddContentResponse> {
+export async function handleAddContent(userId, { publicKey, content, signature, linkDescription, amount }): Promise<Rpc.SendAddContentResponse> {
   let link = await getLinkFromContent(content);
   if (link) {
     let linkAmplifier = cache.users.get(userId).userName;
@@ -526,7 +533,7 @@ export async function handleAddContent(userId, {publicKey, content, signature, l
   return rsp;
 }
 
-export async function handleAmplify(userId, {publicKey, content, signature, linkDescription, amount}): Promise<Rpc.AddContentOk> {
+export async function handleAmplify(userId, { publicKey, content, signature, linkDescription, amount }): Promise<Rpc.AddContentOk> {
   let linkId = cache.getLinkIdFromUrl(parse(content));
   let link = cache.links.get(linkId);
   let rslt = undefined;
@@ -568,7 +575,7 @@ export async function GetUserLinks(id: Dbt.userId): Promise<Rpc.UserLinkItem[]> 
 export async function GetUserPosts(id: Dbt.userId): Promise<Rpc.PostInfoItem[]> {
   let a: Dbt.Post[] = await db.any(`select * from posts where "userId" = '${id}' order by updated desc`);
   let posts = Promise.all(a.map(async p => {
-    let {postId, created, updated, title, tags} = p;
+    let { postId, created, updated, title, tags } = p;
     let cont = cache.contents.get(p.contentId);
     let contentUrl = cont ? cont.content : null;
     let published = cont ? cont.created : null;
@@ -584,24 +591,24 @@ export async function GetPostBody(id: Dbt.postId): Promise<string> {
 }
 
 export async function SavePost(userId: Dbt.userId, req: Rpc.SavePostRequest): Promise<Dbt.Post> {
-  let {postId, title, body, tags} = req;
-  let p = {userId, postId, title, body, tags};
+  let { postId, title, body, tags } = req;
+  let p = { userId, postId, title, body, tags };
   let post: Dbt.Post;
-  if (req.publish && req.investment > 0) p['published'] = new Date(); 
+  if (req.publish && req.investment > 0) p['published'] = new Date();
   if (p.postId) post = await updateRecord<Dbt.Post>("posts", p);
   else post = await insertRecord<Dbt.Post>("posts", p);
   if (req.publish && req.investment > 0) {
     let url = parse(serverUrl);
     url.pathname = '/post/' + post.postId.toString();
-    let content =  format(url);
-    await handleAddContent(userId, {publicKey: '', content, signature: '', linkDescription: title, amount: req.investment});
+    let content = format(url);
+    await handleAddContent(userId, { publicKey: '', content, signature: '', linkDescription: title, amount: req.investment });
     let contentId = cache.getContentIdFromContent(content);
-    post = await updateRecord<Dbt.Post>("posts", {...post, contentId}); 
+    post = await updateRecord<Dbt.Post>("posts", { ...post, contentId });
   }
   return post;
 }
 
-export async function registerInvitation(ipAddress: string, linkId: Dbt.linkId ): Promise<Dbt.Invitation> {
-  console.log("registering inv "+ipAddress);
-  return await upsertRecord<Dbt.Invitation>("invitations", {ipAddress, linkId});
+export async function registerInvitation(ipAddress: string, linkId: Dbt.linkId): Promise<Dbt.Invitation> {
+  console.log("registering inv " + ipAddress);
+  return await upsertRecord<Dbt.Invitation>("invitations", { ipAddress, linkId });
 }

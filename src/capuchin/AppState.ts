@@ -1,6 +1,7 @@
 import { Url, format, parse } from 'url';
-import {UserLinkItem, PostInfoItem} from '../lib/rpc';
+import { UserLinkItem, PostInfoItem } from '../lib/rpc';
 import * as Dbt from '../lib/datatypes';
+import *as Utils from '../lib/utils';
 
 export interface LinkInfo { synereoUrl: Url, linkDepth: number, linkAmplifier: string };
 
@@ -13,7 +14,9 @@ export interface AppState {
   redirects: Map<string, string>;   // keys are synereo urls - values are source urls 
   activeUrl: string | null;
   moniker: string;
-  ampCredits: number;
+  email: string;
+  authprov: string;
+  credits: number;
   jwt: string;
   lastErrorMessage: string;
   investments: UserLinkItem[];
@@ -28,7 +31,7 @@ export function initState(): AppState {
   console.log("initState called");
   return {
     publicKey: null, privateKey: null, links: new Map<string, LinkInfo>(), redirects: new Map<string, string>(),
-    activeUrl: null, moniker: 'unknown', ampCredits: 0, jwt: '', lastErrorMessage: '', 
+    activeUrl: null, moniker: 'unknown', authprov: '', email: '', credits: 0, jwt: '', lastErrorMessage: '',
     investments: [], promotions: [], connectedUsers: [], reachableUserCount: 0, posts: [], currentPost: null
   };
 }
@@ -57,27 +60,27 @@ export function setLink(state: AppState, curl_: string, syn_: string, linkDepth:
 // serialization occurs by sendMessages between background "page"" and popup panel
 // Maps don't serialize :-(
 export function preSerialize(st: AppState): any {
-   let links = Object.create(null);
-   st.links.forEach( (v,k) => {
-     links[k] = v;
-   });
-   let redirects = Object.create(null);
-   st.redirects.forEach( (v,k) => {
-     redirects[k] = v;
-   });
-   return {...st, links, redirects};
+  let links = Object.create(null);
+  st.links.forEach((v, k) => {
+    links[k] = v;
+  });
+  let redirects = Object.create(null);
+  st.redirects.forEach((v, k) => {
+    redirects[k] = v;
+  });
+  return { ...st, links, redirects };
 }
 
 export function postDeserialize(st: any): AppState {
-   let links = new Map<string,Url>();
-   for (const k in st.links) {
-     links.set(k, st.links[k]);
-   };
-   let redirects = new Map<string,string>();
-   for (const k in st.redirects) {
-     redirects.set(k, st.redirects[k]);
-   };
-   return {...st, links, redirects};
+  let links = new Map<string, Url>();
+  for (const k in st.links) {
+    links.set(k, st.links[k]);
+  };
+  let redirects = new Map<string, string>();
+  for (const k in st.redirects) {
+    redirects.set(k, st.redirects[k]);
+  };
+  return { ...st, links, redirects };
 }
 
 export function expandedUrl(state: AppState, curl_: string = state.activeUrl): string {
@@ -91,8 +94,8 @@ export function expandedUrl(state: AppState, curl_: string = state.activeUrl): s
 }
 
 export function isSynereoLink(url: Url): boolean {
-  let srch = process.env.NODE_ENV == "development" ? "localhost:8080" : "synereo";
-  return (url.host.toLowerCase().indexOf(srch) >= 0)
+  let srch = Utils.serverUrl
+  return (format(url).toLowerCase().startsWith(srch))
     && (url.path.startsWith("/link/"))
 }
 
@@ -105,7 +108,7 @@ export function setLoading(state: AppState, curl_: string): AppState {
   let curl = prepareUrl(curl_)
   let st = state;
   if (!isSeen(st, curl)) {
-    console.log("setLoading called: "+ curl_);
+    console.log("setLoading called: " + curl_);
     let links = new Map(st.links);
     links.set(curl, null);
     st = { ...st, links };

@@ -2,7 +2,7 @@
 
 
 export type authId = string;
-export type authProvider = "ip" | "facebook" | "github" | "twitter" | "linkedin" | "chrome";
+export type authProvider = "facebook" | "github" | "twitter" | "linkedin" | "chrome";
 export type binary = ArrayBuffer;
 export type contentCryptId = ArrayBuffer;
 export type contentType = "url" | "video" | "post" | "audio";
@@ -35,10 +35,9 @@ export interface User {
   readonly publicKey: publicKey | null,
   readonly userName: userName | null,
   readonly email: email | null,
-  readonly ipAddress: ipAddress | null,
   readonly created: created | null,
   readonly updated: updated | null,
-  readonly ampCredits: integer | null,
+  readonly credits: integer | null,
   readonly groups: userGroup[] | null
 };
 

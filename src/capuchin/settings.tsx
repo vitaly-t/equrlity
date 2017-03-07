@@ -18,7 +18,7 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
 
   constructor(props) {
     super(props);
-    this.state = { nickName: props.appState.moniker, email: '' };
+    this.state = { nickName: props.appState.moniker, email: props.appState.email };
   }
 
   ctrls: { nickNameInput?: HTMLInputElement, emailInput?: HTMLInputElement, depositInput?: HTMLInputElement } = {}
@@ -28,7 +28,8 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
   }
 
   changeEmail() {
-    this.setState({ email: this.ctrls.emailInput.value });
+    // email is not currently editable due to relying on chrome identity stuff
+    //this.setState({ email: this.ctrls.emailInput.value });
   }
 
   saveSettings = () => {
@@ -188,7 +189,7 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
         <div>
           <h4>Investments : </h4>
           {vsp}
-          <h6>Your Current Wallet Balance is : {st.ampCredits}.</h6>
+          <h6>Your Current Wallet Balance is : {st.credits}.</h6>
           {vsp}
           {invdiv}
         </div>

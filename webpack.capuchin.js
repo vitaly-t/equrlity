@@ -2,8 +2,9 @@ const webpack = require('webpack');
 const path = require('path');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
 const tgtdir = process.env.NODE_ENV === 'development' ? 'dist/capuchin_dev' : 'dist/capuchin_rel'
-const {capuchinVersion} = require('./dist/lib/utils');
-const {TextEncoder, TextDecoder} = require('text-encoding');
+const { capuchinVersion } = require('./dist/lib/utils');
+const { TextEncoder, TextDecoder } = require('text-encoding');
+let outPath = path.resolve(__dirname, tgtdir);
 
 module.exports = function (env) {
   return {
@@ -14,7 +15,7 @@ module.exports = function (env) {
       post: './src/capuchin/post.tsx',
     },
     output: {
-      path: path.resolve(__dirname, tgtdir),
+      path: outPath,
       filename: '[name]_bndl.js'
     },
     resolve: {
@@ -26,14 +27,6 @@ module.exports = function (env) {
           test: /\.tsx?$/,
           loader: 'ts-loader',
           exclude: /node_modules/
-        },
-        {
-          test: /\.css$/,
-          use: ['style-loader', 'css-loader']
-        },
-        {
-          test: /\.(ttf|eot|woff)$/,
-          loader: 'file-loader'        
         },
         {
           enforce: 'pre',
@@ -50,16 +43,25 @@ module.exports = function (env) {
         {
           from: 'src/capuchin/assets',
           transform: function (content, path) {
-            //console.log(content);
-            var str = (new TextDecoder('utf-8')).decode(content);
-            var rslt = str.replace("__CAPUCHIN_VERSION__", capuchinVersion());
-            return (new TextEncoder()).encode(rslt);
+            if (path.endsWith('manifest.json')) {
+              console.log("transforming: " + path);
+              var str = (new TextDecoder('utf-8')).decode(content);
+              var rslt = str.replace("__CAPUCHIN_VERSION__", capuchinVersion());
+              return (new TextEncoder()).encode(rslt);
+            }
+            return content;
           }
         },
         {
-          from: 'assets/*.css',
-        }
-      ]),
+          from: 'node_modules/@blueprintjs/core/dist/*.css',
+          to: outPath
+        },
+        {
+          context: path.resolve(__dirname, 'node_modules/@blueprintjs/core/resources'),
+          from: '**/*',
+          to: path.resolve(outPath, 'node_modules/@blueprintjs/core/resources/')
+        },
+      ], { copyUnmodified: true }),
       new webpack.DefinePlugin({
         'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development')
       }),

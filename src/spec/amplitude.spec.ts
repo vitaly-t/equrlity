@@ -15,7 +15,7 @@ it("should work", async () => {
   await pg.init();
   let u1 = await pg.createUser();
   expect(u1.userName).toEqual("anonymous_0", "not the first user");
-  expect(u1.ampCredits).toEqual(1000);
+  expect(u1.credits).toEqual(1000);
 
   let u2 = await pg.createUser();
   expect(u2.userName).toEqual("anonymous_1", "not the second user");
@@ -28,7 +28,7 @@ it("should work", async () => {
   let rsp1 = await pg.handleAddContent(u1.userId, { publicKey: "", content: "https://www.example.com/anydamnthing", signature: "", linkDescription: "wow awesome link", amount: 10 });
   let ok = rsp1 as Rpc.AddContentOk;
   expect(ok.link).toBeDefined("add content call failed");
-  expect(cache.users.get(u1.userId).ampCredits).toEqual(990);
+  expect(cache.users.get(u1.userId).credits).toEqual(990);
 
   let url = parse(ok.link);
   let linkId1 = cache.getLinkIdFromUrl(url);
@@ -37,7 +37,7 @@ it("should work", async () => {
 
   let rsp2 = await pg.handleAmplify(u2.userId, { publicKey: "", content: ok.link, signature: "", linkDescription: "amplify me baby", amount: 20 });
   expect(rsp2.link).toBeDefined("amplify call failed");
-  expect(cache.users.get(u2.userId).ampCredits).toEqual(980);
+  expect(cache.users.get(u2.userId).credits).toEqual(980);
   let url2 = parse(rsp2.link);
   expect(cache.isSynereo(url2)).toEqual(true);
   let linkId2 = cache.getLinkIdFromUrl(url2);
@@ -63,20 +63,20 @@ it("should work", async () => {
     expect(prom).toEqual(1, "promotions not working");
     let viewed = await pg.has_viewed(u2.userId, linkId);
     expect(viewed).toEqual(false);
-    let bal = cache.users.get(u2.userId).ampCredits;
+    let bal = cache.users.get(u2.userId).credits;
     let linkbal = cache.links.get(linkId).amount;
 
     // user2 views link
     await pg.payForView(u2.userId, linkId)
-    let newbal = cache.users.get(u2.userId).ampCredits;
+    let newbal = cache.users.get(u2.userId).credits;
     expect(newbal).toEqual(bal + 1, "payment for view not recorded");
     expect(cache.links.get(linkId).amount).toEqual(linkbal - 1, "link amount not adjusted for view");
 
-    expect(cache.userlinks.get(u1.userId).length).toEqual(1,"social graph not correct");
+    expect(cache.userlinks.get(u1.userId).length).toEqual(1, "social graph not correct");
     let rsp2 = await pg.handleAmplify(u3.userId, { publicKey: "", content: ok.link, signature: "", linkDescription: "yaal2", amount: 10 });
     let ok2 = rsp2 as Rpc.AddContentOk;
     expect(ok2.link).toBeDefined("amplify call failed");
-    expect(cache.userlinks.get(u1.userId).length).toEqual(2,"social graph not extended");
+    expect(cache.userlinks.get(u1.userId).length).toEqual(2, "social graph not extended");
     {
       let url = parse(ok2.link);
       let linkId2 = cache.getLinkIdFromUrl(url);
@@ -94,12 +94,12 @@ it("should work", async () => {
     let ok3 = rsp3 as Rpc.AddContentOk;
     expect(ok3.link).toBeDefined("amplify call failed");
     {
-      let bal = cache.users.get(u1.userId).ampCredits;
+      let bal = cache.users.get(u1.userId).credits;
       let link = cache.links.get(linkId);
       let linkbal = link.amount;
       await pg.redeem_link(link);
-      let newbal = cache.users.get(u1.userId).ampCredits;
-      expect(bal + linkbal).toEqual(newbal,"link balance not redeemed");
+      let newbal = cache.users.get(u1.userId).credits;
+      expect(bal + linkbal).toEqual(newbal, "link balance not redeemed");
       let rootLinkIds = await pg.getRootLinkIdsForContentId(contentId);
       expect(rootLinkIds.length).toEqual(2);
     }

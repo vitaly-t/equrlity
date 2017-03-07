@@ -1,66 +1,49 @@
+import * as dotenv from 'dotenv-safe';
+let env = dotenv.load();
+console.log("dotenv loaded");
 
-import { promisify } from '../lib/promisify';
+// internal node
 import * as fs from "fs"
-import * as pg from './pgsql';
-import * as Dbt from '../lib/datatypes'
-import * as Koa from "koa";
-import * as bodyParser from 'koa-bodyparser';
-import * as session from 'koa-session';
-import * as Router from 'koa-router';
-import * as OxiDate from '../lib/oxidate';
-import * as uuid from '../lib/uuid.js';
-import * as jwt from './jwt';
-//import passport from './auth';
-import {serve} from './koa-static';
-import * as send from 'koa-send';
-import clientIP from './clientIP.js';
 import { Url, parse } from 'url';
-import * as Rpc from '../lib/rpc';
-import { capuchinVersion, isDev } from '../lib/utils';
-import * as cors from 'kcors';
-import * as cache from './cache';
+
+// node_modules
+import * as React from 'react';
+import * as ReactDOMServer from 'react-dom/server'
 import * as Remarkable from 'remarkable';
-const md = new Remarkable({ html: true });
 import axios from 'axios';
 
-// server-side rendering a bust - boo-hoo!
-import * as React from 'react';
-//import * as ReactDOM from 'react-dom';
-import * as ReactDOMServer from 'react-dom/server'
+import * as Koa from "koa";
+import * as bodyParser from 'koa-bodyparser';
+import * as Router from 'koa-router';
+import * as send from 'koa-send';
+import * as cors from 'kcors';
+
+// lib
+import * as OxiDate from '../lib/oxidate';
+import * as uuid from '../lib/uuid.js';
+import { promisify } from '../lib/promisify';
+import * as Utils from '../lib/utils';
+import * as Dbt from '../lib/datatypes'
+import * as Rpc from '../lib/rpc';
 import { PostView } from '../lib/postview';
 import { LinkLandingPage, HomePage } from '../lib/landingPages';
-import {createAuth} from "./pgsql";
-import * as Utils from '../lib/utils';
+import { validateContentSignature } from '../lib/Crypto';
 
+
+// local
+import * as jwt from './jwt';
+import { serve } from './koa-static';
+import clientIP from './clientIP.js';
+import * as pg from './pgsql';
+import * as cache from './cache';
+
+const md = new Remarkable({ html: true });
 const jwt_secret = process.env.JWT_AMPLITUDE_KEY;
 
 pg.init();
-//pg.resetDataTables();
-//pg.recreateDataTables();
-
-function isMember(grp: string, ctx: Koa.Context): boolean {
-  let grps = ctx.user.groups;
-  return grps && grps.indexOf(grp + ',') >= 0;
-}
-
-let strToDate = function (cdt: string): Date {
-  return OxiDate.parse(cdt, 'yyyyMMdd');
-};
 
 function getUser(id: Dbt.userId): Dbt.User {
   return cache.users.get(id);
-}
-
-async function getUserByAuthId(publicKey: JsonWebKey, authId: string, email?: string, providerOpt?: string): Promise<Dbt.User> {
-  let provider = providerOpt || "chrome";
-  let auth: any[] = await pg.getUserIdByAuth(authId);
-  if(auth && auth.length > 0) {
-    return getUser(auth[0].userId);
-  } else {
-    let user: Dbt.User = await pg.createUser("", email);
-    await createAuth(authId, user.userId, provider);
-    return user;
-  }
 }
 
 function readFileAsync(src: string): Promise<string> {
@@ -71,40 +54,6 @@ function readFileAsync(src: string): Promise<string> {
     });
   });
 }
-
-/*
-let authent = async function (ctx, prov, authId) {
-  console.log("authent call with authId : " + authId);
-  if (!authId) {
-    ctx.status = 403
-  } else {
-    console.log("authenticating for provider: " + prov);
-    let user = pg.get_user_from_auth(prov, authId);
-    if (user) {
-      ctx.user = user;
-      ctx.userId = { id: user.userId };
-      if (prov !== 'ip') {
-        let ip = clientIP(ctx.req);
-        let auth = { ...pg.emptyAuth(), authProvider: 'ip', authId: ip, userId: ctx.userId.id };
-        await pg.upsert_auth(auth);
-      }
-      else pg.touch_auth(prov, authId)
-    } else {
-      if (!ctx.user) {
-        if (prov !== 'ip') console.log("authentication problem - no previous user"); // return;  // ???
-        await createUser(ctx);
-      }
-    }
-    if (prov === 'ip') delete ctx.userId.auth;
-    else ctx.userId.auth = prov + ':' + authId;
-
-    let tok = jwt.sign(ctx.userId, jwt_secret); //{expiresInMinutes: 60*24*14});
-    ctx['token'] = tok;
-
-    //await ctx.login(user);   // for when passport is enabled
-  }
-};
-*/
 
 const app = new Koa();
 app.keys = ['amplitude'];  //@@GS what does this do again?
@@ -123,7 +72,7 @@ app.use(
     origin: "*",
     allowMethods: 'GET,HEAD,PUT,POST,DELETE,PATCH',
     allowHeaders: ["X-Requested-With", "Content-Type", "Authorization", "x-syn-client-version"],
-    exposeHeaders: ["x-syn-moniker", "x-syn-credits", "x-syn-token", "x-syn-authprov", "x-syn-groups"],
+    exposeHeaders: ["x-syn-token", "x-syn-moniker", "x-syn-email", "x-syn-credits", "x-syn-groups"],
   })
 );
 
@@ -178,36 +127,38 @@ publicRouter.get('/', async (ctx, next) => {
 
 publicRouter.post('/auth', async (ctx) => {
   let userInfo = ctx.request.body.userInfo;
-  let pub = ctx.request.body.publicKey;
+  let publicKey = ctx.request.body.publicKey;
   let authValue = ctx.headers.authorization;
   let token;
   try {
     token = authValue.split(" ")[1];
-  } catch(e) {
+  } catch (e) {
     token = "";
   }
-  if(!userInfo || !pub || !authValue || !token) {
+  if (!userInfo || !publicKey || !authValue || !token) {
     ctx.status = 400;
     return;
   }
 
-  console.log("We got such auth data: ");
-  console.log("Key: " + JSON.stringify(pub));
-  console.log("User: " + JSON.stringify(userInfo));
-  console.log("Token: " + token);
+  //console.log("We got such auth data: ");
+  //console.log("Key: " + JSON.stringify(publicKey));
+  //console.log("User: " + JSON.stringify(userInfo));
+  //console.log("Token: " + token);
 
-  let authRsp = await axios.create({responseType: "json"}).get(Utils.chromeAuthUrl + token);
-  if(authRsp.status === 200 && authRsp.data.user_id === userInfo.id) {
-    console.log("Correct auth token.");
-    let user = await getUserByAuthId(pub, userInfo.id, userInfo.email);
-    let token = jwt.sign(user.userId, jwt_secret);
-    ctx.body = {jwt: token};
-    return;
-  } else {
-    console.log("Authentication failed!");
-    ctx.status = 401;
-    return;
+  let authId = userInfo.id;
+  let email = userInfo.email;
+  let authRsp = await axios.create({ responseType: "json" }).get(Utils.chromeAuthUrl + token);
+  if (authRsp.status === 200 && authRsp.data.user_id === authId) {
+    let user = await pg.getUserByAuthId(authId, "chrome");  //@@GS - pretty sure this should just be "google" - no need for "chrome"
+    if (!user) {
+      user = await pg.createUser(email);
+      await pg.createAuth(authId, user.userId, "chrome");
+    }
+    let id = user.userId;
+    let token = jwt.sign({ id, publicKey, email }, jwt_secret);
+    ctx.body = { jwt: token };
   }
+  else ctx.throw(401, "Authentication failed!");
 });
 
 app.use(publicRouter.routes());
@@ -241,7 +192,7 @@ app.use(async (ctx, next) => {
     ctx.body = { error: { message: 'Unknown Client' } };
     return;
   }
-  if (client === 'capuchin' && version !== capuchinVersion()) {
+  if (client === 'capuchin' && version !== Utils.capuchinVersion()) {
     ctx.status = 400;
     ctx.body = { error: { message: 'Client is out-of-date and requires upgrade' } };
     return;
@@ -252,15 +203,22 @@ app.use(async (ctx, next) => {
 app.use(jwt.jwt({ secret: jwt_secret, ignoreExpiration: true, key: 'userId' }));
 
 app.use(async function (ctx, next) {
+  let _userId = { ...ctx['userId'] };
   await next();
 
-  let user: Dbt.User = getUser(ctx['userId']);
-  if (user) {
-    //console.log("Setting credits to : " + user.ampCredits.toString());
-    ctx.set('x-syn-credits', user.ampCredits.toString());
-    ctx.set('x-syn-moniker', user.userName);
-    await pg.touch_user(user.userId, clientIP(ctx));
+  let userId = ctx['userId'];
+  let user: Dbt.User = getUser(userId.id);
+  if (!user) throw new Error("system corruption detected");
+  let { publicKey, email, id } = userId;
+  if (!_userId || _userId.publicKey !== publicKey || _userId.email !== email || _userId.id !== id) {
+    let token = jwt.sign(userId, jwt_secret); //{expiresInMinutes: 60*24*14});
+    console.log("sending token");
+    ctx.set('x-syn-token', token);
   }
+  ctx.set('x-syn-credits', user.credits.toString());
+  ctx.set('x-syn-moniker', user.userName);
+  ctx.set('x-syn-email', email);
+  await pg.touch_user(user.userId);
 });
 
 app.use(async function (ctx, next) {
@@ -268,9 +226,9 @@ app.use(async function (ctx, next) {
   if (!userId) {
     console.log("jwt returned no key");
     let ipAddress = clientIP(ctx);
-    let user = await pg.createUser(ipAddress);
+    let user = await pg.createUser();
     ctx['userId'] = { id: user.userId };
-    ctx.user = user;
+    ctx['user'] = user;
     let inv = await pg.retrieveRecord<Dbt.Invitation>("invitations", { ipAddress });
     if (inv) {
       await pg.deleteRecord("invitations", inv);
@@ -282,67 +240,22 @@ app.use(async function (ctx, next) {
     }
   }
   else {
-    let user = getUser(userId);
+    let user = getUser(userId.id);
     if (!user) {
-      ctx.status = 403;
+      ctx.status = 400;
       ctx.body = { error: { message: 'Invalid token supplied (out of date?)' } };
       return;
     }
-    ctx.user = user;
+    ctx['user'] = user;
   }
   ctx['token'] = jwt.sign(ctx['userId'], jwt_secret); //{expiresInMinutes: 60*24*14});
   await next();
 });
 
 
-/*
-app.use(async function (ctx, next) {
-//  Julia! - authentication / passport stuff should go here.  The identification stuff has been handled above
-// and the context now contains both userId and user
-
-await next()
-if (cxt.auth) {
-  let auth = cxt.auth;
-  let prov = auth.slice(0, auth.indexOf(':'));
-  let grps = ctx.user.groups || '';
-  ctx.set('x-syn-authprov', prov);
-  ctx.set('x-syn-groups', grps);
-}
-*/
-
-app.use(async function(ctx, next) {
-  let signature = ctx.request.body.params.signature;
-  let method = ctx.request.body.method;
-  let key = ctx.request.body.params.publicKey;
-  console.log(key);
-  if(signature && key ) {
-    console.log("Signature found for the method '" + method + "': " + signature);
-    try{
-      let verifier = require('../lib/verifier');
-      let verified = verifier.ecdsaVerify(key, signature, ctx.request.body.params.content);
-      if(!verified) {
-        ctx.status = 403;
-        return;
-      }
-    } catch(e) {
-      console.log("Verification error: " + e.toString());
-      ctx.status = 403;
-      return;
-    }
-  } else console.log("No signature found for the method '" + method + "'");
-
-  await next();
-});
-
 const router = new Router();
 router.post('/rpc', async function (ctx: any) {
-  let {jsonrpc, method, params, id} = ctx.request.body;  // from bodyparser 
-  if (!ctx.header.authorization) {
-    // console.log("sending token");
-    // ctx.set('x-syn-token', ctx['token']);
-    ctx.status = 403;
-    return;
-  }
+  let { jsonrpc, method, params, id } = ctx.request.body;  // from bodyparser 
 
   if (jsonrpc != "2.0") {
     let error: Rpc.Error = { id, error: { code: -32600, message: "Invalid version" } };
@@ -350,15 +263,20 @@ router.post('/rpc', async function (ctx: any) {
     return;
   }
 
+  let checkPK = (publicKey: JsonWebKey) => {
+    let pk = ctx.userId.publicKey;
+    if (!pk) throw new Error("missing public key from token");
+    if (JSON.stringify(publicKey) !== JSON.stringify(pk)) throw new Error("Invalid publicKey submitted");
+  }
+
+  let userId = ctx.userId.id;
   try {
     switch (method as Rpc.Method) {
       case "initialize": {
         let req: Rpc.InitializeRequest = params;
-        let {publicKey} = req;
-        let usr = getUser(ctx.userId);
+        checkPK(req.publicKey)
+        let usr = getUser(userId);
         if (!usr) throw new Error("Internal error getting user details");
-        usr = { ...usr, publicKey };
-        await pg.upsert_user(usr);
         let redirectUrl = ctx['redirectUrl'];
         let result: Rpc.InitializeResponse = { ok: true, redirectUrl };
         ctx.body = { id, result };
@@ -366,15 +284,17 @@ router.post('/rpc', async function (ctx: any) {
       }
       case "addContent": {
         let req: Rpc.AddContentRequest = params;
-        let url = parse(req.content);
+        let { publicKey, content, signature } = req;
+        let url = parse(content);
+        checkPK(publicKey)
+        if (!validateContentSignature(publicKey, content, signature)) throw new Error("request failed verification");
         let result: Rpc.SendAddContentResponse = null;
-        let {publicKey: any} = params;
-        let usr = getUser(ctx.userId);
+        let usr = getUser(userId);
         if (cache.isSynereo(url)) {
-          result = await pg.handleAmplify(ctx.userId, params)
+          result = await pg.handleAmplify(userId, params)
         }
         else {
-          result = await pg.handleAddContent(ctx.userId, params)
+          result = await pg.handleAddContent(userId, params)
         }
         ctx.body = { id, result };
         break;
@@ -403,9 +323,9 @@ router.post('/rpc', async function (ctx: any) {
           if (!linkId) throw new Error("invalid link");
           let ip = clientIP(ctx);
           cache.cancelPossibleInvitation(ip);
-          if (!(await pg.has_viewed(ctx.userId, linkId))) {
+          if (!(await pg.has_viewed(userId, linkId))) {
             console.log("attention gots to get paid for!!!");
-            await pg.payForView(ctx.userId, linkId)
+            await pg.payForView(userId, linkId)
           }
           contentUrl = cache.getContentFromLinkId(linkId);
           let link = cache.links.get(linkId);
@@ -421,8 +341,8 @@ router.post('/rpc', async function (ctx: any) {
       }
       case "changeSettings": {
         let req: Rpc.ChangeSettingsRequest = params;
-        let {moniker, email} = req;
-        let usr = getUser(ctx.userId);
+        let { moniker } = req;
+        let usr = getUser(userId);
         if (!usr) throw new Error("Internal error getting user details");
         if (moniker && moniker !== usr.userName) {
           if (await pg.checkMonikerUsed(moniker)) {
@@ -431,7 +351,6 @@ router.post('/rpc', async function (ctx: any) {
           }
           usr = { ...usr, userName: moniker };
         }
-        if (email) usr = { ...usr, email };
         await pg.upsert_user(usr);
         let result: Rpc.ChangeSettingsResponse = { ok: true };
         ctx.body = { id, result };
@@ -439,12 +358,11 @@ router.post('/rpc', async function (ctx: any) {
       }
       case "getUserLinks": {
         //let req: Rpc.GetUserLinksRequest = params;
-        let uid = ctx.userId;
-        let links = await pg.GetUserLinks(uid);
-        let promotions = await pg.deliver_new_promotions(uid);
-        let connectedUsers = cache.getConnectedUserNames(uid);
-        let reachableUserCount = cache.getReachableUserIds(uid).length;
-        let posts = await pg.GetUserPosts(uid);
+        let links = await pg.GetUserLinks(userId);
+        let promotions = await pg.deliver_new_promotions(userId);
+        let connectedUsers = cache.getConnectedUserNames(userId);
+        let reachableUserCount = cache.getReachableUserIds(userId).length;
+        let posts = await pg.GetUserPosts(userId);
         let result: Rpc.GetUserLinksResponse = { links, promotions, connectedUsers, reachableUserCount, posts };
         ctx.body = { id, result };
         break;
@@ -453,7 +371,7 @@ router.post('/rpc', async function (ctx: any) {
         let req: Rpc.RedeemLinkRequest = params;
         let link = cache.links.get(req.linkId);
         await pg.redeem_link(link);
-        let links = await pg.GetUserLinks(ctx.userId);
+        let links = await pg.GetUserLinks(userId);
         let result: Rpc.RedeemLinkResponse = { links };
         ctx.body = { id, result };
         break;
@@ -467,8 +385,8 @@ router.post('/rpc', async function (ctx: any) {
       }
       case "savePost": {
         let req: Rpc.SavePostRequest = params;
-        await pg.SavePost(ctx.userId, req);
-        let posts = await pg.GetUserPosts(ctx.userId);
+        await pg.SavePost(userId, req);
+        let posts = await pg.GetUserPosts(userId);
         let result: Rpc.SavePostResponse = { posts };
         ctx.body = { id, result };
         break;

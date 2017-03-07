@@ -6,11 +6,11 @@ export default {
     "authProvider": {
       "sqlType": "varchar(36)",
       "enum": [
-        "ip",
         "facebook",
         "github",
         "twitter",
         "linkedin",
+        "chrome",
       ]
     },
     "binary": {
@@ -133,8 +133,8 @@ export default {
     "Promotion": ["linkId", "userId", "created", "updated",
       { "name": "delivered", "type": "timestamp" }
     ],
-    "User": ["userId", "publicKey", "userName", "email", "ipAddress", "created", "updated",
-      { "name": "ampCredits", "type": "integer" },
+    "User": ["userId", "publicKey", "userName", "email", "created", "updated",
+      { "name": "credits", "type": "integer" },
       { "name": "groups", "type": "userGroup", "multiValued": true }
     ],
     "UserLink": [

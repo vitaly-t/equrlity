@@ -1,4 +1,4 @@
 $source = "./dist/capuchin_dev/*"
 $destination = "/devtmp/capuchin_dev"
 
-Copy-Item $source $destination
+Copy-Item $source $destination -Recurse -Force
