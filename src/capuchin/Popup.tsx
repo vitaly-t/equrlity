@@ -60,7 +60,7 @@ export class PopupPanel extends React.Component<PopupPanelProps, PopupPanelState
         {infoDiv}
         <p>Investment amount: <input type="number" ref={(e) => this.ctrls.amountInput = e} max={st.credits}
           value={this.state.amplifyAmount} onChange={(e) => this.changeAmplifyAmount()} /></p>
-        <p>This will provide for a maximum of {Math.floor(this.state.amplifyAmount / costPerView)} promotions.</p>
+        <p>This will provide for a maximum of {Math.floor(this.state.amplifyAmount / costPerView)} promotions.</p>  
         <p>Description: <input type="string" style={{ width: 400 }} ref={(e) => this.ctrls.descriptionInput = e}
           value={desc} onChange={(e) => this.changeDescription()} /></p>
         <button onClick={saveaction} >{lbl}</button>
@@ -70,7 +70,7 @@ export class PopupPanel extends React.Component<PopupPanelProps, PopupPanelState
     return <div>
       <p>Using Server Url: {serverUrl} </p>
       <p>Your Synereo Nickname is: {st.moniker}</p>
-      <p>Your current Amp Balance is: {st.credits}</p>
+      <p>Your current Account Balance is: {st.credits}</p>
       <p><button onClick={settingsAction}>View/Edit Settings</button></p>
       {pnl}
       {versionDiv}

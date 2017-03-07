@@ -1,7 +1,7 @@
 import * as React from 'react';
 import * as ReactDOM from "react-dom";
-import * as Blueprint from "@blueprintjs/core";
-//import '@blueprintjs/core/dist/blueprint.css';
+import { Button } from "@blueprintjs/core";
+import { YesNoBox } from './dialogs';
 import * as OxiDate from '../lib/oxidate';
 
 import { AppState, postDeserialize } from "./AppState";
@@ -10,27 +10,28 @@ import { sendGetUserLinks } from './Comms';
 import { Url, format } from 'url';
 import * as Rpc from '../lib/rpc'
 import * as Utils from '../lib/utils';
+import * as Constants from '../lib/constants';
 
 interface SettingsPageProps { appState?: AppState };
-interface SettingsPageState { nickName: string, email: string };
+interface SettingsPageState { nickName: string, email: string, confirmDeletePost?: Rpc.PostInfoItem, transferAmount: number, transferTo: string };
 
 export class SettingsPage extends React.Component<SettingsPageProps, SettingsPageState> {
 
   constructor(props) {
     super(props);
-    this.state = { nickName: props.appState.moniker, email: props.appState.email };
+    console.log("email received: " + props.appState.email);
+    this.state = { nickName: props.appState.moniker, email: props.appState.email, transferAmount: 0, transferTo: '' };
   }
 
-  ctrls: { nickNameInput?: HTMLInputElement, emailInput?: HTMLInputElement, depositInput?: HTMLInputElement } = {}
+  ctrls: {
+    nickNameInput?: HTMLInputElement, emailInput?: HTMLInputElement, depositInput?: HTMLInputElement,
+    transferAmount?: HTMLInputElement, transferTo?: HTMLInputElement
+  } = {}
 
-  changeNickName() {
-    this.setState({ nickName: this.ctrls.nickNameInput.value });
-  }
-
-  changeEmail() {
-    // email is not currently editable due to relying on chrome identity stuff
-    //this.setState({ email: this.ctrls.emailInput.value });
-  }
+  changeNickName() { this.setState({ nickName: this.ctrls.nickNameInput.value }); }
+  changeEmail() { this.setState({ email: this.ctrls.emailInput.value }); }
+  changeTransferAmount() { this.setState({ transferAmount: parseInt(this.ctrls.transferAmount.value) }); }
+  changeTransferTo() { this.setState({ transferTo: this.ctrls.transferTo.value }); }
 
   saveSettings = () => {
     console.log("saving settings");
@@ -52,7 +53,7 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
 
         return (
           <tr key={l.linkId} >
-            <td><button onClick={redeem}>Redeem</button></td>
+            <td><Button onClick={redeem}>Redeem</Button></td>
             <td><a href="" onClick={onclick} >{url}</a></td>
             <td>{l.linkDepth}</td>
             <td>{l.promotionsCount}</td>
@@ -83,7 +84,14 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
     }
 
     let postsdiv = <p>You do not currently have any uploaded posts.</p>
-    if (st.posts.length > 0) {
+    if (this.state.confirmDeletePost) {
+      let msg = "Warning: Deleting a Post is irreversible. Are you sure you wish to Proceed?";
+      let onClose = () => this.setState({ confirmDeletePost: null });
+      let postId = this.state.confirmDeletePost.postId;
+      let onYes = () => chrome.runtime.sendMessage({ eventType: "RemovePost", postId, async: true });
+      postsdiv = <YesNoBox message={msg} onYes={onYes} onClose={onClose} />
+    }
+    else if (st.posts.length > 0) {
       let postrows = st.posts.map(p => {
         let onclick = () => { chrome.tabs.create({ active: true, url: p.contentUrl }); };
         let created = p.created ? OxiDate.toFormat(new Date(p.created), "DDDD, MMMM D @ HH:MIP") : '';
@@ -91,9 +99,11 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
         let published = p.published ? OxiDate.toFormat(new Date(p.updated), "DDDD, MMMM D @ HH:MIP") : '';
 
         let edit = () => { chrome.runtime.sendMessage({ eventType: "LaunchPostEditPage", post: p }); };
+        let remove = () => { this.setState({ confirmDeletePost: p }) };
         return (
           <tr key={p.postId} >
-            <td><button onClick={edit}>Edit</button></td>
+            <td><Button onClick={edit} text="Edit" /></td>
+            <td><Button onClick={remove} text="Delete" /></td>
             <td><a href="" onClick={onclick} >{p.contentUrl}</a></td>
             <td>{p.title}</td>
             <td>{created}</td>
@@ -107,6 +117,7 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
         <table className="pt-table pt-striped pt-bordered" >
           <thead>
             <tr>
+              <th></th>
               <th></th>
               <th>Content</th>
               <th>Title</th>
@@ -134,7 +145,7 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
         if (desc) desc = desc.replace('_', ' ');
         return (
           <tr key={url} >
-            <td><button onClick={dismiss}>Dismiss</button></td>
+            <td><Button onClick={dismiss} text="Dismiss" /></td>
             <td><a href="" onClick={onclick} >{tgt}</a></td>
             <td>{desc}</td>
           </tr>
@@ -159,19 +170,76 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
     let vsp = <div style={{ height: 20 }} />;
     let divStyle = { width: '100%', marginTop: 5, marginLeft: 5, padding: 6 };
     let lhcolStyle = { width: '20%' };
+    let transfer = () => {
+      let amount = this.state.transferAmount;
+      let transferTo = this.state.transferTo;
+      let req: Rpc.TransferCreditsRequest = { transferTo, amount };
+      if (amount > 0 && transferTo) {
+        chrome.runtime.sendMessage({ eventType: "TransferCredits", req, async: true });
+        this.setState({ transferAmount: 0 });
+      }
+    };
     let userp = userNames.length > 0 ? <div><p>You are currently directly connected with another {userNames.length} Synereo user{userNames.length > 1 ? "s" : ""}.</p>
       <p>Your social graph currently extends to {st.reachableUserCount} reachable users.</p>
     </div>
       : <p>You are not currently connected with any other Synereo users. Hence, no promotions can be issued on your behalf.</p>;
+
+    let authdiv = <p>You are currently authenticated via {st.authprov}</p>;
+    if (!st.authprov) {
+      let authClick = (provider) => {
+        let req: Rpc.AuthenticateRequest = { provider };
+        chrome.runtime.sendMessage({ eventType: "Authenticate", req, async: true });
+      }
+      let root = Utils.serverUrl + "/auth";
+      authdiv = (
+        <div>
+          <p>You are not currently authenticated.</p>
+          <p>You can authenticate via:</p>
+          <ul>
+            <li><a href="" onClick={() => authClick('facebook')} >Facebook</a></li>
+            <li><a href="" onClick={() => authClick('twitter')} >Twitter</a></li>
+            <li><a href="" onClick={() => authClick('github')} >GitHub</a></li>
+            <li><a href="" onClick={() => authClick('google')} >Google</a></li>
+          </ul>
+        </div>
+      )
+    };
+
+    let transferDiv = (
+      <div>
+        {vsp}
+        <p>If you wish, you can transfer credits to another Amplitude user.</p>
+        <div style={divStyle} >
+          <div style={{ display: 'inline' }}>Amount to Transfer: </div>
+          <input type="number" style={{ display: 'inline', height: 24, marginLeft: 20, marginTop: 6, width: '100' }} ref={(e) => this.ctrls.transferAmount = e}
+            value={this.state.transferAmount} onChange={e => this.changeTransferAmount()} />
+          <div style={{ display: 'inline', marginLeft: 20 }}>Transfer To: </div>
+          <input type="text" style={{ display: 'inline', height: 24, marginLeft: 20, marginTop: 6, width: '200' }} ref={(e) => this.ctrls.transferTo = e}
+            value={this.state.transferTo} onChange={e => this.changeTransferTo()} />
+          <Button key='transfer' className="pt-intent-primary" style={{ display: 'inline', marginLeft: 20 }} onClick={() => transfer()} text="Transfer" />
+        </div>
+      </div>);
 
     return (
       <div>
         <h3>Synereo Amplitude Status and Settings.</h3>
         <div style={divStyle}>
           {userp}
+          {authdiv}
         </div>
         {vsp}
         <h5>Your Settings:</h5>
+        <div style={divStyle}>
+          <p>To ensure your privacy, we do not store any information whatsoever about your account on our servers, other than an internally generated identifier
+            and your  nickname.
+            We use web standard JWTs (Javascript Web Token - see <a href="https://jwt.io" target="_blank">https://jwt.io)</a>) to store any and all other identifying information inside your web browser's local storage, and ensure that
+            it never appears on disk on our servers. This means that
+            it is simply impossible for anybody hacking our servers to gain access to any information about you personally.  Nor can we ever be coerced by
+            any legal authority whatsoever to provide information which we simply do not have access to.
+          </p>
+          <p>We do not use passwords at all.  In the future we intend to provide standard "Social Login" functionality (Keybase, Facebook, GitHub, Twitter, Google, LinkedIn etc)
+            to allow for independant establishment of your identity, and the sharing of accounts across multiple devices based on that established identity.</p>
+        </div>
         <div style={divStyle}>
           <div style={lhcolStyle} >Nickname: </div>
           <input type="text" style={{ width: '60%' }} name="NickName" id="nickId" ref={(e) => this.ctrls.nickNameInput = e}
@@ -183,13 +251,14 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
             value={this.state.email} onChange={(e) => this.changeEmail()} />
         </div>
         <div style={divStyle}>
-          <button type="button" className="pt-intent-primary" onClick={this.saveSettings} >Save Settings</button>
+          <Button className="pt-intent-primary" onClick={this.saveSettings} text="Save Settings" />
         </div>
         {vsp}
         <div>
           <h4>Investments : </h4>
           {vsp}
           <h6>Your Current Wallet Balance is : {st.credits}.</h6>
+          {transferDiv}
           {vsp}
           {invdiv}
         </div>
@@ -206,7 +275,7 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
           {postsdiv}
           {vsp}
           <div style={divStyle}>
-            <button type="button" className="pt-intent-primary" onClick={() => chrome.runtime.sendMessage({ eventType: "CreatePost" })} >Create New Post</button>
+            <Button className="pt-intent-primary" onClick={() => chrome.runtime.sendMessage({ eventType: "CreatePost" })} text="Create New Post" />
           </div>
         </div>
         {vsp}
@@ -216,7 +285,7 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
           {vidsdiv}
           {vsp}
           <div style={divStyle}>
-            <button type="button" className="pt-intent-primary" onClick={() => chrome.runtime.sendMessage({ eventType: "UploadVideo" })} >Upload New Video</button>
+            <Button type="Button" className="pt-intent-primary" onClick={() => chrome.runtime.sendMessage({ eventType: "UploadVideo" })} text="Upload New Video" />
           </div>
         </div>
         {vsp}
@@ -226,7 +295,7 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
           {audsdiv}
           {vsp}
           <div style={divStyle}>
-            <button type="button" className="pt-intent-primary" onClick={() => chrome.runtime.sendMessage({ eventType: "UploadAudio" })} >Upload New Audio</button>
+            <Button type="Button" className="pt-intent-primary" onClick={() => chrome.runtime.sendMessage({ eventType: "UploadAudio" })} text="Upload New Audio" />
           </div>
         </div>
       </div>);

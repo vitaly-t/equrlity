@@ -5,7 +5,7 @@
   "main": "index.ts",
   "scripts": {
     "start": "node dist/server/server.js",
-    "build": "npm run mklib && npm run mksrv && npm run mkapp && npm run mkrelease",
+    "build": "npm run clean && npm run mklib && npm run mksrv && npm run mkapp && npm run mkrelease",
     "clean": "rimraf dist",
     "gen": "npm run mklib && node src/scripts/gentypes.js",
     "mk": "npm run mklib && npm run mksrv && npm run mkapp",
@@ -53,14 +53,9 @@
     "kcors": "^2.2.1",
     "koa": "^2.0.0",
     "koa-bodyparser": "^3.1.0",
-    "koa-convert": "^1.2.0",
-    "koa-passport": "^3.0.0-rc.2",
     "koa-router": "^7.0.1",
     "koa-send": "^3.3.0",
-    "koa-session": "^3.1.0",
-    "koa-static2": "^0.1.8",
     "koa-websocket": "^3.0.1",
-    "koa2-static-files": "^1.0.4",
     "localforage": "1.4.3",
     "passport-facebook": "^2.1.1",
     "passport-github": "^1.1.0",
@@ -93,7 +88,7 @@
     "style-loader": "^0.13.1",
     "text-encoding": "^0.6.4",
     "ts-loader": "^1.3.3",
-    "typescript": "^2.1.4",
+    "typescript": "^2.2.1",
     "webpack": "^2.2.0"
   },
   "engines": {

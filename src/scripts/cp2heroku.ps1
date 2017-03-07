@@ -2,6 +2,7 @@ $tgtdir = '../amplitude_heroku'
 
 $env:NODE_ENV = "production"
 npm run mkapp
+$env:NODE_ENV = "development"
 
 $ScriptPath = Split-Path $MyInvocation.InvocationName
 & "$ScriptPath\zipapp.ps1"
@@ -14,4 +15,5 @@ Copy-Item dist/lib -Destination $tgtdir/dist -Recurse -Force -Exclude *.map
 Copy-Item assets/synereo-plugin.zip -Destination $tgtdir/assets 
 Copy-Item assets/synereo-plugin.tar.gz -Destination $tgtdir/assets 
 Copy-Item assets/index.htmpl -Destination $tgtdir/assets 
+Copy-Item .env.rel.example -Destination $tgtdir/.env.example 
 

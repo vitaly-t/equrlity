@@ -40,7 +40,9 @@
  * 
  *   - x-syn-moniker: the user's current moniker. 
  * 
- *   - x-syn-credits: the balance in the users account. (presumably Amps?)
+ *   - x-syn-email: the user's current email address. 
+ * 
+ *   - x-syn-credits: the balance in the users account. 
  * 
  *   - x-syn-token: the jwt token identifying the current user.
  * 
@@ -60,7 +62,7 @@ import * as Dbt from './datatypes';
 
 //TODO: rename "getUserLinks" to "loadSettingsPage"
 export type Method = "addContent" | "initialize" | "changeMoniker" | "loadLink" | "getRedirect" | "changeSettings"
-  | "getUserLinks" | "redeemLink" | "getPostBody" | "savePost" ;
+  | "getUserLinks" | "redeemLink" | "getPostBody" | "savePost" | "removePost" | "removeContent" | "transferCredits" | "authenticate" ;
 
 /**
  * Informational type tags used to indicate intended usage.
@@ -305,23 +307,94 @@ export type RedeemLinkRequest = { linkId: Dbt.linkId; }
 */
 export type RedeemLinkResponse = { links: UserLinkItem[]; }
 
+
+/**
+ * removeContent method.
+ * 
+ * used to remove a content item from the system. Implicitly redeems all links associated with the content.
+ * will only work if the current user is the owner of the content.
+ * 
+ * note that Capuchin does not currently expose this method in the UI.  It is performed implicitly via removePost, removeVideo etc..
+ *
+ * content: the url of the content to be removed 
+ */
+export type RemoveContentRequest = { content: Dbt.urlString; }
+
+/**
+* ok: true if successful, false indicates that content is not owned by the current user.
+*/
+export type RemoveContentResponse = { ok: boolean; }
+
+/**
+ * removePost method.
+ * 
+ * used to remove a content item from the system. Implicitly redeems all links associated with the content.
+ * will only work if the current user is the owner of the content.
+ *
+ * content: the url of the content to be removed 
+ */
+export type RemovePostRequest = { postId: Dbt.postId; }
+
+/**
+* links: the array of link information items owned by the user, after the link has been redeemed.
+* 
+* ok: true if successful, false indicates that content is not owned by the current user.
+*/
+export type RemovePostResponse = { ok: boolean; }
+
+/**
+ * transferCredits method.
+ * 
+ * allows a user to transfer credits to another user.
+ *
+ * transferTo: the moniker of the user to transfer to.
+ * amount: the number of credits to transfer. 
+ */
+export type TransferCreditsRequest = { transferTo: Dbt.userName; amount: Dbt.integer }
+
+/**
+* links: the array of link information items owned by the user, after the link has been redeemed.
+* 
+* ok: true if successful, false indicates that content is not owned by the current user.
+*/
+export type TransferCreditsResponse = { ok: boolean; }
+
+/**
+ * authenticate method.
+ * 
+ * authenticate via a social login provider.
+ *
+ * provider: the provider to authenticate with.
+ */
+export type AuthenticateRequest = { provider: string }
+
+/**
+* links: the array of link information items owned by the user, after the link has been redeemed.
+* 
+* ok: true if successful, false indicates that content is not owned by the current user.
+*/
+export type AuthenticateResponse = { ok: boolean; }
+
+
+// aggregate the above types
+
 export type RequestBody = AddContentRequest | InitializeRequest | LoadLinkRequest | GetRedirectRequest | ChangeSettingsRequest
-  | GetUserLinksRequest | RedeemLinkRequest | GetPostBodyRequest;
+  | GetUserLinksRequest | RedeemLinkRequest | GetPostBodyRequest | RemoveContentRequest | TransferCreditsRequest | AuthenticateRequest;
 
 export type ResponseBody = AddContentResponse & SendAddContentResponse & InitializeResponse & LoadLinkResponse & GetRedirectResponse & ChangeSettingsResponse
-  & GetUserLinksResponse & RedeemLinkResponse & GetPostBodyResponse;
+  & GetUserLinksResponse & RedeemLinkResponse & GetPostBodyResponse & RemoveContentResponse & TransferCreditsResponse & AuthenticateResponse;
+
+// internal to server.
+export type RecvRequestBody = AddContentRequest & InitializeRequest & LoadLinkRequest & GetRedirectRequest & ChangeSettingsRequest
+  & GetUserLinksRequest & RedeemLinkRequest & GetPostBodyRequest & RemoveContentRequest & TransferCreditsRequest & AuthenticateRequest;
+
+export type SendResponseBody = AddContentResponse | SendAddContentResponse | InitializeResponse | LoadLinkResponse | GetRedirectResponse | ChangeSettingsResponse
+  | GetUserLinksResponse | RedeemLinkResponse | GetPostBodyResponse | RemoveContentResponse | TransferCreditsResponse | AuthenticateResponse;
 
 /**
  * the follow is basically a thought bubble about how this api might be further improved.
  * feel free to ignore it.
  */
-
-// internal to server.
-export type RecvRequestBody = AddContentRequest & InitializeRequest & LoadLinkRequest & GetRedirectRequest & ChangeSettingsRequest
-  & GetUserLinksRequest & RedeemLinkRequest & GetPostBodyRequest;
-
-export type SendResponseBody = AddContentResponse | SendAddContentResponse | InitializeResponse | LoadLinkResponse | GetRedirectResponse | ChangeSettingsResponse
-  | GetUserLinksResponse | RedeemLinkResponse | GetPostBodyResponse;
 
 /*
 export type RpcMethod<Request,Response> = {
@@ -331,8 +404,6 @@ export type RpcMethod<Request,Response> = {
   clientReceiveResponse: (rsp: Response) => void;
 }
 */
-
-
 
 /**
  * the json-rpc 2.0 interface as per the spec.
@@ -346,7 +417,7 @@ export type Request = {
 
 export type Error = {
   id: number;
-  error: { code: number, message: string };
+  error: { code?: number, message: string };
 }
 
 export type Result = {
