@@ -25,8 +25,19 @@ async function getCookie() {
 }
 */
 
+export async function sendAuthRequest(data: Object, authHeader: string): Promise<AxiosResponse> {
+  let headers = { 'content-type': 'application/json', 'Accept': 'application/json'};
+  headers['Authorization'] = authHeader;
+  headers['x-syn-client-version'] = 'capuchin-' + Utils.capuchinVersion();
+  let req =  await axios.create({
+    headers,
+    responseType: 'json'
+  });
+  return await req.post(Utils.authUrl, data);
+}
+
 async function apiRequest(st: AppState) {
-  let headers = { 'content-type': 'application/json', 'Accept': 'application/json'}
+  let headers = { 'content-type': 'application/json', 'Accept': 'application/json'};
   if (st.jwt) headers['Authorization'] = 'Bearer '+st.jwt;
   headers['x-syn-client-version'] = 'capuchin-' +Utils.capuchinVersion();
   //if (Utils.isDev()) headers['x-syn-moniker'] = st.moniker;

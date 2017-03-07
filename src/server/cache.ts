@@ -179,7 +179,7 @@ export function registerPossibleInvitation(ip: string, linkId: Dbt.linkId) {
 
 export function cancelPossibleInvitation(ip: string) {
   console.log("cancelling possible inv :"+ip)
-  invitations.set(ip);
+  invitations.set(ip, 0);
 }
 
 export function isPossibleInvitation(ip, linkId) {

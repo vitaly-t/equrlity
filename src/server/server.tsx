@@ -21,6 +21,7 @@ import * as cors from 'kcors';
 import * as cache from './cache';
 import * as Remarkable from 'remarkable';
 const md = new Remarkable({ html: true });
+import axios from 'axios';
 
 // server-side rendering a bust - boo-hoo!
 import * as React from 'react';
@@ -28,6 +29,8 @@ import * as React from 'react';
 import * as ReactDOMServer from 'react-dom/server'
 import { PostView } from '../lib/postview';
 import { LinkLandingPage, HomePage } from '../lib/landingPages';
+import {createAuth} from "./pgsql";
+import * as Utils from '../lib/utils';
 
 const jwt_secret = process.env.JWT_AMPLITUDE_KEY;
 
@@ -46,7 +49,19 @@ let strToDate = function (cdt: string): Date {
 
 function getUser(id: Dbt.userId): Dbt.User {
   return cache.users.get(id);
-};
+}
+
+async function getUserByAuthId(publicKey: JsonWebKey, authId: string, email?: string, providerOpt?: string): Promise<Dbt.User> {
+  let provider = providerOpt || "chrome";
+  let auth: any[] = await pg.getUserIdByAuth(authId);
+  if(auth && auth.length > 0) {
+    return getUser(auth[0].userId);
+  } else {
+    let user: Dbt.User = await pg.createUser("", email);
+    await createAuth(authId, user.userId, provider);
+    return user;
+  }
+}
 
 function readFileAsync(src: string): Promise<string> {
   return new Promise(function (resolve, reject) {
@@ -135,31 +150,65 @@ publicRouter.get('/link/:id', async (ctx, next) => {
   let view = <LinkLandingPage url={url} />;
   let ins = ReactDOMServer.renderToStaticMarkup(view);
   let html = await readFileAsync('./assets/index.htmpl');
-  let body = html.replace('{{{__BODY__}}}', ins)
+  let body = html.replace('{{{__BODY__}}}', ins);
   ctx.body = body;
 
-})
+});
 
 publicRouter.get('/post/:id', async (ctx, next) => {
   let postId = parseInt(ctx.params.id);
-  let post = await pg.retrieveRecord<Dbt.Post>("posts", { postId })
-  let creator = cache.users.get(post.userId).userName
+  let post = await pg.retrieveRecord<Dbt.Post>("posts", { postId });
+  let creator = cache.users.get(post.userId).userName;
   let view = <PostView post={post} creator={creator} />;
   let ins = ReactDOMServer.renderToStaticMarkup(view);
   let html = await readFileAsync('./assets/index.htmpl');
-  let body = html.replace('{{{__BODY__}}}', ins)
+  let body = html.replace('{{{__BODY__}}}', ins);
   ctx.body = body;
-})
+});
 
 // need to serve this route before static files are enabled
 publicRouter.get('/', async (ctx, next) => {
   let view = <HomePage />;
   let ins = ReactDOMServer.renderToStaticMarkup(view);
   let html = await readFileAsync('./assets/index.htmpl');
-  let body = html.replace('{{{__BODY__}}}', ins)
+  let body = html.replace('{{{__BODY__}}}', ins);
   ctx.body = body;
 
-})
+});
+
+publicRouter.post('/auth', async (ctx) => {
+  let userInfo = ctx.request.body.userInfo;
+  let pub = ctx.request.body.publicKey;
+  let authValue = ctx.headers.authorization;
+  let token;
+  try {
+    token = authValue.split(" ")[1];
+  } catch(e) {
+    token = "";
+  }
+  if(!userInfo || !pub || !authValue || !token) {
+    ctx.status = 400;
+    return;
+  }
+
+  console.log("We got such auth data: ");
+  console.log("Key: " + JSON.stringify(pub));
+  console.log("User: " + JSON.stringify(userInfo));
+  console.log("Token: " + token);
+
+  let authRsp = await axios.create({responseType: "json"}).get(Utils.chromeAuthUrl + token);
+  if(authRsp.status === 200 && authRsp.data.user_id === userInfo.id) {
+    console.log("Correct auth token.");
+    let user = await getUserByAuthId(pub, userInfo.id, userInfo.email);
+    let token = jwt.sign(user.userId, jwt_secret);
+    ctx.body = {jwt: token};
+    return;
+  } else {
+    console.log("Authentication failed!");
+    ctx.status = 401;
+    return;
+  }
+});
 
 app.use(publicRouter.routes());
 
@@ -177,7 +226,7 @@ app.use(async (ctx, next) => {
     ctx.status = 500;
     ctx.body = { error: { message: 'Unhandled error on Server : ' + err.message } };
   }
-})
+});
 
 app.use(async (ctx, next) => {
   let client_ver = ctx.headers['x-syn-client-version'];
@@ -205,7 +254,7 @@ app.use(jwt.jwt({ secret: jwt_secret, ignoreExpiration: true, key: 'userId' }));
 app.use(async function (ctx, next) {
   await next();
 
-  let user: Dbt.User = getUser(ctx['userId'].id);
+  let user: Dbt.User = getUser(ctx['userId']);
   if (user) {
     //console.log("Setting credits to : " + user.ampCredits.toString());
     ctx.set('x-syn-credits', user.ampCredits.toString());
@@ -233,9 +282,9 @@ app.use(async function (ctx, next) {
     }
   }
   else {
-    let user = getUser(userId.id);
+    let user = getUser(userId);
     if (!user) {
-      ctx.status = 400;
+      ctx.status = 403;
       ctx.body = { error: { message: 'Invalid token supplied (out of date?)' } };
       return;
     }
@@ -261,12 +310,38 @@ if (cxt.auth) {
 }
 */
 
+app.use(async function(ctx, next) {
+  let signature = ctx.request.body.params.signature;
+  let method = ctx.request.body.method;
+  let key = ctx.request.body.params.publicKey;
+  console.log(key);
+  if(signature && key ) {
+    console.log("Signature found for the method '" + method + "': " + signature);
+    try{
+      let verifier = require('../lib/verifier');
+      let verified = verifier.ecdsaVerify(key, signature, ctx.request.body.params.content);
+      if(!verified) {
+        ctx.status = 403;
+        return;
+      }
+    } catch(e) {
+      console.log("Verification error: " + e.toString());
+      ctx.status = 403;
+      return;
+    }
+  } else console.log("No signature found for the method '" + method + "'");
+
+  await next();
+});
+
 const router = new Router();
 router.post('/rpc', async function (ctx: any) {
   let {jsonrpc, method, params, id} = ctx.request.body;  // from bodyparser 
   if (!ctx.header.authorization) {
-    console.log("sending token");
-    ctx.set('x-syn-token', ctx['token']);
+    // console.log("sending token");
+    // ctx.set('x-syn-token', ctx['token']);
+    ctx.status = 403;
+    return;
   }
 
   if (jsonrpc != "2.0") {
@@ -280,7 +355,7 @@ router.post('/rpc', async function (ctx: any) {
       case "initialize": {
         let req: Rpc.InitializeRequest = params;
         let {publicKey} = req;
-        let usr = getUser(ctx.userId.id);
+        let usr = getUser(ctx.userId);
         if (!usr) throw new Error("Internal error getting user details");
         usr = { ...usr, publicKey };
         await pg.upsert_user(usr);
@@ -294,37 +369,28 @@ router.post('/rpc', async function (ctx: any) {
         let url = parse(req.content);
         let result: Rpc.SendAddContentResponse = null;
         let {publicKey: any} = params;
-        let usr = getUser(ctx.userId.id);
-        /*  Julia - help!!!
-        if (usr.publicKey) {
-          if (usr.publicKey !== publicKey) throw new Error("Invalid public key supplied");
-        }
-        else {
-          usr = { ...usr, publicKey };
-          await pg.upsert_user(usr);
-        }
-        */
+        let usr = getUser(ctx.userId);
         if (cache.isSynereo(url)) {
-          result = await pg.handleAmplify(ctx.userId.id, params)
+          result = await pg.handleAmplify(ctx.userId, params)
         }
         else {
-          result = await pg.handleAddContent(ctx.userId.id, params)
+          result = await pg.handleAddContent(ctx.userId, params)
         }
-        ctx.body = { id, result }
+        ctx.body = { id, result };
         break;
       }
       case "loadLink": {
         let req: Rpc.LoadLinkRequest = params;
         let lnk = await pg.getLinkFromContent(req.url);
         if (!lnk) {
-          let result: Rpc.LoadLinkResponse = { found: false }
+          let result: Rpc.LoadLinkResponse = { found: false };
           ctx.body = { id, result };
           return;
         }
-        let url = cache.linkToUrl(lnk.linkId)
+        let url = cache.linkToUrl(lnk.linkId);
         let linkDepth = cache.getLinkDepth(lnk);
-        let linkAmplifier = cache.users.get(lnk.userId).userName
-        let result: Rpc.LoadLinkResponse = { found: true, url, linkDepth, linkAmplifier }
+        let linkAmplifier = cache.users.get(lnk.userId).userName;
+        let result: Rpc.LoadLinkResponse = { found: true, url, linkDepth, linkAmplifier };
         ctx.body = { id, result };
         break;
       }
@@ -337,26 +403,26 @@ router.post('/rpc', async function (ctx: any) {
           if (!linkId) throw new Error("invalid link");
           let ip = clientIP(ctx);
           cache.cancelPossibleInvitation(ip);
-          if (!(await pg.has_viewed(ctx.userId.id, linkId))) {
+          if (!(await pg.has_viewed(ctx.userId, linkId))) {
             console.log("attention gots to get paid for!!!");
-            await pg.payForView(ctx.userId.id, linkId)
+            await pg.payForView(ctx.userId, linkId)
           }
           contentUrl = cache.getContentFromLinkId(linkId);
           let link = cache.links.get(linkId);
-          let linkDepth = cache.getLinkDepth(link)
+          let linkDepth = cache.getLinkDepth(link);
           let linkAmplifier = cache.users.get(link.userId).userName;
           let result: Rpc.GetRedirectResponse = { found: true, contentUrl, linkDepth, linkAmplifier };
           ctx.body = { id, result };
           break;
         }
         let result: Rpc.GetRedirectResponse = { found: false };
-        ctx.body = { id, result }
+        ctx.body = { id, result };
         break;
       }
       case "changeSettings": {
         let req: Rpc.ChangeSettingsRequest = params;
         let {moniker, email} = req;
-        let usr = getUser(ctx.userId.id);
+        let usr = getUser(ctx.userId);
         if (!usr) throw new Error("Internal error getting user details");
         if (moniker && moniker !== usr.userName) {
           if (await pg.checkMonikerUsed(moniker)) {
@@ -373,7 +439,7 @@ router.post('/rpc', async function (ctx: any) {
       }
       case "getUserLinks": {
         //let req: Rpc.GetUserLinksRequest = params;
-        let uid = ctx.userId.id
+        let uid = ctx.userId;
         let links = await pg.GetUserLinks(uid);
         let promotions = await pg.deliver_new_promotions(uid);
         let connectedUsers = cache.getConnectedUserNames(uid);
@@ -386,8 +452,8 @@ router.post('/rpc', async function (ctx: any) {
       case "redeemLink": {
         let req: Rpc.RedeemLinkRequest = params;
         let link = cache.links.get(req.linkId);
-        await pg.redeem_link(link)
-        let links = await pg.GetUserLinks(ctx.userId.id);
+        await pg.redeem_link(link);
+        let links = await pg.GetUserLinks(ctx.userId);
         let result: Rpc.RedeemLinkResponse = { links };
         ctx.body = { id, result };
         break;
@@ -401,8 +467,8 @@ router.post('/rpc', async function (ctx: any) {
       }
       case "savePost": {
         let req: Rpc.SavePostRequest = params;
-        await pg.SavePost(ctx.userId.id, req);
-        let posts = await pg.GetUserPosts(ctx.userId.id);
+        await pg.SavePost(ctx.userId, req);
+        let posts = await pg.GetUserPosts(ctx.userId);
         let result: Rpc.SavePostResponse = { posts };
         ctx.body = { id, result };
         break;

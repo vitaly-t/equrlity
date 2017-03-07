@@ -23,17 +23,37 @@ async function createKeyPairIf(keys: string[]): Promise<void> {
   }
 }
 
+function getProfile(): Promise<chrome.identity.UserInfo> {
+  return new Promise((resolve, reject) => {
+    chrome.identity.getProfileUserInfo(uin => resolve(uin));
+  });
+}
+
+function getChromeAccessToken(): Promise<string> {
+  return new Promise((resolve, reject) => {
+    chrome.identity.getAuthToken({interactive: true}, token => resolve(token))
+  });
+}
+
 async function initialize() {
   console.log("initializing...");
-  localForage.config({ name: 'synereo-capuchin' })
+  localForage.config({ name: 'synereo-capuchin' });
   const keys: string[] = await localForage.keys();
+  const userInfo: chrome.identity.UserInfo = await getProfile();
+  const chromeToken: string = await getChromeAccessToken();
   await createKeyPairIf(keys);
   const publicKey = await localForage.getItem<JsonWebKey>('publicKey');
   const privateKey = await localForage.getItem<JsonWebKey>('privateKey');
-  const jwt = await localForage.getItem<string>('jwt');
-  if (!jwt) console.log("No JWT found");
-  await handleMessage({ eventType: "Thunk", fn: ((st: AppState) => { return { ...st, publicKey, privateKey, jwt } }) });
-  handleAsyncMessage({ eventType: "Initialize" });
+  const jwt = await AsyncHandlers.Authenticate(userInfo, chromeToken, publicKey);
+  console.log("JWT: " + jwt);
+  if (!jwt) {
+    await handleMessage({ eventType: "Thunk", fn: ((st: AppState) => { return { ...st, publicKey, privateKey } }) });
+    console.log("No JWT received");
+  } else {
+    await localForage.setItem<string>('jwt', jwt);
+    await handleMessage({ eventType: "Thunk", fn: ((st: AppState) => { return { ...st, publicKey, privateKey, jwt } }) });
+    handleAsyncMessage({ eventType: "Initialize" });
+  }
 }
 
 chrome.runtime.onStartup.addListener(initialize);

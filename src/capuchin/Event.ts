@@ -100,7 +100,7 @@ function tabsQuery(q: chrome.tabs.QueryInfo): Promise<chrome.tabs.Tab[]> {
 }
 
 async function currentTab(): Promise<chrome.tabs.Tab> {
-  let a = await tabsQuery({ active: true, currentWindow: true })
+  let a = await tabsQuery({ active: true, currentWindow: true });
   return a[0];
 }
 
@@ -126,6 +126,17 @@ function extractResult<rspBody>(response: AxiosResponse): Rpc.ResponseBody {
 }
 
 export namespace AsyncHandlers {
+
+  export async function Authenticate(
+      userInfo: chrome.identity.UserInfo, authToken: string, publicKey: JsonWebKey): Promise<string> {
+    const response = await Comms.sendAuthRequest({userInfo: userInfo, publicKey: publicKey}, "Bearer " + authToken);
+    let result = "";
+    if(response.status === 200) {
+      console.log(response);
+      result = response.data.jwt;
+    }
+    return result;
+  }
 
   export async function Initialize(state: AppState): Promise<(st: AppState) => AppState> {
     const rsp = await Comms.sendInitialize(state)
