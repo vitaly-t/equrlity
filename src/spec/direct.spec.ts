@@ -9,7 +9,12 @@ import * as Rpc from '../lib/rpc';
 import { it } from 'jasmine-promise-wrapper';
 import * as cache from '../server/cache';
 
-it("should work", async () => {
+async function countLinks(): Promise<number> {
+  let rslt = await pg.db.one("select count(*) as count from links");
+  return parseInt(rslt.count);
+}
+
+it("should work using direct calls", async () => {
   expect(Utils.isDev()).toEqual(true, "not a dev environment");
   await pg.recreateDataTables();
   await pg.init();
@@ -29,18 +34,21 @@ it("should work", async () => {
   let ok = rsp1 as Rpc.AddContentOk;
   expect(ok.link).toBeDefined("add content call failed");
   expect(cache.users.get(u1.userId).credits).toEqual(990);
+  expect(await countLinks()).toEqual(1);
 
   let url = parse(ok.link);
-  let linkId1 = cache.getLinkIdFromUrl(url);
+  let linkId1 = Utils.getLinkIdFromUrl(url);
   let link1 = cache.links.get(linkId1);
   expect(link1).toBeDefined("cache error on link1");
 
   let rsp2 = await pg.handleAmplify(u2.userId, { publicKey: "", content: ok.link, signature: "", linkDescription: "amplify me baby", amount: 20 });
-  expect(rsp2.link).toBeDefined("amplify call failed");
+  expect(await countLinks()).toEqual(2);
+  let rspt = rsp2 as Rpc.AddContentResponse
+  expect(rspt.link).toBeDefined("amplify call failed");
   expect(cache.users.get(u2.userId).credits).toEqual(980);
-  let url2 = parse(rsp2.link);
-  expect(cache.isSynereo(url2)).toEqual(true);
-  let linkId2 = cache.getLinkIdFromUrl(url2);
+  let url2 = parse(rspt.link);
+  expect(Utils.isSynereo(url2)).toEqual(true);
+  let linkId2 = Utils.getLinkIdFromUrl(url2);
   expect(cache.getChainFromLinkId(linkId2).length).toEqual(2, "link not chained");
 
   // test social graph updated
@@ -52,16 +60,19 @@ it("should work", async () => {
 
   {  // new let namespace
     let content = "https://www.example.com/somethingelse";
-    let rsp = await pg.handleAddContent(u1.userId, { publicKey: "", content: content, signature: "", linkDescription: "yaal (yet-another-awesome-link)", amount: 10 });
+    console.log("here");
+    let rsp = await pg.handleAddContent(u1.userId, { publicKey: "", content: content, signature: "", linkDescription: "yaal", amount: 10 });
+    expect(await countLinks()).toEqual(3);
+
     let ok = rsp as Rpc.AddContentOk;
     expect(ok.link).toBeDefined("add content call failed");
     let contentId = cache.getContentIdFromContent(content);
     let url = parse(ok.link);
-    expect(cache.isSynereo(url)).toEqual(true);
-    let linkId = cache.getLinkIdFromUrl(url);
-    let prom = await pg.promotions_count(linkId);
+    expect(Utils.isSynereo(url)).toEqual(true);
+    let linkId = Utils.getLinkIdFromUrl(url);
+    let prom = await pg.promotionsCount(linkId);
     expect(prom).toEqual(1, "promotions not working");
-    let viewed = await pg.has_viewed(u2.userId, linkId);
+    let viewed = await pg.hasViewed(u2.userId, linkId);
     expect(viewed).toEqual(false);
     let bal = cache.users.get(u2.userId).credits;
     let linkbal = cache.links.get(linkId).amount;
@@ -79,7 +90,7 @@ it("should work", async () => {
     expect(cache.userlinks.get(u1.userId).length).toEqual(2, "social graph not extended");
     {
       let url = parse(ok2.link);
-      let linkId2 = cache.getLinkIdFromUrl(url);
+      let linkId2 = Utils.getLinkIdFromUrl(url);
       let bal = cache.links.get(linkId).amount;
       expect(cache.getChainFromLinkId(linkId2).length).toEqual(2, "link not chained");
 
@@ -97,7 +108,7 @@ it("should work", async () => {
       let bal = cache.users.get(u1.userId).credits;
       let link = cache.links.get(linkId);
       let linkbal = link.amount;
-      await pg.redeem_link(link);
+      await pg.redeemLink(link);
       let newbal = cache.users.get(u1.userId).credits;
       expect(bal + linkbal).toEqual(newbal, "link balance not redeemed");
       let rootLinkIds = await pg.getRootLinkIdsForContentId(contentId);

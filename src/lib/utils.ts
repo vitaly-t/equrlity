@@ -1,5 +1,8 @@
 "use strict";
 
+import * as Dbt from './datatypes';
+import { Url, parse, format } from 'url';
+
 export function isMember(grp) {
   let grps = localStorage.getItem('pseudoq.groups');
   return grps && grps.indexOf(grp + ',') >= 0;
@@ -26,6 +29,7 @@ export function capuchinVersion() {
 export const serverUrl = isDev() ? "http://localhost:8080" : "https://synereo-amplitude.herokuapp.com";
 export const chromeAuthUrl = "https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=";
 
+
 export function printBase64Binary(byteArray: Uint8Array): string {
   return btoa(String.fromCharCode(...byteArray));
 }
@@ -49,3 +53,25 @@ export function shuffle<T>(array): T[] {
   }
   return result;
 }
+
+export function isSynereo(url: Url): boolean {
+  let srv = parse(serverUrl);
+  return url.host === srv.host && url.protocol === srv.protocol;
+}
+
+export function getLinkIdFromUrl(url: Url): Dbt.linkId {
+  if (!isSynereo(url)) throw new Error("Not a synero url");
+  if (!url.path.startsWith("/link/")) throw new Error("Malformed link path");
+  let linkId = parseInt(url.path.substring(6));
+  return linkId;
+}
+
+export function linkToUrl(linkId: Dbt.linkId, desc: Dbt.linkDescription): Dbt.urlString {
+  let srv = parse(serverUrl);
+  if (desc) desc = desc.replace(/ /g, '_');
+  srv.pathname = "/link/" + linkId.toString()
+  srv.hash = (desc ? "#" + desc : '')
+  return format(srv);
+}
+
+

@@ -62,7 +62,7 @@ import * as Dbt from './datatypes';
 
 //TODO: rename "getUserLinks" to "loadSettingsPage"
 export type Method = "addContent" | "initialize" | "changeMoniker" | "loadLink" | "getRedirect" | "changeSettings"
-  | "getUserLinks" | "redeemLink" | "getPostBody" | "savePost" | "removePost" | "removeContent" | "transferCredits" | "authenticate" ;
+  | "getUserLinks" | "redeemLink" | "getPostBody" | "savePost" | "removePost" | "removeContent" | "transferCredits" | "authenticate";
 
 /**
  * Informational type tags used to indicate intended usage.
@@ -203,7 +203,7 @@ export type GetRedirectResponse = {
  * deposit: allows the user to summarily give themselves more currency, and will be removed once the system goes live.
  */
 export type ChangeSettingsRequest = {
-  moniker: string;
+  userName: string;
   email: string;
 }
 
@@ -396,14 +396,7 @@ export type SendResponseBody = AddContentResponse | SendAddContentResponse | Ini
  * feel free to ignore it.
  */
 
-/*
-export type RpcMethod<Request,Response> = {
-  clientSendRequest: () => Request;
-  serverReceiveRequest: (req: Request) => Response;
-  serverSendResponse: () => Response;
-  clientReceiveResponse: (rsp: Response) => void;
-}
-*/
+export type Handler<Request, Response> = (req: Request) => Promise<Response>;
 
 /**
  * the json-rpc 2.0 interface as per the spec.

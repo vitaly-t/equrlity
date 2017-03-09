@@ -141,24 +141,16 @@ export async function handleAsyncMessage(event: Message) {
 
 }
 
-let __handling = false;
-export async function handleMessage(event: Message, async: boolean = false): Promise<AppState> {
+export function handleMessage(event: Message, async: boolean = false): AppState {
   function storeState(st: AppState): void {
     if (__state !== st) {
-      //console.log("storing state");
       __state = st;
       chrome.runtime.sendMessage({ eventType: 'Render', appState: preSerialize(st) });
     }
   }
 
   let st = currentState();
-  //console.log("Handling: " + event.eventType);
   try {
-    if (__handling) {
-      if (async) setTimeout(() => handleMessage(event, true), 1);
-      else throw new Error("attempt to call handleMessage re-entrantly");
-    }
-    __handling = true;
     st.lastErrorMessage = '';
     switch (event.eventType) {
       case "Thunk":
@@ -190,8 +182,5 @@ export async function handleMessage(event: Message, async: boolean = false): Pro
     st.lastErrorMessage = e.message;
     if (e.message === "Network Error") setTimeout(() => initialize(), 15000);
   }
-  finally {
-    __handling = false;
-  }
-  return st
+  return st;
 }

@@ -218,7 +218,7 @@ app.use(async function (ctx, next) {
   ctx.set('x-syn-credits', user.credits.toString());
   ctx.set('x-syn-moniker', user.userName);
   ctx.set('x-syn-email', email);
-  await pg.touch_user(user.userId);
+  await pg.touchUser(user.userId);
 });
 
 app.use(async function (ctx, next) {
@@ -252,6 +252,9 @@ app.use(async function (ctx, next) {
   await next();
 });
 
+async function handleRequest<I, O>(method: Rpc.Handler<I, O>, req: I): Promise<O> {
+  return method(req);
+}
 
 const router = new Router();
 router.post('/rpc', async function (ctx: any) {
@@ -288,14 +291,12 @@ router.post('/rpc', async function (ctx: any) {
         let url = parse(content);
         checkPK(publicKey)
         if (!validateContentSignature(publicKey, content, signature)) throw new Error("request failed verification");
-        let result: Rpc.SendAddContentResponse = null;
         let usr = getUser(userId);
-        if (cache.isSynereo(url)) {
-          result = await pg.handleAmplify(userId, params)
+        let hndlr: Rpc.Handler<Rpc.AddContentRequest, Rpc.SendAddContentResponse> = async (req) => {
+          if (Utils.isSynereo(url)) return await pg.handleAmplify(userId, req)
+          return await pg.handleAddContent(userId, req)
         }
-        else {
-          result = await pg.handleAddContent(userId, params)
-        }
+        let result = await handleRequest(hndlr, req);
         ctx.body = { id, result };
         break;
       }
@@ -318,12 +319,12 @@ router.post('/rpc', async function (ctx: any) {
         let req: Rpc.GetRedirectRequest = params;
         let contentUrl = null;
         let url = parse(req.linkUrl);
-        if (cache.isSynereo(url)) {
-          let linkId = cache.getLinkIdFromUrl(url);
+        if (Utils.isSynereo(url)) {
+          let linkId = Utils.getLinkIdFromUrl(url);
           if (!linkId) throw new Error("invalid link");
           let ip = clientIP(ctx);
           cache.cancelPossibleInvitation(ip);
-          if (!(await pg.has_viewed(userId, linkId))) {
+          if (!(await pg.hasViewed(userId, linkId))) {
             console.log("attention gots to get paid for!!!");
             await pg.payForView(userId, linkId)
           }
@@ -341,28 +342,29 @@ router.post('/rpc', async function (ctx: any) {
       }
       case "changeSettings": {
         let req: Rpc.ChangeSettingsRequest = params;
-        let { moniker } = req;
+        let { userName } = req;
         let usr = getUser(userId);
         if (!usr) throw new Error("Internal error getting user details");
-        if (moniker && moniker !== usr.userName) {
-          if (await pg.checkMonikerUsed(moniker)) {
+        if (userName && userName !== usr.userName) {
+          if (await pg.checkMonikerUsed(userName)) {
             ctx.body = { id, error: { message: "Nickname not available" } };
             return;
           }
-          usr = { ...usr, userName: moniker };
+          usr = { ...usr, userName };
         }
-        await pg.upsert_user(usr);
+        let updts = await pg.upsertUser(usr);
+        cache.update(updts);
         let result: Rpc.ChangeSettingsResponse = { ok: true };
         ctx.body = { id, result };
         break;
       }
       case "getUserLinks": {
         //let req: Rpc.GetUserLinksRequest = params;
-        let links = await pg.GetUserLinks(userId);
-        let promotions = await pg.deliver_new_promotions(userId);
+        let links = await pg.getUserLinks(userId);
+        let promotions = await pg.deliverNewPromotions(userId);
         let connectedUsers = cache.getConnectedUserNames(userId);
         let reachableUserCount = cache.getReachableUserIds(userId).length;
-        let posts = await pg.GetUserPosts(userId);
+        let posts = await pg.getUserPosts(userId);
         let result: Rpc.GetUserLinksResponse = { links, promotions, connectedUsers, reachableUserCount, posts };
         ctx.body = { id, result };
         break;
@@ -370,23 +372,23 @@ router.post('/rpc', async function (ctx: any) {
       case "redeemLink": {
         let req: Rpc.RedeemLinkRequest = params;
         let link = cache.links.get(req.linkId);
-        await pg.redeem_link(link);
-        let links = await pg.GetUserLinks(userId);
+        await pg.redeemLink(link);
+        let links = await pg.getUserLinks(userId);
         let result: Rpc.RedeemLinkResponse = { links };
         ctx.body = { id, result };
         break;
       }
       case "getPostBody": {
         let req: Rpc.GetPostBodyRequest = params;
-        let body = await pg.GetPostBody(req.postId);
+        let body = await pg.getPostBody(req.postId);
         let result: Rpc.GetPostBodyResponse = { body };
         ctx.body = { id, result };
         break;
       }
       case "savePost": {
         let req: Rpc.SavePostRequest = params;
-        await pg.SavePost(userId, req);
-        let posts = await pg.GetUserPosts(userId);
+        await pg.savePost(userId, req);
+        let posts = await pg.getUserPosts(userId);
         let result: Rpc.SavePostResponse = { posts };
         ctx.body = { id, result };
         break;
