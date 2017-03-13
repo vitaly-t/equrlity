@@ -69,6 +69,7 @@
     "react-addons-css-transition-group": "^15.4.2",
     "react-addons-transition-group": "^15.4.2",
     "react-dom": "^15.4.2",
+    "react-dropzone": "^3.11.1",
     "react-input": "^4.1.2",
     "reactstrap": "^4.2.0",
     "reflexbox": "^2.2.3",

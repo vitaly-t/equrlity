@@ -1,16 +1,18 @@
 import * as React from 'react';
 import * as ReactDOM from "react-dom";
 import { Button } from "@blueprintjs/core";
-import { YesNoBox } from './dialogs';
-import * as OxiDate from '../lib/oxidate';
-
-import { AppState, postDeserialize } from "./AppState";
-import { sendGetUserLinks } from './Comms';
-
+import * as Dropzone from 'react-dropzone';
 import { Url, format } from 'url';
+
 import * as Rpc from '../lib/rpc'
 import * as Utils from '../lib/utils';
 import * as Constants from '../lib/constants';
+import * as OxiDate from '../lib/oxidate';
+
+import { YesNoBox } from './dialogs';
+import { AppState, postDeserialize } from "./AppState";
+import { sendGetUserLinks } from './Comms';
+
 
 interface SettingsPageProps { appState?: AppState };
 interface SettingsPageState { nickName: string, email: string, confirmDeletePost?: Rpc.PostInfoItem, transferAmount: number, transferTo: string };
@@ -37,6 +39,16 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
     console.log("saving settings");
     let settings: Rpc.ChangeSettingsRequest = { userName: this.state.nickName, email: this.state.email };
     chrome.runtime.sendMessage({ eventType: "ChangeSettings", settings, async: true });
+  }
+
+  onDropVideos(acceptedFiles, rejectedFiles) {
+    console.log('Accepted files: ', acceptedFiles);
+    console.log('Rejected files: ', rejectedFiles);
+  }
+
+  onDropAudios(acceptedFiles, rejectedFiles) {
+    console.log('Accepted files: ', acceptedFiles);
+    console.log('Rejected files: ', rejectedFiles);
   }
 
   render() {
@@ -284,18 +296,18 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
           {vsp}
           {vidsdiv}
           {vsp}
-          <div style={divStyle}>
-            <Button type="Button" className="pt-intent-primary" onClick={() => chrome.runtime.sendMessage({ eventType: "UploadVideo" })} text="Upload New Video" />
-          </div>
-        </div>
-        {vsp}
-        <div>
-          <h4>Your Audios : </h4>
+          <Dropzone onDrop={this.onDropVideos}>
+            <div>Try dropping some video files here, or click to select video filess to upload.</div>
+          </Dropzone>
           {vsp}
-          {audsdiv}
-          {vsp}
-          <div style={divStyle}>
-            <Button type="Button" className="pt-intent-primary" onClick={() => chrome.runtime.sendMessage({ eventType: "UploadAudio" })} text="Upload New Audio" />
+          <div>
+            <h4>Your Audios : </h4>
+            {vsp}
+            {audsdiv}
+            {vsp}
+            <Dropzone onDrop={this.onDropAudios} accept="audio/mpeg,audio/mp3,audio.wav,audio/mp4">
+              <div>Try dropping some audio files here, or click to select audio files to upload.</div>
+            </Dropzone>
           </div>
         </div>
       </div>);
