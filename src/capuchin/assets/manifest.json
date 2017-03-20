@@ -22,5 +22,9 @@
     "scripts": [
       "background_bndl.js"
     ]
+  },
+  "icons": {
+    "128": "images/pseudoq2.png",
+    "32": "images/pseudoq2.png"
   }
 }
