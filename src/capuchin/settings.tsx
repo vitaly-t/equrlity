@@ -82,7 +82,7 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
               <th></th>
               <th>Content</th>
               <th>Depth</th>
-              <th>Amplifications</th>
+              <th>Promotions</th>
               <th>Deliveries</th>
               <th>Views</th>
               <th>Balance</th>
@@ -148,7 +148,7 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
     let audsdiv = <p>You do not currently have any uploaded audios.</p>
 
     let links = st.promotions;
-    let linkdiv = <p>There are no new amplified links for you.</p>
+    let linkdiv = <p>There are no new promoted links for you.</p>
     if (links.length > 0) {
       let linkrows = links.map(url => {
         let dismiss = () => { chrome.runtime.sendMessage({ eventType: "DismissPromotion", url }); };
@@ -191,10 +191,10 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
         this.setState({ transferAmount: 0 });
       }
     };
-    let userp = userNames.length > 0 ? <div><p>You are currently directly connected with another {userNames.length} Synereo user{userNames.length > 1 ? "s" : ""}.</p>
+    let userp = userNames.length > 0 ? <div><p>You are currently directly connected with another {userNames.length} user{userNames.length > 1 ? "s" : ""}.</p>
       <p>Your social graph currently extends to {st.reachableUserCount} reachable users.</p>
     </div>
-      : <p>You are not currently connected with any other Synereo users. Hence, no promotions can be issued on your behalf.</p>;
+      : <p>You are not currently connected with any other users. Hence, no promotions can be issued on your behalf.</p>;
 
     let authdiv = <p>You are currently authenticated via {st.authprov}</p>;
     if (!st.authprov) {
@@ -220,7 +220,7 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
     let transferDiv = (
       <div>
         {vsp}
-        <p>If you wish, you can transfer credits to another Amplitude user.</p>
+        <p>If you wish, you can transfer credits to another user.</p>
         <div style={divStyle} >
           <div style={{ display: 'inline' }}>Amount to Transfer: </div>
           <input type="number" style={{ display: 'inline', height: 24, marginLeft: 20, marginTop: 6, width: '100' }} ref={(e) => this.ctrls.transferAmount = e}
@@ -234,7 +234,7 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
 
     return (
       <div>
-        <h3>Synereo Amplitude Status and Settings.</h3>
+        <h3>Status and Settings.</h3>
         <div style={divStyle}>
           {userp}
           {authdiv}
@@ -276,7 +276,7 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
         </div>
         {vsp}
         <div>
-          <h4>Amplified Links for you : </h4>
+          <h4>Promoted Links for you : </h4>
           {vsp}
           {linkdiv}
         </div>

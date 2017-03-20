@@ -26,7 +26,7 @@ export function capuchinVersion() {
   return "0.8.5";
 }
 
-export const serverUrl = isDev() ? "http://localhost:8080" : "https://synereo-amplitude.herokuapp.com";
+export const serverUrl = isDev() ? "http://localhost:8080" : "https://pseudoqurl.herokuapp.com";
 export const chromeAuthUrl = "https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=";
 
 
@@ -54,13 +54,13 @@ export function shuffle<T>(array): T[] {
   return result;
 }
 
-export function isSynereo(url: Url): boolean {
+export function isPseudoQURL(url: Url): boolean {
   let srv = parse(serverUrl);
   return url.host === srv.host && url.protocol === srv.protocol;
 }
 
 export function getLinkIdFromUrl(url: Url): Dbt.linkId {
-  if (!isSynereo(url)) throw new Error("Not a synero url");
+  if (!isPseudoQURL(url)) throw new Error("Not a PseudoQURL url");
   if (!url.path.startsWith("/link/")) throw new Error("Malformed link path");
   let linkId = parseInt(url.path.substring(6));
   return linkId;

@@ -38,7 +38,7 @@ import * as pg from './pgsql';
 import * as cache from './cache';
 
 const md = new Remarkable({ html: true });
-const jwt_secret = process.env.JWT_AMPLITUDE_KEY;
+const jwt_secret = process.env.JWT_PSEUDOQURL_KEY;
 
 pg.init();
 
@@ -56,7 +56,7 @@ function readFileAsync(src: string): Promise<string> {
 }
 
 const app = new Koa();
-app.keys = ['amplitude'];  //@@GS what does this do again?
+app.keys = ['pseudoqurl'];  //@@GS what does this do again?
 
 const publicRouter = new Router();
 
@@ -71,18 +71,18 @@ app.use(
   cors({
     origin: "*",
     allowMethods: 'GET,HEAD,PUT,POST,DELETE,PATCH',
-    allowHeaders: ["X-Requested-With", "Content-Type", "Authorization", "x-syn-client-version"],
-    exposeHeaders: ["x-syn-token", "x-syn-moniker", "x-syn-email", "x-syn-credits", "x-syn-groups"],
+    allowHeaders: ["X-Requested-With", "Content-Type", "Authorization", "x-psq-client-version"],
+    exposeHeaders: ["x-psq-token", "x-psq-moniker", "x-psq-email", "x-psq-credits", "x-psq-groups"],
   })
 );
 
 // These are necessary because we are not serving static files yet.
-publicRouter.get('/download/synereo.zip', async function (ctx, next) {
-  await send(ctx, './assets/synereo-plugin.zip');
+publicRouter.get('/download/pseudoq.zip', async function (ctx, next) {
+  await send(ctx, './assets/pseudoq-plugin.zip');
 });
 
-publicRouter.get('/download/synereo.tar.gz', async function (ctx, next) {
-  await send(ctx, './assets/synereo-plugin.tar.gz');
+publicRouter.get('/download/pseudoq.tar.gz', async function (ctx, next) {
+  await send(ctx, './assets/pseudoq-plugin.tar.gz');
 });
 
 
@@ -180,7 +180,7 @@ app.use(async (ctx, next) => {
 });
 
 app.use(async (ctx, next) => {
-  let client_ver = ctx.headers['x-syn-client-version'];
+  let client_ver = ctx.headers['x-psq-client-version'];
   if (!client_ver) {
     ctx.status = 400;
     ctx.body = { error: { message: 'Invalid Client - missing header' } };
@@ -213,11 +213,11 @@ app.use(async function (ctx, next) {
   if (!_userId || _userId.publicKey !== publicKey || _userId.email !== email || _userId.id !== id) {
     let token = jwt.sign(userId, jwt_secret); //{expiresInMinutes: 60*24*14});
     console.log("sending token");
-    ctx.set('x-syn-token', token);
+    ctx.set('x-psq-token', token);
   }
-  ctx.set('x-syn-credits', user.credits.toString());
-  ctx.set('x-syn-moniker', user.userName);
-  ctx.set('x-syn-email', email);
+  ctx.set('x-psq-credits', user.credits.toString());
+  ctx.set('x-psq-moniker', user.userName);
+  ctx.set('x-psq-email', email);
   await pg.touchUser(user.userId);
 });
 
@@ -293,7 +293,7 @@ router.post('/rpc', async function (ctx: any) {
         if (!validateContentSignature(publicKey, content, signature)) throw new Error("request failed verification");
         let usr = getUser(userId);
         let hndlr: Rpc.Handler<Rpc.AddContentRequest, Rpc.SendAddContentResponse> = async (req) => {
-          if (Utils.isSynereo(url)) return await pg.handleAmplify(userId, req)
+          if (Utils.isPseudoQURL(url)) return await pg.handlePromote(userId, req)
           return await pg.handleAddContent(userId, req)
         }
         let result = await handleRequest(hndlr, req);
@@ -310,8 +310,8 @@ router.post('/rpc', async function (ctx: any) {
         }
         let url = cache.linkToUrl(lnk.linkId);
         let linkDepth = cache.getLinkDepth(lnk);
-        let linkAmplifier = cache.users.get(lnk.userId).userName;
-        let result: Rpc.LoadLinkResponse = { found: true, url, linkDepth, linkAmplifier };
+        let linkPromoter = cache.users.get(lnk.userId).userName;
+        let result: Rpc.LoadLinkResponse = { found: true, url, linkDepth, linkPromoter };
         ctx.body = { id, result };
         break;
       }
@@ -319,7 +319,7 @@ router.post('/rpc', async function (ctx: any) {
         let req: Rpc.GetRedirectRequest = params;
         let contentUrl = null;
         let url = parse(req.linkUrl);
-        if (Utils.isSynereo(url)) {
+        if (Utils.isPseudoQURL(url)) {
           let linkId = Utils.getLinkIdFromUrl(url);
           if (!linkId) throw new Error("invalid link");
           let ip = clientIP(ctx);
@@ -331,8 +331,8 @@ router.post('/rpc', async function (ctx: any) {
           contentUrl = cache.getContentFromLinkId(linkId);
           let link = cache.links.get(linkId);
           let linkDepth = cache.getLinkDepth(link);
-          let linkAmplifier = cache.users.get(link.userId).userName;
-          let result: Rpc.GetRedirectResponse = { found: true, contentUrl, linkDepth, linkAmplifier };
+          let linkPromoter = cache.users.get(link.userId).userName;
+          let result: Rpc.GetRedirectResponse = { found: true, contentUrl, linkDepth, linkPromoter };
           ctx.body = { id, result };
           break;
         }

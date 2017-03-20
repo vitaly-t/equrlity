@@ -10,8 +10,8 @@ import * as Dbt from '../lib/datatypes';
 async function apiRequest(st: AppState) {
   let headers = { 'content-type': 'application/json', 'Accept': 'application/json' };
   if (st.jwt) headers['Authorization'] = 'Bearer ' + st.jwt;
-  headers['x-syn-client-version'] = 'capuchin-' + Utils.capuchinVersion();
-  //if (Utils.isDev()) headers['x-syn-moniker'] = st.moniker;
+  headers['x-psq-client-version'] = 'capuchin-' + Utils.capuchinVersion();
+  //if (Utils.isDev()) headers['x-psq-moniker'] = st.moniker;
   return axios.create({
     timeout: 10000,
     headers,
@@ -26,7 +26,7 @@ async function apiRequest(st: AppState) {
 export async function sendAuthRequest(data: Object, authHeader: string): Promise<AxiosResponse> {
   let headers = { 'content-type': 'application/json', 'Accept': 'application/json' };
   headers['Authorization'] = authHeader;
-  headers['x-syn-client-version'] = 'capuchin-' + Utils.capuchinVersion();
+  headers['x-psq-client-version'] = 'capuchin-' + Utils.capuchinVersion();
   let req = await axios.create({
     headers,
     responseType: 'json'

@@ -6,19 +6,19 @@ import * as Rpc from '../lib/rpc'
 import { capuchinVersion, serverUrl } from '../lib/utils';
 
 export interface PopupPanelProps { appState?: AppState; serverMessage?: string };
-export interface PopupPanelState { amplifyAmount: number, description: string };
+export interface PopupPanelState { promoteAmount: number, description: string };
 
 export class PopupPanel extends React.Component<PopupPanelProps, PopupPanelState> {
 
   constructor(props) {
     super(props);
-    this.state = { amplifyAmount: 20, description: props.appState.activeUrl };
+    this.state = { promoteAmount: 20, description: props.appState.activeUrl };
   }
 
   ctrls: { amountInput?: HTMLInputElement, descriptionInput?: HTMLInputElement } = {}
 
-  changeAmplifyAmount() {
-    this.setState({ amplifyAmount: parseInt(this.ctrls.amountInput.value) });
+  changePromoteAmount() {
+    this.setState({ promoteAmount: parseInt(this.ctrls.amountInput.value) });
   }
 
   changeDescription() {
@@ -47,20 +47,20 @@ export class PopupPanel extends React.Component<PopupPanelProps, PopupPanelState
       let desc = this.state.description;
       console.log("rendering for target :" + tgt);
       let linkInfo = getLinked(st, curl);
-      let lbl = linkInfo ? (linkInfo.linkAmplifier === st.moniker ? "Re-Invest" : "Re-Amplify") : "Amplify";
+      let lbl = linkInfo ? (linkInfo.linkPromoter === st.moniker ? "Re-Invest" : "Re-Promote") : "Promote";
       let saveaction = () => {
-        let amount = this.state.amplifyAmount;
+        let amount = this.state.promoteAmount;
         let linkDescription = this.state.description
         chrome.runtime.sendMessage({ eventType: "Save", amount, linkDescription, async: true });
       }
-      let infoDiv = linkInfo ? <div>{`Amplified by: ${linkInfo.linkAmplifier}, Link depth : ${linkInfo.linkDepth}`}</div> : null;
+      let infoDiv = linkInfo ? <div>{`Promoted by: ${linkInfo.linkPromoter}, Link depth : ${linkInfo.linkDepth}`}</div> : null;
       let costPerView = linkInfo ? linkInfo.linkDepth + 1 : 1;
       pnl = (<div>
         <p>Target : <textarea style={{ width: 450 }}>{tgt}</textarea></p>
         {infoDiv}
         <p>Investment amount: <input type="number" ref={(e) => this.ctrls.amountInput = e} max={st.credits}
-          value={this.state.amplifyAmount} onChange={(e) => this.changeAmplifyAmount()} /></p>
-        <p>This will provide for a maximum of {Math.floor(this.state.amplifyAmount / costPerView)} promotions.</p>  
+          value={this.state.promoteAmount} onChange={(e) => this.changePromoteAmount()} /></p>
+        <p>This will provide for a maximum of {Math.floor(this.state.promoteAmount / costPerView)} promotions.</p>
         <p>Description: <input type="string" style={{ width: 400 }} ref={(e) => this.ctrls.descriptionInput = e}
           value={desc} onChange={(e) => this.changeDescription()} /></p>
         <button onClick={saveaction} >{lbl}</button>
@@ -69,7 +69,7 @@ export class PopupPanel extends React.Component<PopupPanelProps, PopupPanelState
     let settingsAction = () => chrome.runtime.sendMessage({ eventType: "LaunchSettingsPage", async: true });
     return <div>
       <p>Using Server Url: {serverUrl} </p>
-      <p>Your Synereo Nickname is: {st.moniker}</p>
+      <p>Your PseudoQURL Nickname is: {st.moniker}</p>
       <p>Your current Account Balance is: {st.credits}</p>
       <p><button onClick={settingsAction}>View/Edit Settings</button></p>
       {pnl}

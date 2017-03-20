@@ -199,7 +199,7 @@ export async function insertContent(t: ITask<any>, userId: Dbt.userId, content: 
   return rslt;
 }
 
-export async function amplifyContent(t: ITask<any>, userId: Dbt.userId, content: string, linkDescription, amount: Dbt.integer, contentType: Dbt.contentType = "url"): Promise<CacheUpdate[]> {
+export async function promoteContent(t: ITask<any>, userId: Dbt.userId, content: string, linkDescription, amount: Dbt.integer, contentType: Dbt.contentType = "url"): Promise<CacheUpdate[]> {
   let usr = await retrieveRecord<Dbt.User>(t, "users", { userId });
   if (amount > usr.credits) throw new Error("Negative balances not allowed");
 

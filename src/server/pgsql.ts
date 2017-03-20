@@ -6,7 +6,7 @@ import * as Rpc from '../lib/rpc';
 import * as cache from './cache';
 import * as tasks from './pgtasks';
 
-export let connectUrl: string = Utils.isTest() ? process.env.DEV_AMPLITUDE_TEST_URL : Utils.isDev() ? process.env.DEV_AMPLITUDE_URL : process.env.AMPLITUDE_URL;
+export let connectUrl: string = Utils.isTest() ? process.env.DEV_PSEUDOQURL_TEST_URL : Utils.isDev() ? process.env.DEV_PSEUDOQURL_URL : process.env.PSEUDOQURL_URL;
 if (!connectUrl.startsWith('postgres:')) connectUrl = 'postgres:' + connectUrl;
 
 import * as OxiDate from '../lib/oxidate';
@@ -303,8 +303,8 @@ export async function insertContent(userId: Dbt.userId, content: string, linkDes
   return rslt;
 }
 
-export async function amplifyContent(userId: Dbt.userId, content: string, linkDescription, amount: Dbt.integer, contentType: Dbt.contentType = "url"): Promise<cache.CacheUpdate[]> {
-  let rslt: cache.CacheUpdate[] = await db.task(t => tasks.amplifyContent(t, userId, content, linkDescription, amount, contentType));
+export async function promoteContent(userId: Dbt.userId, content: string, linkDescription, amount: Dbt.integer, contentType: Dbt.contentType = "url"): Promise<cache.CacheUpdate[]> {
+  let rslt: cache.CacheUpdate[] = await db.task(t => tasks.promoteContent(t, userId, content, linkDescription, amount, contentType));
   let linkUpdt = rslt.find(e => e.table === "links" as cache.CachedTable);
   await promoteLink(linkUpdt.record, amount);
   return rslt;
@@ -354,9 +354,9 @@ export async function createUser(email?: string): Promise<Dbt.User> {
 async function _handleAddContent(t: ITask<any>, userId, { publicKey, content, signature, linkDescription, amount }): Promise<[cache.CacheUpdate[], Rpc.SendAddContentResponse]> {
   let link = await tasks.getLinkFromContent(t, content);
   if (link) {
-    let linkAmplifier = cache.users.get(userId).userName;
+    let linkPromoter = cache.users.get(userId).userName;
     let linkDepth = cache.getLinkDepth(link);
-    let rsp: Rpc.AddContentAlreadyRegistered = { prevLink: cache.linkToUrl(link.linkId), linkAmplifier };
+    let rsp: Rpc.AddContentAlreadyRegistered = { prevLink: cache.linkToUrl(link.linkId), linkPromoter };
     return [[], rsp];
   }
   let updts = await tasks.insertContent(t, userId, content, linkDescription, amount);
@@ -374,7 +374,7 @@ export async function handleAddContent(userId, { publicKey, content, signature, 
   return rsp;
 }
 
-async function _handleAmplify(t: ITask<any>, userId, { publicKey, content, signature, linkDescription, amount }): Promise<[cache.CacheUpdate[], Rpc.AddContentOk]> {
+async function _handlePromote(t: ITask<any>, userId, { publicKey, content, signature, linkDescription, amount }): Promise<[cache.CacheUpdate[], Rpc.AddContentOk]> {
   let linkId = Utils.getLinkIdFromUrl(parse(content));
   let link = cache.links.get(linkId);
   let linkDepth = cache.getLinkDepth(link);
@@ -388,20 +388,20 @@ async function _handleAmplify(t: ITask<any>, userId, { publicKey, content, signa
     let contentId = cache.getContentIdFromContent(content);
     let prevId = await tasks.getLinkAlreadyInvestedIn(t, userId, contentId);
     if (prevId) throw new Error("user has previously invested in this content");
-    rslt = await tasks.amplifyContent(t, userId, content, linkDescription, amount);
+    rslt = await tasks.promoteContent(t, userId, content, linkDescription, amount);
     linkDepth += 1;
     link = rslt.find(e => e.table === "links" as cache.CachedTable).record;
     // this call is really just to aid testing
-    // through the UI it should not be possible to amplify a link without first viewing it
+    // through the UI it should not be possible to promote a link without first viewing it
   }
   await _promoteLink(t, link, amount);
-  let linkAmplifier = cache.users.get(userId).userName;
-  return [rslt, { link: Utils.linkToUrl(link.linkId, linkDescription), linkDepth, linkAmplifier }];
+  let linkPromoter = cache.users.get(userId).userName;
+  return [rslt, { link: Utils.linkToUrl(link.linkId, linkDescription), linkDepth, linkPromoter }];
 
 }
 
-export async function handleAmplify(userId, { publicKey, content, signature, linkDescription, amount }): Promise<Rpc.SendAddContentResponse> {
-  let pr = await db.tx(t => _handleAmplify(t, userId, { publicKey, content, signature, linkDescription, amount }));
+export async function handlePromote(userId, { publicKey, content, signature, linkDescription, amount }): Promise<Rpc.SendAddContentResponse> {
+  let pr = await db.tx(t => _handlePromote(t, userId, { publicKey, content, signature, linkDescription, amount }));
   let updts: cache.CacheUpdate[] = pr[0];
   let rsp: Rpc.SendAddContentResponse = pr[1];
   cache.update(updts);

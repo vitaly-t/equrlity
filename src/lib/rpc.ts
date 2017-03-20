@@ -1,5 +1,5 @@
 /**
- * The JSON-RPC 2.0 interface for Amplitude, implemented in TypeScript.
+ * The JSON-RPC 2.0 interface for PseduoQURL, implemented in TypeScript.
  * 
  * See http://www.jsonrpc.org/specification for technical details of the rpc protocol.
  * 
@@ -17,8 +17,8 @@
  *  cors({
  *   origin: "*",
  *   allowMethods: 'GET,HEAD,PUT,POST,DELETE,PATCH',
- *   allowHeaders: ["X-Requested-With", "Content-Type", "Authorization", "x-syn-client-version"],
- *   exposeHeaders: ["x-syn-moniker", "x-syn-credits", "x-syn-token", "x-syn-authprov", "x-syn-groups"],
+ *   allowHeaders: ["X-Requested-With", "Content-Type", "Authorization", "x-psq-client-version"],
+ *   exposeHeaders: ["x-psq-moniker", "x-psq-credits", "x-psq-token", "x-psq-authprov", "x-psq-groups"],
  *  })
  * 
  * allowHeaders (supplied by client in request):
@@ -28,28 +28,28 @@
  *   - Content-Type: must be "application/json". (Note that the capuchin client also supplies an Accept header with value "application/json". Presumably it is also neccessary?)
  *
  *   - Authorization:  Used to implement JWT (see https://jwt.io). If no Authorization Header is provided, the user is assumed to be a
- *                     new user. A new account will be created, and a new token will be generated and returned in the response 'x-syn-token' header.
+ *                     new user. A new account will be created, and a new token will be generated and returned in the response 'x-psq-token' header.
  *                     The client should from then on supply the generated token using the Authorizatio header value "Bearer " followed by the token string.
  * 
- *   - x-syn-client-version: Used to identify the requesting client software. If not supplied the request is rejected (400).
+ *   - x-psq-client-version: Used to identify the requesting client software. If not supplied the request is rejected (400).
  *                           If supplied it must be of the form {client-name}-{client-version}.
  *                           Currently, the allowed values for client-name are either "capuchin" or "lizard".
  *                           The client version is used by the capuchin reference client to automatically detect if the client needs upgrading      
  *        
  * exposeHeaders (supplied by server in response):
  * 
- *   - x-syn-moniker: the user's current moniker. 
+ *   - x-psq-moniker: the user's current moniker. 
  * 
- *   - x-syn-email: the user's current email address. 
+ *   - x-psq-email: the user's current email address. 
  * 
- *   - x-syn-credits: the balance in the users account. 
+ *   - x-psq-credits: the balance in the users account. 
  * 
- *   - x-syn-token: the jwt token identifying the current user.
+ *   - x-psq-token: the jwt token identifying the current user.
  * 
- *   - x-syn-authprov: not currently used.  Will be used to allow social logins via Facebook, Twitter, GitHub etc, and also to allow for 
+ *   - x-psq-authprov: not currently used.  Will be used to allow social logins via Facebook, Twitter, GitHub etc, and also to allow for 
  *                     the same user account to be used across multiple devices.
  * 
- *   - x-syn-groups: not currently used.  Will be used to identify the user groups the user is a member of, allowing the client to present optional
+ *   - x-psq-groups: not currently used.  Will be used to identify the user groups the user is a member of, allowing the client to present optional
  *                   interface functionality for administrators, content creators etc.
 */
 
@@ -57,7 +57,7 @@
 import * as Dbt from './datatypes';
 
 /**
- * The available json-rpc methods of the Amplitude API.  
+ * The available json-rpc methods of the PseudoQURL API.  
  */
 
 //TODO: rename "getUserLinks" to "loadSettingsPage"
@@ -94,11 +94,11 @@ export type InitializeResponse = {
 /**
  * addContent method
  * 
- * Issued whenever content is added to the system, and also when a url is "Amplified", "Re-Amplified", "Re-Invested".
+ * Issued whenever content is added to the system, and also when a url is "Promoted", "Re-Promoted", "Re-Invested".
  * 
  * publicKey: not currently used. can be empty, but must be supplied.
  * content: the url being added. 
- *   - If it is a synereo url, it will intepreted as a "Re-Amplify", unless the user has already (re-)amplified it, in which case it will be seen as a "Re-Invest".
+ *   - If it is a pseudoq url, it will intepreted as a "Re-Promote", unless the user has already (re-)promoted it, in which case it will be seen as a "Re-Invest".
  *   - otherwise it will be interpreted as fresh content, and will be added unless another user has already added it.
  * signature: currently ignored, but must be supplied.
  * linkDescription: used in construction of the generated return link, appearing after the '#'. 
@@ -116,7 +116,7 @@ export type AddContentRequest = {
  * returned if the call was successful ie. a new link was generated.
  * 
  * link: the newly generated link
- * linkDepth: the number of parents the new link has.  Will be zero if not a "Re-Amplify" or "Re-Invest"
+ * linkDepth: the number of parents the new link has.  Will be zero if not a "Re-Promote" or "Re-Invest"
  */
 export type AddContentOk = {
   link: UrlString;
@@ -124,14 +124,14 @@ export type AddContentOk = {
 }
 
 /**
- * returned if the content had already been added to the system, and the call was not a synereo url.
+ * returned if the content had already been added to the system, and the call was not a pseudoq url.
  * 
- * prevLink: the root link of the previous amplification.
- * linkAmplifier: the moniker of the user who originally added the content.
+ * prevLink: the root link of the previous promotion.
+ * linkPromoter: the moniker of the user who originally added the content.
  */
 export type AddContentAlreadyRegistered = {
   prevLink: UrlString;
-  linkAmplifier: string;
+  linkPromoter: string;
 }
 
 /**
@@ -161,22 +161,22 @@ export type LoadLinkRequest = {
  * found: was the link found. If the link was not found, the remaining fields are not supplied.
  * url: the url of the found link.
  * linkDepth: the number of parents of the found link.
- * linkAmplifier: the moniker of the user who owns the found link.
+ * linkPromoter: the moniker of the user who owns the found link.
  */
 export type LoadLinkResponse = {
   found: boolean;
   url?: UrlString;
   linkDepth?: Integer;
-  linkAmplifier?: string;
+  linkPromoter?: string;
 }
 
 /**
  * getRedirect method.
  * 
- * used when the client has detected that a synereo link url is being loaded, and it needs to be redirect the interface (tab page) to the
+ * used when the client has detected that a pseudoq link url is being loaded, and it needs to be redirect the interface (tab page) to the
  * underlying content url.
  * 
- * linkUrl: the synereo url requiring the redirect info.
+ * linkUrl: the pseudoq url requiring the redirect info.
  */
 export type GetRedirectRequest = { linkUrl: UrlString; }
 
@@ -184,13 +184,13 @@ export type GetRedirectRequest = { linkUrl: UrlString; }
  * found: was the link found. If the link was not found, the remaining fields are not supplied.
  * contentUrl: the url the client should redirect to.
  * linkDepth: the number of parents of the link.
- * linkAmplifier: the moniker of the user who owns the link.
+ * linkPromoter: the moniker of the user who owns the link.
  */
 export type GetRedirectResponse = {
   found: boolean;
   contentUrl?: UrlString;
   linkDepth?: Integer;
-  linkAmplifier?: string;
+  linkPromoter?: string;
 }
 
 /**
@@ -240,7 +240,7 @@ export type GetUserLinksResponse = {
  * 
  * linkId: the id of the link
  * contentUrl: the content url the link will redirect to.
- * linkDepth: the number of parent links in the chain (via re-amplification).
+ * linkDepth: the number of parent links in the chain (via re-promotion).
  * viewCount: the number of views the link has registered.
  * promotionsCount: the number of other users the link has been sent to.
  * deliveries: the number of other users who have actually received the link.

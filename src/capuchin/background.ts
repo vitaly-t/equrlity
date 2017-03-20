@@ -37,7 +37,7 @@ function getChromeAccessToken(): Promise<string> {
 
 async function initialize() {
   console.log("initializing...");
-  localForage.config({ name: 'synereo-capuchin' });
+  localForage.config({ name: 'pseudoq-capuchin' });
   const keys: string[] = await localForage.keys();
   const userInfo: chrome.identity.UserInfo = await getProfile();
   const chromeToken: string = await getChromeAccessToken();

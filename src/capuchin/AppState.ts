@@ -3,15 +3,13 @@ import { UserLinkItem, PostInfoItem } from '../lib/rpc';
 import * as Dbt from '../lib/datatypes';
 import *as Utils from '../lib/utils';
 
-export interface LinkInfo { synereoUrl: Url, linkDepth: number, linkAmplifier: string };
-
-export type PopupMode = "Amplify" | "Settings";
+export interface LinkInfo { pseudoqUrl: Url, linkDepth: number, linkPromoter: string };
 
 export interface AppState {
   publicKey: JsonWebKey | null;
   privateKey: JsonWebKey | null;
   links: Map<string, LinkInfo>;
-  redirects: Map<string, string>;   // keys are synereo urls - values are source urls 
+  redirects: Map<string, string>;   // keys are pseudoq urls - values are source urls 
   activeUrl: string | null;
   moniker: string;
   email: string;
@@ -40,16 +38,16 @@ export function getLinked(state: AppState, curl: string): LinkInfo {
   return state.links.get(prepareUrl(curl));
 }
 
-export function setLink(state: AppState, curl_: string, syn_: string, linkDepth: number, linkAmplifier: string): AppState {
+export function setLink(state: AppState, curl_: string, syn_: string, linkDepth: number, linkPromoter: string): AppState {
   let contentUrl = prepareUrl(curl_);
-  let synereoUrl = prePrepareUrl(syn_);
-  if (!synereoUrl.hash) synereoUrl.hash = '#' + contentUrl
-  else synereoUrl.hash = synereoUrl.hash.replace(' ', '_');
+  let pseudoqUrl = prePrepareUrl(syn_);
+  if (!pseudoqUrl.hash) pseudoqUrl.hash = '#' + contentUrl
+  else pseudoqUrl.hash = pseudoqUrl.hash.replace(' ', '_');
   let info = state.links.get(contentUrl);
-  if (info && format(info.synereoUrl) === format(synereoUrl)) return state;
+  if (info && format(info.pseudoqUrl) === format(pseudoqUrl)) return state;
   let links = new Map(state.links)
-  links.set(contentUrl, { synereoUrl, linkDepth, linkAmplifier });
-  let redir = format(synereoUrl);
+  links.set(contentUrl, { pseudoqUrl, linkDepth, linkPromoter });
+  let redir = format(pseudoqUrl);
   let i = redir.indexOf('#');
   redir = redir.substring(0, i);
   let redirects = new Map(state.redirects);
@@ -88,12 +86,12 @@ export function expandedUrl(state: AppState, curl_: string = state.activeUrl): s
   let rslt = curl;
   if (isSeen(state, curl)) {
     let info: LinkInfo = state.links.get(curl);
-    if (info) rslt = format(info.synereoUrl);
+    if (info) rslt = format(info.pseudoqUrl);
   }
   return rslt;
 }
 
-export function isSynereoLink(url: Url): boolean {
+export function isPseudoQLink(url: Url): boolean {
   let srch = Utils.serverUrl
   return (format(url).toLowerCase().startsWith(srch))
     && (url.path.startsWith("/link/"))

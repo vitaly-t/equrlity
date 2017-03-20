@@ -41,13 +41,13 @@ it("should work using direct calls", async () => {
   let link1 = cache.links.get(linkId1);
   expect(link1).toBeDefined("cache error on link1");
 
-  let rsp2 = await pg.handleAmplify(u2.userId, { publicKey: "", content: ok.link, signature: "", linkDescription: "amplify me baby", amount: 20 });
+  let rsp2 = await pg.handlePromote(u2.userId, { publicKey: "", content: ok.link, signature: "", linkDescription: "promote me baby", amount: 20 });
   expect(await countLinks()).toEqual(2);
   let rspt = rsp2 as Rpc.AddContentResponse
-  expect(rspt.link).toBeDefined("amplify call failed");
+  expect(rspt.link).toBeDefined("promote call failed");
   expect(cache.users.get(u2.userId).credits).toEqual(980);
   let url2 = parse(rspt.link);
-  expect(Utils.isSynereo(url2)).toEqual(true);
+  expect(Utils.isPseudoQURL(url2)).toEqual(true);
   let linkId2 = Utils.getLinkIdFromUrl(url2);
   expect(cache.getChainFromLinkId(linkId2).length).toEqual(2, "link not chained");
 
@@ -68,7 +68,7 @@ it("should work using direct calls", async () => {
     expect(ok.link).toBeDefined("add content call failed");
     let contentId = cache.getContentIdFromContent(content);
     let url = parse(ok.link);
-    expect(Utils.isSynereo(url)).toEqual(true);
+    expect(Utils.isPseudoQURL(url)).toEqual(true);
     let linkId = Utils.getLinkIdFromUrl(url);
     let prom = await pg.promotionsCount(linkId);
     expect(prom).toEqual(1, "promotions not working");
@@ -84,9 +84,9 @@ it("should work using direct calls", async () => {
     expect(cache.links.get(linkId).amount).toEqual(linkbal - 1, "link amount not adjusted for view");
 
     expect(cache.userlinks.get(u1.userId).length).toEqual(1, "social graph not correct");
-    let rsp2 = await pg.handleAmplify(u3.userId, { publicKey: "", content: ok.link, signature: "", linkDescription: "yaal2", amount: 10 });
+    let rsp2 = await pg.handlePromote(u3.userId, { publicKey: "", content: ok.link, signature: "", linkDescription: "yaal2", amount: 10 });
     let ok2 = rsp2 as Rpc.AddContentOk;
-    expect(ok2.link).toBeDefined("amplify call failed");
+    expect(ok2.link).toBeDefined("Promote call failed");
     expect(cache.userlinks.get(u1.userId).length).toEqual(2, "social graph not extended");
     {
       let url = parse(ok2.link);
@@ -94,16 +94,16 @@ it("should work using direct calls", async () => {
       let bal = cache.links.get(linkId).amount;
       expect(cache.getChainFromLinkId(linkId2).length).toEqual(2, "link not chained");
 
-      // user4 views amplified link
+      // user4 views promoted link
       await pg.payForView(u4.userId, linkId2);
       let newbal = cache.links.get(linkId).amount;
       expect(newbal).toEqual(bal + 1, "incorrect payment for chained view");
     }
 
     // redeem link  testing - particularly re-grafting..
-    let rsp3 = await pg.handleAmplify(u4.userId, { publicKey: "", content: ok.link, signature: "", linkDescription: "yaal3", amount: 10 });
+    let rsp3 = await pg.handlePromote(u4.userId, { publicKey: "", content: ok.link, signature: "", linkDescription: "yaal3", amount: 10 });
     let ok3 = rsp3 as Rpc.AddContentOk;
-    expect(ok3.link).toBeDefined("amplify call failed");
+    expect(ok3.link).toBeDefined("promote call failed");
     {
       let bal = cache.users.get(u1.userId).credits;
       let link = cache.links.get(linkId);

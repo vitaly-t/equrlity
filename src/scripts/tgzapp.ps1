@@ -1,5 +1,5 @@
 $source = "./dist/capuchin_rel"
-$destination = "./assets/synereo-plugin.tar.gz"
+$destination = "./assets/pseudoqurl-plugin.tar.gz"
 
 set-alias sz "D:\dev\tools\7za.exe"  
 # create temp dir, copy all files into it etc

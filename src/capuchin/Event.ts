@@ -1,6 +1,6 @@
 import {
   AppState, initState, setLink, expandedUrl, isSeen, setLoading,
-  getRedirectUrl, prepareUrl, isSynereoLink, PopupMode
+  getRedirectUrl, prepareUrl, isPseudoQLink
 } from './AppState';
 
 import * as localForage from "localforage";
@@ -105,14 +105,14 @@ async function currentTab(): Promise<chrome.tabs.Tab> {
 }
 
 function extractHeadersToState(st: AppState, rsp: AxiosResponse): AppState {
-  let credits = parseInt(rsp.headers['x-syn-credits']);
-  let moniker = rsp.headers['x-syn-moniker'];
+  let credits = parseInt(rsp.headers['x-psq-credits']);
+  let moniker = rsp.headers['x-psq-moniker'];
 
-  let jwt = rsp.headers['x-syn-token'];
+  let jwt = rsp.headers['x-psq-token'];
   if (!st.jwt && !jwt) throw new Error("Expected token but none received");
   jwt = jwt || st.jwt;
-  let email = rsp.headers['x-syn-email'] || st.email;
-  let authprov = rsp.headers['x-syn-authprov'] || st.authprov;
+  let email = rsp.headers['x-psq-email'] || st.email;
+  let authprov = rsp.headers['x-psq-authprov'] || st.authprov;
 
   return { ...st, credits, moniker, jwt, email, authprov };
 }
@@ -168,9 +168,9 @@ export namespace AsyncHandlers {
         chrome.runtime.sendMessage({ eventType: 'RenderMessage', msg: "Content already registered." });
         // very naughty state mutation here ... so sue me!!
         // this is to prevent an immediate render from instantaneously wiping out the above message.
-        let synereoUrl = parse(rslt.prevLink);
-        let linkAmplifier = rslt.linkAmplifier
-        st.links.set(url, { synereoUrl, linkDepth: 0, linkAmplifier });
+        let pseudoqUrl = parse(rslt.prevLink);
+        let linkPromoter = rslt.linkPromoter
+        st.links.set(url, { pseudoqUrl, linkDepth: 0, linkPromoter });
         return st;
       }
       else {  //  a new link has been generated 
@@ -188,7 +188,7 @@ export namespace AsyncHandlers {
       st = extractHeadersToState(st, response);
       let rslt: Rpc.GetRedirectResponse = extractResult(response);
       if (rslt.found) {
-        st = setLink(st, rslt.contentUrl, curl, rslt.linkDepth, rslt.linkAmplifier);
+        st = setLink(st, rslt.contentUrl, curl, rslt.linkDepth, rslt.linkPromoter);
         st = { ...st, activeUrl: rslt.contentUrl };
         console.log("redirecting to: " + rslt.contentUrl);
         chrome.tabs.update(tab.id, { url: rslt.contentUrl });
@@ -232,13 +232,13 @@ export namespace AsyncHandlers {
       chrome.tabs.update(tab.id, { url: tgt });
     }
     if (isSeen(state, curl)) return (st => { return { ...st, activeUrl: curl }; });
-    if (isSynereoLink(parse(curl))) return GetRedirect(state, curl)
+    if (isPseudoQLink(parse(curl))) return GetRedirect(state, curl)
     let response = await Comms.sendLoadLink(state, curl);
     let thunk = (st: AppState) => {
       st = extractHeadersToState(st, response);
       let rslt: Rpc.LoadLinkResponse = extractResult(response);
       st = { ...st, activeUrl: curl };
-      if (rslt.found) st = setLink(st, curl, rslt.url, rslt.linkDepth, rslt.linkAmplifier);
+      if (rslt.found) st = setLink(st, curl, rslt.url, rslt.linkDepth, rslt.linkPromoter);
       return st;
     };
     return thunk;
