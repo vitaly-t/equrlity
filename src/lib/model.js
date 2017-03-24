@@ -173,7 +173,6 @@ export default {
       "rowType": "Content",
       "primaryKey": ["contentId"],
       "autoIncrement": "contentId",
-      "uniques": [["content"]],
       "updated": "updated",
       "foreignKeys": [
         { "ref": "users", "columns": ["userId"] },
@@ -185,10 +184,9 @@ export default {
       "autoIncrement": "linkId",
       "foreignKeys": [
         { "ref": "users", "columns": ["userId"] },
-        { "ref": "contents", "columns": ["contentId"] },
         { "ref": "links", "columns": ["prevLink"] },
       ],
-      "uniques": [["contentId", "userId"]],
+      "uniques": [["url", "userId"]],
     },
     "invitations": {
       "rowType": "Invitation",

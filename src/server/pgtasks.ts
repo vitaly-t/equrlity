@@ -155,6 +155,10 @@ export async function getLinksForContentId(t: ITask<any>, id: Dbt.contentId): Pr
   return await t.any(`select * from links where url = '${url}'`);
 }
 
+export async function getLinksForUrl(t: ITask<any>, url: Dbt.urlString): Promise<Dbt.Link[]> {
+  return await t.any(`select * from links where url = '${url}'`);
+}
+
 export async function isPromoted(t: ITask<any>, userId: Dbt.userId, linkId: Dbt.linkId): Promise<boolean> {
   let rslt = await t.any(`select created from promotions where "userId" = '${userId}' and "linkId" = ${linkId}`);
   return rslt.length === 1;
@@ -192,9 +196,9 @@ export async function promoteContent(t: ITask<any>, userId: Dbt.userId, contentI
   let cont = await retrieveRecord<Dbt.Content>(t, "contents", { contentId });
   if (amount > usr.credits) throw new Error("Negative balances not allowed");
   let rslt: CacheUpdate[] = [];
-  let links = await t.any(`select "linkId" from links where "contentId" = ${contentId}`)
-  if (links.length > 0) throw new Error("Content has already been published")
   let url = Utils.contentToUrl(contentId);
+  let links = await t.any(`select "linkId" from links where url = '${url}'`)
+  if (links.length > 0) throw new Error("Content has already been published")
   let linkDescription = cont.title;
   let link: Dbt.Link = { ...emptyLink(), userId, url, linkDescription, amount };
   link = await insertRecord<Dbt.Link>(t, "links", link);
@@ -207,10 +211,16 @@ export async function promoteContent(t: ITask<any>, userId: Dbt.userId, contentI
 export async function promoteLink(t: ITask<any>, userId: Dbt.userId, linkurl: string, linkDescription, amount: Dbt.integer, contentType: Dbt.contentType = "url"): Promise<CacheUpdate[]> {
   let usr = await retrieveRecord<Dbt.User>(t, "users", { userId });
   if (amount > usr.credits) throw new Error("Negative balances not allowed");
-
-  let prevLink = Utils.getLinkIdFromUrl(parse(linkurl));
-  let prv = await retrieveRecord<Dbt.Link>(t, "links", { linkId: prevLink });
-  let link: Dbt.Link = { ...prv, userId, prevLink, linkDescription, amount };
+  let ourl = parse(linkurl);
+  let link: Dbt.Link = null;
+  if (Utils.isPseudoQLinkURL(ourl)) {
+    let prevLink = Utils.getLinkIdFromUrl(parse(linkurl));
+    let prv = await retrieveRecord<Dbt.Link>(t, "links", { linkId: prevLink });
+    link = { ...prv, userId, prevLink, linkDescription, amount };
+  }
+  else {
+    link = { ...emptyLink(), userId, url: linkurl, linkDescription, amount };
+  }
   let rslt: CacheUpdate[] = [];
   link = await insertRecord<Dbt.Link>(t, "links", link);
   console.log("inserted link: " + link.linkId);
@@ -266,7 +276,7 @@ export async function viewCount(t: ITask<any>, linkId: Dbt.linkId): Promise<numb
 }
 
 export async function getLinkAlreadyInvestedIn(t: ITask<any>, userId: Dbt.userId, url: Dbt.urlString): Promise<Dbt.linkId | null> {
-  let recs = await t.any(`select "linkId" from links where url = ${url} and "userId" = '${userId}' `);
+  let recs = await t.any(`select "linkId" from links where url = '${url}' and "userId" = '${userId}' `);
   if (recs.length > 0) return recs[0].linkId;
   return null;
 }

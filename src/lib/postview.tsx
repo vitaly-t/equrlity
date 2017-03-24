@@ -37,7 +37,7 @@ export class PostView extends React.Component<PostViewProps, PostViewState> {
     let body = decoder.decode(view);
     let h = { __html: md.render(body) };
     let lstedit = post.updated ? oxiDate.toFormat(new Date(post.updated), "DDDD, MMMM D @ HH:MIP") : 'never';
-    let pub = post.published ? oxiDate.toFormat(new Date(post.published), "DDDD, MMMM D @ HH:MIP") : 'never';
+    //let pub = post.published ? oxiDate.toFormat(new Date(post.published), "DDDD, MMMM D @ HH:MIP") : 'never';
     let tags = post.tags
     let tagbtns = tags.map(t => <Tag key={'tag:' + t} >{t}</Tag>);
     return (
@@ -49,7 +49,6 @@ export class PostView extends React.Component<PostViewProps, PostViewState> {
           {tagbtns}
         </div>
         <div style={rowStyle} >Created by: {creator}.</div>
-        <div style={rowStyle} >Published: {pub}.</div>
         <div style={rowStyle} >Last Edited: {lstedit}.</div>
       </div>
     );

@@ -128,35 +128,10 @@ export function getLinkDepth(link: Dbt.Link): Dbt.integer {
   return rslt;
 }
 
-export function getContentFromLinkId(linkId: Dbt.linkId): Dbt.content | null {
+export function getContentFromLinkId(linkId: Dbt.linkId): Dbt.urlString | null {
   let link = links.get(linkId);
   if (!link) return null;
-  let content = contents.get(link.contentId);
-  if (!content) return null;
-  return content.content;
-}
-
-export function getContentIdFromLinkId(linkId: Dbt.linkId): Dbt.contentId | null {
-  let link = links.get(linkId);
-  if (!link) return null;
-  let content = contents.get(link.contentId);
-  if (!content) return null;
-  return content.contentId;
-}
-
-export function getContentIdFromContent(content: string): Dbt.contentId | null {
-  let result = null;
-  for (const [k, v] of contents) {
-    if (v.content === content) {
-      result = k;
-      break;
-    }
-  }
-  return result;
-}
-
-export function isContentKnown(content: string): boolean {
-  return getContentIdFromContent(content) != null;
+  return link.url;
 }
 
 export function linkToUrl(linkId: Dbt.linkId): Dbt.urlString {

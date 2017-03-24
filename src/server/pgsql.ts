@@ -230,6 +230,14 @@ export async function findRootLinkForContentId(id: Dbt.contentId): Promise<Dbt.L
   return await db.task(t => tasks.getLinksForContentId(t, id));
 }
 
+export async function getRootLinksForUrl(url: Dbt.urlString): Promise<Dbt.Link[]> {
+  return await db.task(t => tasks.getRootLinksForUrl(t, url));
+}
+
+export async function getLinksForUrl(url: Dbt.urlString): Promise<Dbt.Link | null> {
+  return await db.task(t => tasks.getLinksForUrl(t, url));
+}
+
 export async function findRootLinkForUrl(url: Dbt.urlString): Promise<Dbt.Link | null> {
   return await db.task(t => tasks.findRootLinkForUrl(t, url));
 }
@@ -376,24 +384,27 @@ async function _handlePromoteLink(t: ITask<any>, userId, { publicKey, url, signa
   let link = null;
   let linkDepth = 0;
   let rslt: cache.CacheUpdate[] = [];
-  linkId = Utils.getLinkIdFromUrl(ourl);
-  link = cache.links.get(linkId);
-  linkDepth = cache.getLinkDepth(link);
+  if (Utils.isPseudoQLinkURL(ourl)) {
+    linkId = Utils.getLinkIdFromUrl(ourl);
+    link = cache.links.get(linkId);
+    linkDepth = cache.getLinkDepth(link);
 
-  if (link.userId === userId) {
-    console.log("investing in link: " + linkId);
-    rslt = await tasks.investInLink(t, link, amount);
+    if (link.userId === userId) {
+      console.log("investing in link: " + linkId);
+      rslt = await tasks.investInLink(t, link, amount);
+    }
+    else {
+      cache.connectUsers(userId, link.userId);
+      let prevId = await tasks.getLinkAlreadyInvestedIn(t, userId, url);
+      if (prevId) throw new Error("user has previously invested in this content");
+      rslt = await tasks.promoteLink(t, userId, url, linkDescription, amount);
+      linkDepth += 1;
+    }
   }
   else {
-    cache.connectUsers(userId, link.userId);
-    let prevId = await tasks.getLinkAlreadyInvestedIn(t, userId, url);
-    if (prevId) throw new Error("user has previously invested in this content");
     rslt = await tasks.promoteLink(t, userId, url, linkDescription, amount);
-    linkDepth += 1;
-    link = rslt.find(e => e.table === "links" as cache.CachedTable).record;
-    // this call is really just to aid testing
-    // through the UI it should not be possible to promote a link without first viewing it
   }
+  link = rslt.find(e => e.table === "links" as cache.CachedTable).record;
   await _promoteLink(t, link, amount);
   let linkPromoter = cache.users.get(userId).userName;
   return [rslt, { link: Utils.linkToUrl(link.linkId, linkDescription), linkDepth, linkPromoter }];
