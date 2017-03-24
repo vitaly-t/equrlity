@@ -7,6 +7,8 @@ import { AppState } from './AppState';
 import * as Utils from '../lib/utils';
 import * as Dbt from '../lib/datatypes';
 
+
+
 async function apiRequest(st: AppState) {
   let headers = { 'content-type': 'application/json', 'Accept': 'application/json' };
   if (st.jwt) headers['Authorization'] = 'Bearer ' + st.jwt;
@@ -51,13 +53,24 @@ export async function sendApiRequest(st: AppState, method: Rpc.Method, params: a
   }
 }
 
-export async function sendAddContent(st: AppState, url: string, linkDescription: string, amount: number): Promise<AxiosResponse> {
+export async function sendPromoteContent(st: AppState, contentId: Dbt.contentId, linkDescription: string, amount: number, tags: string[]): Promise<AxiosResponse> {
+  const privateCryptoKey: CryptoKey = await Crypto.importPrivateKeyfromJWK(st.privateKey);
+  const signature: ArrayBuffer = await Crypto.signData(privateCryptoKey, UTF8.stringToUtf8ByteArray(contentId.toString()).buffer);
+  const uint8ArraySignature = new Uint8Array(signature);
+  const sig = Utils.printBase64Binary(new Uint8Array(signature));
+  const mime_ext = "txt";
+  let req: Rpc.PromoteContentRequest = { publicKey: st.publicKey, contentId, signature: sig, linkDescription, amount, tags };
+  return await sendApiRequest(st, "promoteContent", req);
+}
+
+export async function sendPromoteLink(st: AppState, url: string, linkDescription: string, amount: number, tags: string[]): Promise<AxiosResponse> {
   const privateCryptoKey: CryptoKey = await Crypto.importPrivateKeyfromJWK(st.privateKey);
   const signature: ArrayBuffer = await Crypto.signData(privateCryptoKey, UTF8.stringToUtf8ByteArray(url).buffer);
   const uint8ArraySignature = new Uint8Array(signature);
   const sig = Utils.printBase64Binary(new Uint8Array(signature));
-  let req: Rpc.AddContentRequest = { publicKey: st.publicKey, content: url, signature: sig, linkDescription, amount };
-  return await sendApiRequest(st, "addContent", req);
+  const mime_ext = "txt";
+  let req: Rpc.PromoteLinkRequest = { publicKey: st.publicKey, url, signature: sig, linkDescription, amount, tags };
+  return await sendApiRequest(st, "promoteLink", req);
 }
 
 export async function sendInitialize(st: AppState): Promise<AxiosResponse> {
@@ -84,10 +97,10 @@ export async function sendRedeemLink(st: AppState, linkId: Dbt.linkId): Promise<
   return await sendApiRequest(st, "redeemLink", { linkId });
 }
 
-export async function sendGetPostBody(st: AppState): Promise<AxiosResponse> {
-  return await sendApiRequest(st, "getPostBody", { postId: st.currentPost.postId });
+export async function sendGetContentBody(st: AppState): Promise<AxiosResponse> {
+  return await sendApiRequest(st, "getContentBody", { contentId: st.currentContent.contentId });
 }
 
-export async function sendSavePost(st: AppState, req: Rpc.SavePostRequest): Promise<AxiosResponse> {
-  return await sendApiRequest(st, "savePost", req);
+export async function sendSaveContent(st: AppState, req: Rpc.SaveContentRequest): Promise<AxiosResponse> {
+  return await sendApiRequest(st, "saveContent", req);
 }

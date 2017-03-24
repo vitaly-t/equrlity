@@ -218,16 +218,20 @@ export async function touchAuth(prov, authId) {
   cache.auths.set(auth.authProvider + ":" + auth.authId, auth);
 }
 
-export async function getRootLinkIdsForContentId(id: Dbt.contentId): Promise<Dbt.Link[]> {
-  return await db.task(t => tasks.getRootLinkIdsForContentId(t, id));
+export async function getRootLinksForContentId(id: Dbt.contentId): Promise<Dbt.Link[]> {
+  return await db.task(t => tasks.getRootLinksForContentId(t, id));
 }
 
-export async function getLinkFromContentId(id: Dbt.contentId): Promise<Dbt.Link | null> {
-  return await db.task(t => tasks.getLinkFromContentId(t, id));
+export async function getLinksForContentId(id: Dbt.contentId): Promise<Dbt.Link | null> {
+  return await db.task(t => tasks.getLinksForContentId(t, id));
 }
 
-export async function getLinkFromContent(url: Dbt.content): Promise<Dbt.Link | null> {
-  return await db.task(t => tasks.getLinkFromContent(t, url));
+export async function findRootLinkForContentId(id: Dbt.contentId): Promise<Dbt.Link | null> {
+  return await db.task(t => tasks.getLinksForContentId(t, id));
+}
+
+export async function findRootLinkForUrl(url: Dbt.urlString): Promise<Dbt.Link | null> {
+  return await db.task(t => tasks.findRootLinkForUrl(t, url));
 }
 
 export async function isPromoted(userId: Dbt.userId, linkId: Dbt.linkId): Promise<boolean> {
@@ -296,15 +300,8 @@ export async function promoteLink(link: Dbt.Link, amount: Dbt.integer): Promise<
   return await db.task(t => _promoteLink(t, link, amount));
 }
 
-export async function insertContent(userId: Dbt.userId, content: string, linkDescription: string, amount: Dbt.integer, contentType: Dbt.contentType = "url"): Promise<cache.CacheUpdate[]> {
-  let rslt: cache.CacheUpdate[] = await db.tx(t => tasks.insertContent(t, userId, content, linkDescription, amount, contentType));
-  let linkUpdt = rslt.find(e => e.table === "links" as cache.CachedTable);
-  await promoteLink(linkUpdt.record, amount);
-  return rslt;
-}
-
 export async function promoteContent(userId: Dbt.userId, content: string, linkDescription, amount: Dbt.integer, contentType: Dbt.contentType = "url"): Promise<cache.CacheUpdate[]> {
-  let rslt: cache.CacheUpdate[] = await db.task(t => tasks.promoteContent(t, userId, content, linkDescription, amount, contentType));
+  let rslt: cache.CacheUpdate[] = await db.task(t => tasks.promoteLink(t, userId, content, linkDescription, amount, contentType));
   let linkUpdt = rslt.find(e => e.table === "links" as cache.CachedTable);
   await promoteLink(linkUpdt.record, amount);
   return rslt;
@@ -331,7 +328,8 @@ export async function viewCount(linkId: Dbt.linkId): Promise<number> {
 }
 
 export async function getLinkAlreadyInvestedIn(userId: Dbt.userId, contentId: Dbt.contentId): Promise<Dbt.linkId | null> {
-  return await db.task(t => tasks.getLinkAlreadyInvestedIn(t, userId, contentId));
+  let url = Utils.contentToUrl(contentId);
+  return await db.task(t => tasks.getLinkAlreadyInvestedIn(t, userId, url));
 }
 
 export async function payForView(viewerId: Dbt.userId, viewedLinkId: Dbt.linkId): Promise<void> {
@@ -351,44 +349,46 @@ export async function createUser(email?: string): Promise<Dbt.User> {
   return user;
 };
 
-async function _handleAddContent(t: ITask<any>, userId, { publicKey, content, signature, linkDescription, amount }): Promise<[cache.CacheUpdate[], Rpc.SendAddContentResponse]> {
-  let link = await tasks.getLinkFromContent(t, content);
-  if (link) {
-    let linkPromoter = cache.users.get(userId).userName;
-    let linkDepth = cache.getLinkDepth(link);
-    let rsp: Rpc.AddContentAlreadyRegistered = { prevLink: cache.linkToUrl(link.linkId), linkPromoter };
-    return [[], rsp];
-  }
-  let updts = await tasks.insertContent(t, userId, content, linkDescription, amount);
-  link = updts.find(e => e.table === "links" as cache.CachedTable).record;
+async function _handlePromoteContent(t: ITask<any>, userId, { publicKey, contentId, signature, amount }): Promise<[cache.CacheUpdate[], Rpc.PromoteContentResponse]> {
+  let cont = await tasks.retrieveRecord<Dbt.Content>(t, "contents", { contentId });
+  if (userId !== cont.userId) throw new Error("Content owned by different user");
+  let links = await tasks.getRootLinksForContentId(t, contentId);
+  if (links.length > 0) throw new Error("Content already promoted");
+  let url = Utils.contentToUrl(contentId);
+  let updts = await tasks.promoteLink(t, userId, url, cont.title, amount);
+  let link = updts.find(e => e.table === "links" as cache.CachedTable).record;
   await _promoteLink(t, link, amount);
-  let rsp: Rpc.AddContentOk = { link: Utils.linkToUrl(link.linkId, linkDescription), linkDepth: 0 };
+  let rsp: Rpc.PromoteContentResponse = { url };
   return [updts, rsp];
 }
 
-export async function handleAddContent(userId, { publicKey, content, signature, linkDescription, amount }): Promise<Rpc.SendAddContentResponse> {
-  let pr = await db.tx(t => _handleAddContent(t, userId, { publicKey, content, signature, linkDescription, amount }));
+export async function handlePromoteContent(userId, { publicKey, contentId, signature, amount }): Promise<Rpc.PromoteContentResponse> {
+  let pr = await db.tx(t => _handlePromoteContent(t, userId, { publicKey, contentId, signature, amount }));
   let updts: cache.CacheUpdate[] = pr[0];
-  let rsp: Rpc.SendAddContentResponse = pr[1];
+  let rsp: Rpc.PromoteContentResponse = pr[1];
   cache.update(updts);
   return rsp;
 }
 
-async function _handlePromote(t: ITask<any>, userId, { publicKey, content, signature, linkDescription, amount }): Promise<[cache.CacheUpdate[], Rpc.AddContentOk]> {
-  let linkId = Utils.getLinkIdFromUrl(parse(content));
-  let link = cache.links.get(linkId);
-  let linkDepth = cache.getLinkDepth(link);
+async function _handlePromoteLink(t: ITask<any>, userId, { publicKey, url, signature, linkDescription, amount }): Promise<[cache.CacheUpdate[], Rpc.PromoteLinkResponse]> {
+  let ourl = parse(url);
+  let linkId = 0;
+  let link = null;
+  let linkDepth = 0;
   let rslt: cache.CacheUpdate[] = [];
+  linkId = Utils.getLinkIdFromUrl(ourl);
+  link = cache.links.get(linkId);
+  linkDepth = cache.getLinkDepth(link);
+
   if (link.userId === userId) {
     console.log("investing in link: " + linkId);
     rslt = await tasks.investInLink(t, link, amount);
   }
   else {
     cache.connectUsers(userId, link.userId);
-    let contentId = cache.getContentIdFromContent(content);
-    let prevId = await tasks.getLinkAlreadyInvestedIn(t, userId, contentId);
+    let prevId = await tasks.getLinkAlreadyInvestedIn(t, userId, url);
     if (prevId) throw new Error("user has previously invested in this content");
-    rslt = await tasks.promoteContent(t, userId, content, linkDescription, amount);
+    rslt = await tasks.promoteLink(t, userId, url, linkDescription, amount);
     linkDepth += 1;
     link = rslt.find(e => e.table === "links" as cache.CachedTable).record;
     // this call is really just to aid testing
@@ -397,13 +397,12 @@ async function _handlePromote(t: ITask<any>, userId, { publicKey, content, signa
   await _promoteLink(t, link, amount);
   let linkPromoter = cache.users.get(userId).userName;
   return [rslt, { link: Utils.linkToUrl(link.linkId, linkDescription), linkDepth, linkPromoter }];
-
 }
 
-export async function handlePromote(userId, { publicKey, content, signature, linkDescription, amount }): Promise<Rpc.SendAddContentResponse> {
-  let pr = await db.tx(t => _handlePromote(t, userId, { publicKey, content, signature, linkDescription, amount }));
+export async function handlePromoteLink(userId, { publicKey, url, signature, linkDescription, amount }): Promise<Rpc.PromoteLinkResponse> {
+  let pr = await db.tx(t => _handlePromoteLink(t, userId, { publicKey, url, signature, linkDescription, amount }));
   let updts: cache.CacheUpdate[] = pr[0];
-  let rsp: Rpc.SendAddContentResponse = pr[1];
+  let rsp: Rpc.PromoteLinkResponse = pr[1];
   cache.update(updts);
   return rsp;
 }
@@ -413,7 +412,7 @@ async function _getUserLinks(t: ITask<any>, id: Dbt.userId): Promise<Rpc.UserLin
   let rslt: Rpc.UserLinkItem[] = []
   for (const l of a) {
     let linkId = l.linkId;
-    let contentUrl = cache.contents.get(l.contentId).content;
+    let contentUrl = l.url
     let linkDepth = cache.getLinkDepth(l);
     let viewCount = await tasks.viewCount(t, linkId);
     let promotionsCount = await tasks.promotionsCount(t, linkId);
@@ -429,29 +428,16 @@ export async function getUserLinks(id: Dbt.userId): Promise<Rpc.UserLinkItem[]> 
   return await db.task(t => _getUserLinks(t, id));
 }
 
-export async function getUserPosts(id: Dbt.userId): Promise<Rpc.PostInfoItem[]> {
-  return await db.task(t => tasks.getUserPosts(t, id));
+export async function getUserContents(id: Dbt.userId): Promise<Rpc.ContentInfoItem[]> {
+  return await db.task(t => tasks.getUserContents(t, id));
 }
 
-export async function getPostBody(id: Dbt.postId): Promise<string> {
-  return await db.task(t => tasks.getPostBody(t, id));
+export async function getContentBody(id: Dbt.contentId): Promise<string> {
+  return await db.task(t => tasks.getContentBody(t, id));
 }
 
-async function _savePost(t: ITask<any>, userId: Dbt.userId, req: Rpc.SavePostRequest): Promise<Dbt.Post> {
-  let post = await tasks.savePost(t, userId, req);
-  if (req.publish && req.investment > 0) {
-    let url = parse(Utils.serverUrl);
-    url.pathname = '/post/' + post.postId.toString();
-    let content = format(url);
-    await _handleAddContent(t, userId, { publicKey: '', content, signature: '', linkDescription: req.title, amount: req.investment });
-    let contentId = cache.getContentIdFromContent(content);
-    post = await tasks.updateRecord<Dbt.Post>(t, "posts", { ...post, contentId });
-  }
-  return post;
-}
-
-export async function savePost(userId: Dbt.userId, req: Rpc.SavePostRequest): Promise<Dbt.Post> {
-  return await db.tx(t => _savePost(t, userId, req));
+export async function saveContent(userId: Dbt.userId, req: Rpc.SaveContentRequest): Promise<Dbt.Content> {
+  return await db.task(t => tasks.saveContent(t, userId, req));
 }
 
 export async function registerInvitation(ipAddress: string, linkId: Dbt.linkId): Promise<Dbt.Invitation> {

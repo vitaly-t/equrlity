@@ -53,11 +53,14 @@
     "jwk-to-pem": "^1.2.6",
     "kcors": "^2.2.1",
     "koa": "^2.0.0",
+    "koa-body": "^2.0.0",
     "koa-bodyparser": "^3.1.0",
+    "koa-joi-router": "^5.0.0",
     "koa-router": "^7.0.1",
     "koa-send": "^3.3.0",
     "koa-websocket": "^3.0.1",
     "localforage": "1.4.3",
+    "mime-types": "^2.1.14",
     "passport-facebook": "^2.1.1",
     "passport-github": "^1.1.0",
     "passport-google-oauth": "^1.0.0",
@@ -95,6 +98,6 @@
     "webpack": "^2.2.0"
   },
   "engines": {
-    "node": "6.9.1"
+    "node": "7.7.4"
   }
 }

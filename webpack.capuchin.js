@@ -48,7 +48,7 @@ module.exports = function (env) {
               console.log("transforming: " + path);
               var str = (new TextDecoder('utf-8')).decode(content);
               str = str.replace("__CAPUCHIN_VERSION__", capuchinVersion());
-              str = str.replace("__GOOGLE_ID__", google_id);
+              //str = str.replace("__GOOGLE_ID__", google_id);
               return (new TextEncoder()).encode(str);
             }
             return content;

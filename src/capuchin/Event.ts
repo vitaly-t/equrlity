@@ -10,11 +10,19 @@ import { AxiosResponse } from 'axios';
 import * as Rpc from '../lib/rpc';
 import * as Dbt from '../lib/datatypes';
 
-export interface Save {
-  eventType: "Save";
-  url: string;
-  amount: number;
-  linkDescription: string;
+export interface AddContent {
+  eventType: "AddContent";
+  req: Rpc.AddContentRequest;
+}
+
+export interface PromoteContent {
+  eventType: "PromoteContent";
+  req: Rpc.PromoteContentRequest;
+}
+
+export interface PromoteLink {
+  eventType: "PromoteLink";
+  req: Rpc.PromoteLinkRequest;
 }
 
 export interface Initialize {
@@ -47,12 +55,12 @@ export interface LaunchSettingsPage {
 
 export interface LaunchPostEditPage {
   eventType: "LaunchPostEditPage";
-  post: Rpc.PostInfoItem;
+  post: Rpc.ContentInfoItem;
 }
 
-export interface SavePost {
-  eventType: "SavePost";
-  req: Rpc.SavePostRequest;
+export interface SaveContent {
+  eventType: "SaveContent";
+  req: Rpc.SaveContentRequest;
 }
 
 export interface CreatePost {
@@ -78,8 +86,8 @@ export interface Thunk {
   fn: (st: AppState) => AppState;
 }
 
-export type Message = Save | Initialize | Load | ActivateTab | Render | ChangeSettings | LaunchSettingsPage
-  | LaunchPostEditPage | SavePost | CreatePost | RedeemLink | GetUserLinks | DismissPromotion | Thunk;
+export type Message = AddContent | PromoteContent | PromoteLink | Initialize | Load | ActivateTab | Render | ChangeSettings | LaunchSettingsPage
+  | LaunchPostEditPage | SaveContent | CreatePost | RedeemLink | GetUserLinks | DismissPromotion | Thunk;
 
 export function getTab(tabId: number): Promise<chrome.tabs.Tab> {
   return new Promise(resolve => {
@@ -149,7 +157,7 @@ export namespace AsyncHandlers {
     return thunk;
   }
 
-  export async function Save(state: AppState, linkDescription: string, amount: number): Promise<(st: AppState) => AppState> {
+  export async function addUrlContent(state: AppState, linkDescription: string, amount: number, tags: string[]): Promise<(st: AppState) => AppState> {
     let curTab = await currentTab();
     if (!curTab) console.log("No current tab");
     if (curTab && prepareUrl(curTab.url) !== state.activeUrl) {
@@ -160,7 +168,36 @@ export namespace AsyncHandlers {
     }
     let src = state.activeUrl;
     let url = expandedUrl(state, src);
-    let response = await Comms.sendAddContent(state, url, linkDescription, amount)
+    let response = await Comms.sendAddUrlContent(state, url, linkDescription, amount, tags)
+    let thunk = (st: AppState) => {
+      st = extractHeadersToState(st, response);
+      let rslt: Rpc.PromoteContentResponse = extractResult(response);
+      if (!rslt.url) {
+        chrome.runtime.sendMessage({ eventType: 'RenderMessage', msg: "Content already registered." });
+        // need to prevent an immediate render from instantaneously wiping out the above message.
+        //let pseudoqUrl = parse(rslt.prevLink);
+        //let linkPromoter = rslt.linkPromoter
+        //st.links.set(url, { pseudoqUrl, linkDepth: 0, linkPromoter });
+        return st;
+      }
+      console.log("received link: " + rslt.url)
+      return setLink(st, src, rslt.url, 0, st.moniker);
+    };
+    return thunk;
+  }
+
+  export async function promoteLink(state: AppState, linkDescription: string, amount: number): Promise<(st: AppState) => AppState> {
+    let curTab = await currentTab();
+    if (!curTab) console.log("No current tab");
+    if (curTab && prepareUrl(curTab.url) !== state.activeUrl) {
+      console.log("Wrong tab");
+      console.log("current : " + curTab.url)
+      console.log("active : " + state.activeUrl)
+      return () => state;
+    }
+    let src = state.activeUrl;
+    let url = expandedUrl(state, src);
+    let response = await Comms.sendAddUrlContent(state, url, linkDescription, amount)
     let thunk = (st: AppState) => {
       st = extractHeadersToState(st, response);
       let rslt: Rpc.AddContentResponse = extractResult(response);

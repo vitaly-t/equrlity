@@ -5,7 +5,7 @@ export type authId = string;
 export type authProvider = "facebook" | "github" | "twitter" | "linkedin" | "chrome";
 export type binary = ArrayBuffer;
 export type contentCryptId = ArrayBuffer;
-export type contentType = "url" | "video" | "post" | "audio";
+export type contentType = "url" | "video" | "post" | "audio" | "image";
 export type created = Date;
 export type date = Date;
 export type email = string;
@@ -23,11 +23,11 @@ export type userGroup = "admin" | "author" | "member";
 export type urlString = string;
 export type userName = string;
 export type uuid = string;
-export type postId = number;
-export type content = string;
+export type content = ArrayBuffer;
 export type contentId = number;
 export type userId = string;
-export type varchar_160 = string;
+export type varchar_8 = string;
+export type varchar_254 = string;
 export type varchar_20 = string;
 
 export interface User {
@@ -39,6 +39,14 @@ export interface User {
   readonly updated: updated | null,
   readonly credits: integer | null,
   readonly groups: userGroup[] | null
+};
+
+export interface UserLink {
+  readonly user_A: userId | null,
+  readonly user_B: userId | null,
+  readonly tags: varchar_20[] | null,
+  readonly created: created | null,
+  readonly updated: updated | null
 };
 
 export interface Auth {
@@ -56,31 +64,23 @@ export interface Content {
   readonly content: content | null,
   readonly created: created | null,
   readonly updated: updated | null,
+  readonly mime_ext: varchar_8 | null,
+  readonly title: varchar_254 | null,
+  readonly tags: varchar_20[] | null,
   readonly cryptHash: binary | null
 };
 
 export interface Link {
   readonly linkId: linkId | null,
   readonly userId: userId | null,
-  readonly contentId: contentId | null,
   readonly linkDescription: linkDescription | null,
   readonly created: created | null,
   readonly updated: updated | null,
+  readonly url: urlString | null,
+  readonly tags: varchar_20[] | null,
   readonly prevLink: linkId | null,
   readonly hitCount: integer | null,
   readonly amount: integer | null
-};
-
-export interface Post {
-  readonly postId: postId | null,
-  readonly userId: userId | null,
-  readonly created: created | null,
-  readonly updated: updated | null,
-  readonly contentId: contentId | null,
-  readonly title: varchar_160 | null,
-  readonly body: text | null,
-  readonly tags: varchar_20[] | null,
-  readonly published: timestamp | null
 };
 
 export interface Invitation {

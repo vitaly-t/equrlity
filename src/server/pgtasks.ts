@@ -127,12 +127,17 @@ export function emptyLink(): Dbt.Link {
   return OxiGen.emptyRec<Dbt.Link>(oxb.tables.get("links"));
 }
 
-export async function getRootLinkIdsForContentId(t: ITask<any>, id: Dbt.contentId): Promise<Dbt.Link[]> {
-  return await t.any(`select * from links where "contentId" = ${id} and "prevLink" is null`);
+export async function getRootLinksForUrl(t: ITask<any>, url: Dbt.urlString): Promise<Dbt.Link[]> {
+  return await t.any(`select * from links where url = '${url}' and "prevLink" is null`);
 }
 
-export async function getLinkFromContentId(t: ITask<any>, id: Dbt.contentId): Promise<Dbt.Link | null> {
-  let recs = await getRootLinkIdsForContentId(t, id);
+export async function getRootLinksForContentId(t: ITask<any>, id: Dbt.contentId): Promise<Dbt.Link[]> {
+  let url = Utils.contentToUrl(id);
+  return await getRootLinksForUrl(t, url);
+}
+
+export async function findRootLinkForUrl(t: ITask<any>, url: Dbt.urlString): Promise<Dbt.Link> {
+  let recs = await getRootLinksForUrl(t, url);
   let l = recs.length;
   if (l == 0) return null;
   if (l == 1) return recs[0];
@@ -140,21 +145,19 @@ export async function getLinkFromContentId(t: ITask<any>, id: Dbt.contentId): Pr
   return recs[i];
 }
 
-export async function getLinkFromContent(t: ITask<any>, url: Dbt.content): Promise<Dbt.Link | null> {
-  let rslt = await t.oneOrNone(`select "contentId" from contents where content = '${url}'`);
-  if (!rslt) return null;
-  return await getLinkFromContentId(t, rslt.contentId);
+export async function findRootLinkForContentId(t: ITask<any>, id: Dbt.contentId): Promise<Dbt.Link> {
+  let url = Utils.contentToUrl(id);
+  return await findRootLinkForUrl(t, url);
+}
+
+export async function getLinksForContentId(t: ITask<any>, id: Dbt.contentId): Promise<Dbt.Link[]> {
+  let url = Utils.contentToUrl(id);
+  return await t.any(`select * from links where url = '${url}'`);
 }
 
 export async function isPromoted(t: ITask<any>, userId: Dbt.userId, linkId: Dbt.linkId): Promise<boolean> {
   let rslt = await t.any(`select created from promotions where "userId" = '${userId}' and "linkId" = ${linkId}`);
   return rslt.length === 1;
-}
-
-export async function getContentFromLinkId(t: ITask<any>, linkId: Dbt.linkId): Promise<Dbt.Content> {
-  let link: Dbt.Link = await retrieveRecord<Dbt.Link>(t, "links", { linkId });
-  let contentId = link.contentId;
-  return await retrieveRecord<Dbt.Content>(t, "contents", { contentId });
 }
 
 export async function linkToUrl(t: ITask<any>, linkId: Dbt.linkId): Promise<Dbt.urlString> {
@@ -184,14 +187,16 @@ export async function deliveriesCount(t: ITask<any>, linkId: Dbt.linkId): Promis
   return parseInt(rslt.cnt);
 }
 
-export async function insertContent(t: ITask<any>, userId: Dbt.userId, content: string, linkDescription: string, amount: Dbt.integer, contentType: Dbt.contentType = "url"): Promise<CacheUpdate[]> {
+export async function promoteContent(t: ITask<any>, userId: Dbt.userId, contentId: Dbt.contentId, amount: Dbt.integer): Promise<CacheUpdate[]> {
   let usr = await retrieveRecord<Dbt.User>(t, "users", { userId });
+  let cont = await retrieveRecord<Dbt.Content>(t, "contents", { contentId });
   if (amount > usr.credits) throw new Error("Negative balances not allowed");
   let rslt: CacheUpdate[] = [];
-  let cont = await insertRecord<Dbt.Content>(t, "contents", { ...emptyContent(), userId, content, contentType, amount });
-  rslt.push({ table: "contents" as CachedTable, record: cont });
-  let contentId = cont.contentId;
-  let link: Dbt.Link = { ...emptyLink(), userId, contentId, linkDescription, amount };
+  let links = await t.any(`select "linkId" from links where "contentId" = ${contentId}`)
+  if (links.length > 0) throw new Error("Content has already been published")
+  let url = Utils.contentToUrl(contentId);
+  let linkDescription = cont.title;
+  let link: Dbt.Link = { ...emptyLink(), userId, url, linkDescription, amount };
   link = await insertRecord<Dbt.Link>(t, "links", link);
   console.log("inserted link: " + link.linkId);
   rslt.push({ table: "links" as CachedTable, record: link });
@@ -199,11 +204,11 @@ export async function insertContent(t: ITask<any>, userId: Dbt.userId, content: 
   return rslt;
 }
 
-export async function promoteContent(t: ITask<any>, userId: Dbt.userId, content: string, linkDescription, amount: Dbt.integer, contentType: Dbt.contentType = "url"): Promise<CacheUpdate[]> {
+export async function promoteLink(t: ITask<any>, userId: Dbt.userId, linkurl: string, linkDescription, amount: Dbt.integer, contentType: Dbt.contentType = "url"): Promise<CacheUpdate[]> {
   let usr = await retrieveRecord<Dbt.User>(t, "users", { userId });
   if (amount > usr.credits) throw new Error("Negative balances not allowed");
 
-  let prevLink = Utils.getLinkIdFromUrl(parse(content));
+  let prevLink = Utils.getLinkIdFromUrl(parse(linkurl));
   let prv = await retrieveRecord<Dbt.Link>(t, "links", { linkId: prevLink });
   let link: Dbt.Link = { ...prv, userId, prevLink, linkDescription, amount };
   let rslt: CacheUpdate[] = [];
@@ -260,8 +265,8 @@ export async function viewCount(t: ITask<any>, linkId: Dbt.linkId): Promise<numb
   return parseInt(rslt.cnt);
 }
 
-export async function getLinkAlreadyInvestedIn(t: ITask<any>, userId: Dbt.userId, contentId: Dbt.contentId): Promise<Dbt.linkId | null> {
-  let recs = await t.any(`select "linkId" from links where "contentId" = ${contentId} and "userId" = '${userId}' `);
+export async function getLinkAlreadyInvestedIn(t: ITask<any>, userId: Dbt.userId, url: Dbt.urlString): Promise<Dbt.linkId | null> {
+  let recs = await t.any(`select "linkId" from links where url = ${url} and "userId" = '${userId}' `);
   if (recs.length > 0) return recs[0].linkId;
   return null;
 }
@@ -325,31 +330,18 @@ export async function createUser(t: ITask<any>, email?: string): Promise<Dbt.Use
   return await insertRecord<Dbt.User>(t, "users", usr);
 };
 
-export async function getUserPosts(t: ITask<any>, id: Dbt.userId): Promise<Rpc.PostInfoItem[]> {
-  let a: Dbt.Post[] = await t.any(`select * from posts where "userId" = '${id}' order by updated desc`);
-  let posts: Rpc.PostInfoItem[] = [];
-  for (const p of a) {
-    let { postId, created, updated, title, tags } = p;
-    let cont = await retrieveRecord<Dbt.Content>(t, "contents", { contentId: p.contentId });
-    let contentUrl = cont ? cont.content : null;
-    let published = cont ? cont.created : null;
-    let itm: Rpc.PostInfoItem = { postId, title, tags, published, contentUrl, created, updated };
-    posts.push(itm);
-  };
-  return posts;
+export async function getUserContents(t: ITask<any>, id: Dbt.userId): Promise<Rpc.ContentInfoItem[]> {
+  return await t.any(`select "contentId","contentType",mime_ext,created,updated,published,title,tags from contents where "userId" = '${id}' order by updated desc`);
 }
 
-export async function getPostBody(t: ITask<any>, id: Dbt.postId): Promise<string> {
+export async function getContentBody(t: ITask<any>, id: Dbt.contentId): Promise<string> {
   let rslt = await t.one(`select body from posts where "postId" = '${id}' `);
   return rslt.body;
 }
 
-export async function savePost(t: ITask<any>, userId: Dbt.userId, req: Rpc.SavePostRequest): Promise<Dbt.Post> {
-  let { postId, title, body, tags } = req;
-  let p = { userId, postId, title, body, tags };
-  let post: Dbt.Post;
-  if (req.publish && req.investment > 0) p['published'] = new Date();
-  return await upsertRecord<Dbt.Post>(t, "posts", p);
+export async function saveContent(t: ITask<any>, userId: Dbt.userId, req: Rpc.SaveContentRequest): Promise<Dbt.Content> {
+  if (req.contentId) return await updateRecord<Dbt.Content>(t, "contents", req);
+  return await insertRecord<Dbt.Content>(t, "contetts", req);
 }
 
 export async function registerInvitation(t: ITask<any>, ipAddress: string, linkId: Dbt.linkId): Promise<Dbt.Invitation> {

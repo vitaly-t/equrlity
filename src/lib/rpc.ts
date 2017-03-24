@@ -61,8 +61,8 @@ import * as Dbt from './datatypes';
  */
 
 //TODO: rename "getUserLinks" to "loadSettingsPage"
-export type Method = "addContent" | "initialize" | "changeMoniker" | "loadLink" | "getRedirect" | "changeSettings"
-  | "getUserLinks" | "redeemLink" | "getPostBody" | "savePost" | "removePost" | "removeContent" | "transferCredits" | "authenticate";
+export type Method = "initialize" | "authenticate" | "addContent" | "promoteContent" | "promoteLink" | "loadLink" | "getRedirect" | "changeSettings"
+  | "getUserLinks" | "redeemLink" | "getContentBody" | "saveContent" | "removeContent" | "transferCredits";
 
 /**
  * Informational type tags used to indicate intended usage.
@@ -92,57 +92,58 @@ export type InitializeResponse = {
 }
 
 /**
- * addContent method
+ * promoteContent method
  * 
- * Issued whenever content is added to the system, and also when a url is "Promoted", "Re-Promoted", "Re-Invested".
+ * used when to promote newly added content.
  * 
- * publicKey: not currently used. can be empty, but must be supplied.
- * content: the url being added. 
- *   - If it is a pseudoq url, it will intepreted as a "Re-Promote", unless the user has already (re-)promoted it, in which case it will be seen as a "Re-Invest".
- *   - otherwise it will be interpreted as fresh content, and will be added unless another user has already added it.
- * signature: currently ignored, but must be supplied.
+ * contentId: the id of the content to published. 
  * linkDescription: used in construction of the generated return link, appearing after the '#'. 
- * amount: the amount being invested in the link (deducted from the user's "wallet").
+ * amount: the amount being invested in the link (deducted from the user's credit balance).
  */
-export type AddContentRequest = {
-  publicKey: JsonWebKey;
-  content: UrlString;
-  signature: string;
+export type PromoteContentRequest = {
+  contentId: Dbt.contentId;
   linkDescription: string;
   amount: Integer;
+  publicKey: JsonWebKey;
+  signature: string;
+}
+
+export type PromoteContentResponse = {
+  url: Dbt.urlString | null;
 }
 
 /**
- * returned if the call was successful ie. a new link was generated.
+ * promoteLink method
  * 
+ * used when a url is "Promote"d (or "Re-Invest"ed).
+ * 
+ * url: the url being added. 
+ *   - it will intepreted as a "Promote", unless the user has already promoted it, in which case it will be seen as a "Re-Invest".
+ * linkDescription: used in construction of the generated return link, appearing after the '#'. 
+ * tags: classifying tags array
+ * amount: the amount being invested in the link (deducted from the user's credit balance).
+ * publicKey: used in conjunction with signature to prevent tampering.
+ * signature: see publicKey.
+ */
+export type PromoteLinkRequest = {
+  url: Dbt.urlString;
+  linkDescription: string;
+  tags: string[];
+  amount: Integer;
+  publicKey: JsonWebKey;
+  signature: string;
+}
+
+/**
  * link: the newly generated link
- * linkDepth: the number of parents the new link has.  Will be zero if not a "Re-Promote" or "Re-Invest"
+ * linkDepth: the number of parents the new link has. 
  */
-export type AddContentOk = {
-  link: UrlString;
+export type PromoteLinkResponse = {
+  link?: UrlString | null;
   linkDepth: Integer;
+  prevLink?: UrlString;
+  linkPromoter?: string;
 }
-
-/**
- * returned if the content had already been added to the system, and the call was not a pseudoq url.
- * 
- * prevLink: the root link of the previous promotion.
- * linkPromoter: the moniker of the user who originally added the content.
- */
-export type AddContentAlreadyRegistered = {
-  prevLink: UrlString;
-  linkPromoter: string;
-}
-
-/**
- * the & operator is a typescript Union, meaning that any of the fields in the components will be accepted. (covariant)
- */
-export type AddContentResponse = AddContentOk & AddContentAlreadyRegistered;
-
-/**
-* internal type used by the server when sending an add content response back to the client (contravariant).
-*/
-export type SendAddContentResponse = AddContentOk | AddContentAlreadyRegistered;
 
 
 /**
@@ -225,14 +226,14 @@ export type GetUserLinksRequest = {}
  * promotions: a list of links promoted by other system users to the current user, that have not previously been delivered.
  * connectedUsers: a list of other users' monikers to which the user is directly connected.
  * reachableUserCount: the number of others user's that the user is directly or indirectly connected to by transitive closure.
- * posts: an array of information items for posts uploaded by the user.
+ * contents: an array of information items for contents uploaded by the user.
  */
 export type GetUserLinksResponse = {
   links: UserLinkItem[];
   promotions: Dbt.urlString[];
   connectedUsers: Dbt.userName[];
   reachableUserCount: Dbt.integer;
-  posts: PostInfoItem[];
+  contents: ContentInfoItem[];
 }
 
 /**
@@ -249,7 +250,7 @@ export type GetUserLinksResponse = {
  */
 export type UserLinkItem = {
   linkId: Dbt.linkId;
-  contentUrl: Dbt.content;
+  contentUrl: Dbt.urlString;
   linkDepth: Dbt.integer;
   viewCount: Dbt.integer;
   promotionsCount: Dbt.integer;
@@ -258,39 +259,42 @@ export type UserLinkItem = {
 }
 
 /**
- * a line item in the posts array above.
+ * a line item in the contents array above.
  * 
- * postId: the id of the post.
- * title: the post title.
- * tags: array of string tags assigned to the post.
- * published: the timestamp of when the post was published.
- * contentUrl: the content url of the post (if published).
+ * contentId: the id of the content.
+ * title: the content title.
+ * tags: array of string tags assigned to the content.
+ * published: the timestamp of when the content was published.
+ * contentUrl: the content url of the content (if published).
  * rootLinkUrl: the url of the root link 
  */
-export type PostInfoItem = {
-  postId: Dbt.postId;
+export type ContentInfoItem = {
+  contentId: Dbt.contentId;
+  contentType: Dbt.contentType;
+  mime_ext: string;
   title: string;
   tags: string[];
   published: Dbt.timestamp;
-  contentUrl: Dbt.urlString;
   created: Dbt.created;
   updated: Dbt.updated;
 };
 
-export type GetPostBodyRequest = { postId: Dbt.postId };
-export type GetPostBodyResponse = { body: string };
+export type GetContentBodyRequest = { contentId: Dbt.contentId };
+export type GetContentBodyResponse = { body: string | null };
 
-export type SavePostRequest = {
-  postId: Dbt.postId;
+export type SaveContentRequest = {
+  contentId: Dbt.contentId;
+  contentType: Dbt.contentType;
+  mime_ext: string;
   title: string;
-  body: string;
+  content?: string;
   tags: string[];
   publish: boolean;
   investment?: Dbt.integer;
 }
 
-export type SavePostResponse = {
-  posts: PostInfoItem[];
+export type SaveContentResponse = {
+  contents: ContentInfoItem[];
 };
 
 /**
@@ -314,33 +318,14 @@ export type RedeemLinkResponse = { links: UserLinkItem[]; }
  * used to remove a content item from the system. Implicitly redeems all links associated with the content.
  * will only work if the current user is the owner of the content.
  * 
- * note that Capuchin does not currently expose this method in the UI.  It is performed implicitly via removePost, removeVideo etc..
- *
  * content: the url of the content to be removed 
  */
-export type RemoveContentRequest = { content: Dbt.urlString; }
+export type RemoveContentRequest = { url: Dbt.urlString; }
 
 /**
-* ok: true if successful, false indicates that content is not owned by the current user.
+* ok: true if successful, false probably indicates that content is not owned by the current user.
 */
 export type RemoveContentResponse = { ok: boolean; }
-
-/**
- * removePost method.
- * 
- * used to remove a content item from the system. Implicitly redeems all links associated with the content.
- * will only work if the current user is the owner of the content.
- *
- * content: the url of the content to be removed 
- */
-export type RemovePostRequest = { postId: Dbt.postId; }
-
-/**
-* links: the array of link information items owned by the user, after the link has been redeemed.
-* 
-* ok: true if successful, false indicates that content is not owned by the current user.
-*/
-export type RemovePostResponse = { ok: boolean; }
 
 /**
  * transferCredits method.
@@ -378,23 +363,18 @@ export type AuthenticateResponse = { ok: boolean; }
 
 // aggregate the above types
 
-export type RequestBody = AddContentRequest | InitializeRequest | LoadLinkRequest | GetRedirectRequest | ChangeSettingsRequest
-  | GetUserLinksRequest | RedeemLinkRequest | GetPostBodyRequest | RemoveContentRequest | TransferCreditsRequest | AuthenticateRequest;
+export type RequestBody = PromoteContentRequest | PromoteLinkRequest | InitializeRequest | LoadLinkRequest | GetRedirectRequest | ChangeSettingsRequest
+  | GetUserLinksRequest | RedeemLinkRequest | GetContentBodyRequest | RemoveContentRequest | TransferCreditsRequest | AuthenticateRequest;
 
-export type ResponseBody = AddContentResponse & SendAddContentResponse & InitializeResponse & LoadLinkResponse & GetRedirectResponse & ChangeSettingsResponse
-  & GetUserLinksResponse & RedeemLinkResponse & GetPostBodyResponse & RemoveContentResponse & TransferCreditsResponse & AuthenticateResponse;
+export type ResponseBody = PromoteContentResponse & PromoteLinkResponse & InitializeResponse & LoadLinkResponse & GetRedirectResponse & ChangeSettingsResponse
+  & GetUserLinksResponse & RedeemLinkResponse & GetContentBodyResponse & RemoveContentResponse & TransferCreditsResponse & AuthenticateResponse;
 
 // internal to server.
-export type RecvRequestBody = AddContentRequest & InitializeRequest & LoadLinkRequest & GetRedirectRequest & ChangeSettingsRequest
-  & GetUserLinksRequest & RedeemLinkRequest & GetPostBodyRequest & RemoveContentRequest & TransferCreditsRequest & AuthenticateRequest;
+export type RecvRequestBody = PromoteContentRequest & PromoteLinkRequest & InitializeRequest & LoadLinkRequest & GetRedirectRequest & ChangeSettingsRequest
+  & GetUserLinksRequest & RedeemLinkRequest & GetContentBodyRequest & RemoveContentRequest & TransferCreditsRequest & AuthenticateRequest;
 
-export type SendResponseBody = AddContentResponse | SendAddContentResponse | InitializeResponse | LoadLinkResponse | GetRedirectResponse | ChangeSettingsResponse
-  | GetUserLinksResponse | RedeemLinkResponse | GetPostBodyResponse | RemoveContentResponse | TransferCreditsResponse | AuthenticateResponse;
-
-/**
- * the follow is basically a thought bubble about how this api might be further improved.
- * feel free to ignore it.
- */
+export type SendResponseBody = PromoteContentResponse | PromoteLinkResponse | InitializeResponse | LoadLinkResponse | GetRedirectResponse | ChangeSettingsResponse
+  | GetUserLinksResponse | RedeemLinkResponse | GetContentBodyResponse | RemoveContentResponse | TransferCreditsResponse | AuthenticateResponse;
 
 export type Handler<Request, Response> = (req: Request) => Promise<Response>;
 
@@ -404,7 +384,7 @@ export type Handler<Request, Response> = (req: Request) => Promise<Response>;
 export type Request = {
   jsonrpc: string,  // always "2.0"
   id: number
-  method: Method,  // statically enforced by the compiler to be one of constituent values
+  method: Method,
   params: RequestBody,
 }
 
@@ -415,7 +395,7 @@ export type Error = {
 
 export type Result = {
   id: number;
-  result: ResponseBody;  // should really be a union type of all available Response Types
+  result: ResponseBody;
 }
 
 export type Response = Result & Error;

@@ -31,7 +31,8 @@ export default {
         "url",
         "video",
         "post",
-        "audio"
+        "audio",
+        "image",
       ]
     },
     "created": {
@@ -108,27 +109,25 @@ export default {
     }
   },
   "typeAliases": {
-    "postId": "integer",
-    "content": "urlString",
+    "content": "binary",
     "contentId": "integer",
     "userId": "uuid",
   },
   "tupleTypes": {
     "Auth": ["authProvider", "authId", "userId", "created", "updated"],
     "Content": ["contentId", "contentType", "userId", "content", "created", "updated",
+      { "name": "mime_ext", "type": "varchar(8)" },
+      { "name": "title", "type": "varchar(254)" },
+      { "name": "tags", "type": "varchar(20)", "multiValued": true },
       { "name": "cryptHash", "type": "binary" },
     ],
     "Invitation": ["ipAddress", "linkId", "created", "updated"],
-    "Link": ["linkId", "userId", "contentId", "linkDescription", "created", "updated",
+    "Link": ["linkId", "userId", "linkDescription", "created", "updated",
+      { "name": "url", "type": "urlString" },
+      { "name": "tags", "type": "varchar(20)", "multiValued": true },
       { "name": "prevLink", "type": "linkId" },
       { "name": "hitCount", "type": "integer", "default": "0" },
       { "name": "amount", "type": "integer" },
-    ],
-    "Post": ["postId", "userId", "created", "updated", "contentId",
-      { "name": "title", "type": "varchar(160)" },
-      { "name": "body", "type": "text" },
-      { "name": "tags", "type": "varchar(20)", "multiValued": true },
-      { "name": "published", "type": "timestamp" },
     ],
     "Promotion": ["linkId", "userId", "created", "updated",
       { "name": "delivered", "type": "timestamp" }
@@ -140,6 +139,7 @@ export default {
     "UserLink": [
       { "name": "user_A", "type": "userId" },
       { "name": "user_B", "type": "userId" },
+      { "name": "tags", "type": "varchar(20)", "multiValued": true },
       "created",
       "updated",
     ],
@@ -152,17 +152,15 @@ export default {
       "uniques": [["userName"]],
       "updated": "updated",
     },
-    /*  we will calculate these from the links table for the moment
     "userlinks": {
       "rowType": "UserLink",
-      "primaryKey": [ "user_A", "user_B" ],
+      "primaryKey": ["user_A", "user_B"],
       "foreignKeys": [
-        { "ref": "users", "columns": [ "user_A" ] },
-        { "ref": "users", "columns": [ "user_B" ] },
-      ]
+        { "ref": "users", "columns": ["user_A"] },
+        { "ref": "users", "columns": ["user_B"] },
+      ],
       "updated": "updated",
     },
-    */
     "auths": {
       "rowType": "Auth",
       "primaryKey": ["authProvider", "authId"],
@@ -191,16 +189,6 @@ export default {
         { "ref": "links", "columns": ["prevLink"] },
       ],
       "uniques": [["contentId", "userId"]],
-    },
-    "posts": {
-      "rowType": "Post",
-      "primaryKey": ["postId"],
-      "autoIncrement": "postId",
-      "updated": "updated",
-      "foreignKeys": [
-        { "ref": "users", "columns": ["userId"] },
-        { "ref": "contents", "columns": ["contentId"] },
-      ],
     },
     "invitations": {
       "rowType": "Invitation",

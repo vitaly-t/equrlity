@@ -8,7 +8,7 @@ import { TimeSpan } from '../lib/timeSpan';
 
 import * as React from 'react';
 import * as ReactDOM from 'react-dom';
-import { sendGetPostBody, sendSavePost } from './Comms';
+import { sendGetContentBody, sendSavePost } from './Comms';
 import * as Rpc from '../lib/rpc';
 import * as Dbt from '../lib/datatypes';
 
@@ -20,7 +20,7 @@ import * as Blueprint from "@blueprintjs/core";
 
 import { AppState, postDeserialize } from "./AppState";
 
-import {PostView, rowStyle, btnStyle, lhcolStyle} from "../lib/postview";
+import { PostView, rowStyle, btnStyle, lhcolStyle } from "../lib/postview";
 
 interface PostProps { appState: AppState };
 interface PostState { title: string, body: string, tags: string, editing: boolean, isError: boolean, prevBody: string, investment: number };
@@ -35,7 +35,7 @@ export class Post extends React.Component<PostProps, PostState> {
   constructor(props: PostProps) {
     super(props);
     let p = props.appState.currentPost;
-    let {title, tags} = p
+    let { title, tags } = p
     this.state = { title, body: '', tags: tags.join(","), editing: true, isError: false, prevBody: '', investment: 20 };
   }
 
@@ -49,7 +49,7 @@ export class Post extends React.Component<PostProps, PostState> {
   componentWillMount() {
     if (!this.props.appState.currentPost.postId) return;
     (async () => {
-      let response = await sendGetPostBody(this.props.appState)
+      let response = await sendGetContentBody(this.props.appState)
       let rsp: Rpc.Response = response.data;
       if (rsp.error) {
         this.setState({ body: "Server returned error: " + rsp.error.message, isError: true });
@@ -76,17 +76,17 @@ export class Post extends React.Component<PostProps, PostState> {
   stopEdit() { this.setState({ editing: false }) }
   abandonEdit() { this.setState({ editing: false, body: this.state.prevBody }); }
 
-  changeTitle(e) { this.setState({ title: e.target.value }); } 
-  changeBody(e) { this.setState({ body: e.target.value }); } 
-  changeTags(e) { this.setState({ tags: e.target.value }); } 
-  changeInvestment(e) { this.setState({ investment: parseInt(e.target.value) }); } 
+  changeTitle(e) { this.setState({ title: e.target.value }); }
+  changeBody(e) { this.setState({ body: e.target.value }); }
+  changeTags(e) { this.setState({ tags: e.target.value }); }
+  changeInvestment(e) { this.setState({ investment: parseInt(e.target.value) }); }
 
   render() {
     let post = this.props.appState.currentPost;
     let creator = this.props.appState.moniker
     if (!post) return null;
     let rowStyle = { width: '100%', marginTop: 2, marginLeft: 5, padding: 6 };
-    let btnStyle= { height: '24', marginTop: 2, marginLeft: 5, marginRight: 5, display: 'inline-block' }; 
+    let btnStyle = { height: '24', marginTop: 2, marginLeft: 5, marginRight: 5, display: 'inline-block' };
     let lhcolStyle = { width: '20%' };
     if (this.state.editing) {
 
@@ -98,7 +98,7 @@ export class Post extends React.Component<PostProps, PostState> {
           </div>
           <div style={rowStyle} >
             <div style={lhcolStyle}>Body:</div>
-            <textarea style={{ width: '100%', minHeight: 400}} ref={(e) => this.ctrls.body = e} value={this.state.body} onChange={e => this.changeBody(e)} />
+            <textarea style={{ width: '100%', minHeight: 400 }} ref={(e) => this.ctrls.body = e} value={this.state.body} onChange={e => this.changeBody(e)} />
           </div>
           <div style={rowStyle} >
             <div style={lhcolStyle}>Tags:</div>
@@ -112,14 +112,14 @@ export class Post extends React.Component<PostProps, PostState> {
       );
     } else {
       let tags = this.state.tags.split(',').map(t => t.trim());
-      let p: Dbt.Post = {...post, body: this.state.body, title: this.state.title, tags, userId: '', contentId: 0 };
+      let p: Dbt.Post = { ...post, body: this.state.body, title: this.state.title, tags, userId: '', contentId: 0 };
       let pubdiv = null;
       if (!post.published) {
-          pubdiv = <div style={rowStyle} >
-            <div style={{display: 'inline'}}>Investment: </div>
-            <input type="text" style={{display: 'inline', height: 24, marginTop: 6, width: '100' }} ref={(e) => this.ctrls.investment = e} value={this.state.investment} onChange={e => this.changeInvestment(e)} />
-            <button key='publish' className="pt-intent-primary" style={btnStyle} onClick={() => this.publish()} >Publish</button>
-           </div>;
+        pubdiv = <div style={rowStyle} >
+          <div style={{ display: 'inline' }}>Investment: </div>
+          <input type="text" style={{ display: 'inline', height: 24, marginTop: 6, width: '100' }} ref={(e) => this.ctrls.investment = e} value={this.state.investment} onChange={e => this.changeInvestment(e)} />
+          <button key='publish' className="pt-intent-primary" style={btnStyle} onClick={() => this.publish()} >Publish</button>
+        </div>;
       }
       return (
         <div>

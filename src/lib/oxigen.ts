@@ -1,5 +1,5 @@
 import * as fs from "fs";
-import json from '../lib/model.js' ;
+import json from '../lib/model.js';
 
 export type FK_Action = "NO ACTION" | "RESTRICT" | "CASCADE" | "SET NULL" | "SET_DEFAULT";
 
@@ -23,7 +23,7 @@ export interface IColumn {
 }
 
 export interface TupleType {
-  name: string, 
+  name: string,
   heading: IColumn[]
 }
 
@@ -55,19 +55,19 @@ export function loadModel(model): IDbSchema {
   let dataTypes = new Map<string, IScalarType>();
   let tables = new Map<string, ITable>()
   let tupleTypes = new Map<string, TupleType>()
-  
+
 
   let typs = model.scalarTypes;
   Object.keys(typs).forEach((k: string) => {
-    let v: IScalarType = {name: k, tsType: "string", ...typs[k]};
+    let v: IScalarType = { name: k, tsType: "string", ...typs[k] };
     dataTypes.set(k, v);
   });
 
   let als = model.typeAliases;
   Object.keys(als).forEach((k: string) => {
-    let t = dataTypes.get( als[k]);
-    if (!t) throw new Error("Missing type for alias: "+k);
-    let v: IScalarType = {...t, name: k};
+    let t = dataTypes.get(als[k]);
+    if (!t) throw new Error("Missing type for alias: " + k);
+    let v: IScalarType = { ...t, name: k };
     dataTypes.set(k, v);
   });
 
@@ -84,45 +84,45 @@ export function loadModel(model): IDbSchema {
         let typ = dataTypes.get(t);
         if (!typ) {
           if (t.startsWith("varchar(")) {
-            let nm = t.replace("(","_").replace(")","");
+            let nm = t.replace("(", "_").replace(")", "");
             let maxLen = parseInt(nm.substring(8))
-            typ = {name: nm, sqlType: t, tsType: "string", maxLen };
+            typ = { name: nm, sqlType: t, tsType: "string", maxLen };
             dataTypes.set(t, typ);
-          } 
-          else throw("unable to locate type for "+v.type);
+          }
+          else throw ("unable to locate type for " + v.type);
         }
         return { ...v, type: typ };
       }
     });
-    tupleTypes.set(k, {name: k, heading: cols});
+    tupleTypes.set(k, { name: k, heading: cols });
   });
 
   let tbls = model.tables;
   Object.keys(tbls).forEach((k: string) => {
     let tbl = tbls[k];
     let tup = tupleTypes.get(tbl.rowType);
-    if (!tup) throw new Error("missing tuple type : "+tbl.rowType);
+    if (!tup) throw new Error("missing tuple type : " + tbl.rowType);
     if (!tbl.foreignKeys) tbl.foreignKeys = [];
     if (!tbl.uniques) tbl.uniques = [];
     let pk = tbl.primaryKey;
     if (!pk) throw new Error("Table missing primary key : " + k);
     pk.forEach(c => {
-      if (tup.heading.findIndex(col => col.name === c ) < 0) throw new Error("Malformed PK : "+ c);
+      if (tup.heading.findIndex(col => col.name === c) < 0) throw new Error("Malformed PK : " + c);
     })
-    tables.set(k, { ...tbl, name: k, rowType: tup});
+    tables.set(k, { ...tbl, name: k, rowType: tup });
   });
 
   tables.forEach(t => {
-     t.foreignKeys.forEach(fk => {
-       if (!tables.has(fk.ref)) throw new Error("Invalid Foreign Key ref: " + fk.ref + " on table: "+t.name);
-       // should also check arity of keys etc.
-     });
+    t.foreignKeys.forEach(fk => {
+      if (!tables.has(fk.ref)) throw new Error("Invalid Foreign Key ref: " + fk.ref + " on table: " + t.name);
+      // should also check arity of keys etc.
+    });
   });
   return { tables, dataTypes };
 }
 
 function cnm(c: string): string {   // postgres column naming 
-  return (c.toLowerCase() === c) ? c :'"' + c + '"';
+  return (c.toLowerCase() === c) ? c : '"' + c + '"';
 }
 
 function colnm(col: IColumn): string {   // postgres column naming 
@@ -131,20 +131,20 @@ function colnm(col: IColumn): string {   // postgres column naming
 
 function filterCols(tbl: ITable, data: Object = null): IColumn[] {
   let cols = tbl.rowType.heading;
-  if (data) cols = cols.filter(c => (data.hasOwnProperty(c.name) && data[c.name] !== undefined) );
+  if (data) cols = cols.filter(c => (data.hasOwnProperty(c.name) && data[c.name] !== undefined));
   return cols;
 }
 
 export function columnNames(tbl: ITable, data: Object = null): string[] {
-  return filterCols(tbl, data).map( colnm );
+  return filterCols(tbl, data).map(colnm);
 }
 
 export function columnRefs(tbl: ITable, data: Object = null): string[] {
-  return filterCols(tbl, data).map( c => '${'+c.name+'}' );
+  return filterCols(tbl, data).map(c => '${' + c.name + '}');
 }
 
 export function columnSets(tbl: ITable, data: Object = null): string[] {
-  return filterCols(tbl, data).filter(c => tbl.primaryKey.indexOf(c.name) < 0).map( c => colnm(c) + ' = ${'+c.name+'}' );
+  return filterCols(tbl, data).filter(c => tbl.primaryKey.indexOf(c.name) < 0).map(c => colnm(c) + ' = ${' + c.name + '}');
 }
 
 export function genInsertColumns(tbl: ITable, data: Object = null): string {
@@ -152,99 +152,99 @@ export function genInsertColumns(tbl: ITable, data: Object = null): string {
   let cols = filterCols(tbl, data);
   if (tbl.autoIncrement) {
     let i = cols.findIndex(c => c.name === tbl.autoIncrement);
-    if (i < 0 && !data) throw new Error("invalid valid value for autoIncrement field: "+tbl.autoIncrement);
+    if (i < 0 && !data) throw new Error("invalid valid value for autoIncrement field: " + tbl.autoIncrement);
     if (i >= 0) cols.splice(i, 1);
   }
-  return '('+ cols.map( colnm ).join() +')';
+  return '(' + cols.map(colnm).join() + ')';
 }
 
 export function genInsertValues(tbl: ITable, data: Object = null): string {
   let cols = filterCols(tbl, data)
   if (tbl.autoIncrement) {
     let i = cols.findIndex(c => c.name === tbl.autoIncrement);
-    if (i >= 0) cols.splice(i,1);
+    if (i >= 0) cols.splice(i, 1);
   }
-  let refs = cols.map( c => '${'+c.name+'}' );
-  return '('+ refs.join() +')';
+  let refs = cols.map(c => '${' + c.name + '}');
+  return '(' + refs.join() + ')';
 }
 
 export function genInsertStatement(tbl: ITable, data: Object = null): string {
-  let stmt = "INSERT INTO "+tbl.name + genInsertColumns(tbl, data) + " VALUES " + genInsertValues(tbl, data);
-  stmt += ' RETURNING '+columnNames(tbl).join();
+  let stmt = "INSERT INTO " + tbl.name + genInsertColumns(tbl, data) + " VALUES " + genInsertValues(tbl, data);
+  stmt += ' RETURNING ' + columnNames(tbl).join();
   return stmt;
 }
 
 export function genRetrieveStatement(tbl: ITable, data: Object = null): string {
   let pk = tbl.primaryKey
-  let where = tbl.primaryKey.map( c => cnm(c) + ' = ${'+c+'}' ).join(' AND ');
-  let stmt = "SELECT * FROM "+ tbl.name + " WHERE " + where;
+  let where = tbl.primaryKey.map(c => cnm(c) + ' = ${' + c + '}').join(' AND ');
+  let stmt = "SELECT * FROM " + tbl.name + " WHERE " + where;
   return stmt;
 }
 
 export function genDeleteStatement(tbl: ITable, data: Object = null): string {
   let pk = tbl.primaryKey
-  let where = tbl.primaryKey.map( c => cnm(c) + ' = ${'+c+'}' ).join(' AND ');
-  let stmt = "DELETE FROM "+ tbl.name + " WHERE " + where;
+  let where = tbl.primaryKey.map(c => cnm(c) + ' = ${' + c + '}').join(' AND ');
+  let stmt = "DELETE FROM " + tbl.name + " WHERE " + where;
   return stmt;
 }
 
 export function genUpdateStatement(tbl: ITable, data: Object = null): string {
   let updtd = '';
   if (data) {
-    tbl.primaryKey.forEach(s => {if (data[s] == null || data[s] == undefined) throw new Error("Primary Key value(s) missing"); } );
+    tbl.primaryKey.forEach(s => { if (data[s] == null || data[s] == undefined) throw new Error("Primary Key value(s) missing"); });
     if (tbl.updated) {
-      data[tbl.updated] = undefined;  
-      updtd = `, "${tbl.updated}" = DEFAULT`; 
+      data[tbl.updated] = undefined;
+      updtd = `, "${tbl.updated}" = DEFAULT`;
     }
   }
-  let where = tbl.primaryKey.map( c => cnm(c) + ' = ${'+c+'}' ).join(' AND ');
-  return "UPDATE "+ tbl.name + " SET " + columnSets(tbl, data).join()  + updtd + " WHERE " + where + ' RETURNING '+columnNames(tbl).join();
+  let where = tbl.primaryKey.map(c => cnm(c) + ' = ${' + c + '}').join(' AND ');
+  return "UPDATE " + tbl.name + " SET " + columnSets(tbl, data).join() + updtd + " WHERE " + where + ' RETURNING ' + columnNames(tbl).join();
 }
 
 export function genUpsertStatement(tbl: ITable, data: Object = null): string {
-  if (tbl.autoIncrement)  throw new Error("Cannot use upsert: "+tbl.name+ "table has autoIncrement column");
-  let istmt =  "INSERT INTO "+tbl.name + genInsertColumns(tbl, data) + " VALUES " + genInsertValues(tbl, data);
+  if (tbl.autoIncrement) throw new Error("Cannot use upsert: " + tbl.name + " table has autoIncrement column");
+  let istmt = "INSERT INTO " + tbl.name + genInsertColumns(tbl, data) + " VALUES " + genInsertValues(tbl, data);
   let ustmt = "UPDATE SET " + columnSets(tbl, data).join();
-  let pk = tbl.primaryKey.map( cnm ).join();
-  return istmt + " on conflict(" + pk + ") do " + ustmt + ' RETURNING '+columnNames(tbl).join();
+  let pk = tbl.primaryKey.map(cnm).join();
+  return istmt + " on conflict(" + pk + ") do " + ustmt + ' RETURNING ' + columnNames(tbl).join();
 }
 
 export function genTypescriptType(tbl: ITable): string {
-  let lns = tbl.rowType.heading.map( c => {
-    return "\n  readonly "+ c.name + ": "+ c.type.name + (c.multiValued ? '[]' : '') + (c.notNull ? '' : ' | null')  
+  let lns = tbl.rowType.heading.map(c => {
+    return "\n  readonly " + c.name + ": " + c.type.name + (c.multiValued ? '[]' : '') + (c.notNull ? '' : ' | null')
   });
-  return "export interface "+tbl.rowType.name+" {" +  lns.join() + "\n};";
+  return "export interface " + tbl.rowType.name + " {" + lns.join() + "\n};";
 }
 
 export function genCreateTableStatement(tbl: ITable): string {
-  let cols = tbl.rowType.heading.map( c => {
+  let cols = tbl.rowType.heading.map(c => {
     let dflt = c.default ? c.default : c.type.sqlDefault ? c.type.sqlDefault : null;
-    return colnm(c) + " " +  (c.name === tbl.autoIncrement ? 'SERIAL' : c.type.sqlType + (c.multiValued ? '[]' : '')) 
-        + (c.notNull ? ' NOT NULL' : '')  +(dflt ? ' DEFAULT ' + dflt : '');
+    return colnm(c) + " " + (c.name === tbl.autoIncrement ? 'SERIAL' : c.type.sqlType + (c.multiValued ? '[]' : ''))
+      + (c.notNull ? ' NOT NULL' : '') + (dflt ? ' DEFAULT ' + dflt : '');
   });
-  let stmt =  "CREATE TABLE "+tbl.name+" (\n  " +  cols.join(",\n  ");
-  stmt += ",\n  PRIMARY KEY (" + tbl.primaryKey.map(cnm).join(",")+")";
+  let stmt = "CREATE TABLE " + tbl.name + " (\n  " + cols.join(",\n  ");
+  stmt += ",\n  PRIMARY KEY (" + tbl.primaryKey.map(cnm).join(",") + ")";
   tbl.foreignKeys.forEach(fk => {
-    stmt += ",\n "+ (fk.name ? "CONSTRAINT" + fk.name : "") +" FOREIGN KEY (" + fk.columns.map(cnm).join(",")+")"
-          +  "\n    REFERENCES " + fk.ref 
-          +  "\n    ON UPDATE " + (fk.onUpdate || "NO ACTION")
-          +  "\n    ON DELETE " + (fk.onDelete || "NO ACTION")
+    stmt += ",\n " + (fk.name ? "CONSTRAINT" + fk.name : "") + " FOREIGN KEY (" + fk.columns.map(cnm).join(",") + ")"
+      + "\n    REFERENCES " + fk.ref
+      + "\n    ON UPDATE " + (fk.onUpdate || "NO ACTION")
+      + "\n    ON DELETE " + (fk.onDelete || "NO ACTION")
   });
   tbl.uniques.forEach(unq => {
-    stmt += ",\n UNIQUE (" + unq.map(cnm).join(",")+")"
+    stmt += ",\n UNIQUE (" + unq.map(cnm).join(",") + ")"
   });
   stmt += "\n);\n";
   return stmt;
 }
 
 export function writeTypescriptTypesToFile(db: IDbSchema, fname: string): void {
-  let strm = fs.createWriteStream(fname, {flags: 'w', encoding: 'utf8'});
+  let strm = fs.createWriteStream(fname, { flags: 'w', encoding: 'utf8' });
   strm.write("// This file is generated - it should not be edited\n\n");
-  strm.on('finish', () => strm.close() );
+  strm.on('finish', () => strm.close());
   db.dataTypes.forEach(t => {
-    let typ = t.enum ?  t.enum.map(s => '"'+s+'"').join(" | ")
-                     : ( t.tsType || "string" )
-    if (t.name !== typ) strm.write("\nexport type " + t.name + " = " + typ + ";");                     
+    let typ = t.enum ? t.enum.map(s => '"' + s + '"').join(" | ")
+      : (t.tsType || "string")
+    if (t.name !== typ) strm.write("\nexport type " + t.name + " = " + typ + ";");
   })
   strm.write("\n\n");
 
@@ -256,11 +256,11 @@ export function writeTypescriptTypesToFile(db: IDbSchema, fname: string): void {
 }
 
 export function writeTableCreateStatementsToFile(db: IDbSchema, fname: string): void {
-  let strm = fs.createWriteStream(fname, {flags: 'w', encoding: 'utf8'});
+  let strm = fs.createWriteStream(fname, { flags: 'w', encoding: 'utf8' });
   strm.write("-- This file is generated - it (probably) should not be edited\n\n");
-  strm.on('finish', () => strm.close() );
+  strm.on('finish', () => strm.close());
   db.tables.forEach(t => {
-    strm.write( genCreateTableStatement(t)+"\n" );                     
+    strm.write(genCreateTableStatement(t) + "\n");
   })
   strm.end("-- end of generated text");
 }
@@ -268,18 +268,18 @@ export function writeTableCreateStatementsToFile(db: IDbSchema, fname: string): 
 export function defaultValue(typ: IScalarType): any {
   if (typ.enum) return [];
   switch (typ.name) {
-    case "string" : return "";
-    case "number" : return typ.max ? typ.min : 0;
-    case "date" : return new Date();
+    case "string": return "";
+    case "number": return typ.max ? typ.min : 0;
+    case "date": return new Date();
     case "boolean": return false;
   }
 }
 
-export function emptyRec<T>(tbl: ITable):  T {
+export function emptyRec<T>(tbl: ITable): T {
   let rslt = Object.create(null);
-  tbl.rowType.heading.forEach( c => rslt[c.name] = undefined );
+  tbl.rowType.heading.forEach(c => rslt[c.name] = undefined);
   return rslt;
-} 
+}
 
-export const dbSchema =  loadModel(json)
+export const dbSchema = loadModel(json)
 

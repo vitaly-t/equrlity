@@ -1,5 +1,5 @@
 import * as dotenv from 'dotenv-safe';
-let env = dotenv.load();
+let env = dotenv.config();
 console.log("dotenv loaded");
 
 // internal node
@@ -17,6 +17,7 @@ import * as bodyParser from 'koa-bodyparser';
 import * as Router from 'koa-router';
 import * as send from 'koa-send';
 import * as cors from 'kcors';
+import * as koaBody from 'koa-body';
 
 // lib
 import * as OxiDate from '../lib/oxidate';
@@ -65,7 +66,9 @@ const publicRouter = new Router();
 //app.use(passport.session());
 //app.use(flash());
 
-app.use(bodyParser());
+//app.use(bodyParser());
+app.use(koaBody({ formidable: { uploadDir: __dirname } }));
+
 
 app.use(
   cors({
@@ -73,7 +76,7 @@ app.use(
     allowMethods: 'GET,HEAD,PUT,POST,DELETE,PATCH',
     allowHeaders: ["X-Requested-With", "Content-Type", "Authorization", "x-psq-client-version"],
     exposeHeaders: ["x-psq-token", "x-psq-moniker", "x-psq-email", "x-psq-credits", "x-psq-groups"],
-  })
+  }) as Koa.Middleware
 );
 
 // These are necessary because we are not serving static files yet.
@@ -104,11 +107,11 @@ publicRouter.get('/link/:id', async (ctx, next) => {
 
 });
 
-publicRouter.get('/post/:id', async (ctx, next) => {
-  let postId = parseInt(ctx.params.id);
-  let post = await pg.retrieveRecord<Dbt.Post>("posts", { postId });
-  let creator = cache.users.get(post.userId).userName;
-  let view = <PostView post={post} creator={creator} />;
+publicRouter.get('/content/:id', async (ctx, next) => {
+  let contentId = parseInt(ctx.params.id);
+  let cont = await pg.retrieveRecord<Dbt.Content>("contents", { contentId });
+  let creator = cache.users.get(cont.userId).userName;
+  let view = <PostView post={cont} creator={creator} />;
   let ins = ReactDOMServer.renderToStaticMarkup(view);
   let html = await readFileAsync('./assets/index.htmpl');
   let body = html.replace('{{{__BODY__}}}', ins);
@@ -125,7 +128,7 @@ publicRouter.get('/', async (ctx, next) => {
 
 });
 
-publicRouter.post('/auth', async (ctx) => {
+publicRouter.post('/auth', async (ctx, next) => {
   let userInfo = ctx.request.body.userInfo;
   let publicKey = ctx.request.body.publicKey;
   let authValue = ctx.headers.authorization;
@@ -256,7 +259,15 @@ async function handleRequest<I, O>(method: Rpc.Handler<I, O>, req: I): Promise<O
   return method(req);
 }
 
+
 const router = new Router();
+
+
+router.put('/upload/audio', async function (ctx: Koa.Context) {
+  console.log(this.request.body.files);
+});
+
+
 router.post('/rpc', async function (ctx: any) {
   let { jsonrpc, method, params, id } = ctx.request.body;  // from bodyparser 
 
@@ -285,24 +296,30 @@ router.post('/rpc', async function (ctx: any) {
         ctx.body = { id, result };
         break;
       }
-      case "addContent": {
-        let req: Rpc.AddContentRequest = params;
-        let { publicKey, content, signature } = req;
-        let url = parse(content);
+      case "promoteContent": {
+        let req: Rpc.PromoteContentRequest = params;
+        let { publicKey, contentId, signature } = req;
         checkPK(publicKey)
-        if (!validateContentSignature(publicKey, content, signature)) throw new Error("request failed verification");
+        if (!validateContentSignature(publicKey, contentId.toString(), signature)) throw new Error("request failed verification");
         let usr = getUser(userId);
-        let hndlr: Rpc.Handler<Rpc.AddContentRequest, Rpc.SendAddContentResponse> = async (req) => {
-          if (Utils.isPseudoQURL(url)) return await pg.handlePromote(userId, req)
-          return await pg.handleAddContent(userId, req)
-        }
-        let result = await handleRequest(hndlr, req);
+        let result: Rpc.PromoteContentResponse = await pg.handlePromoteContent(userId, req)
+        ctx.body = { id, result };
+        break;
+      }
+      case "promoteLink": {
+        let req: Rpc.PromoteLinkRequest = params;
+        let { publicKey, url, signature } = req;
+        let ourl = parse(url);
+        checkPK(publicKey)
+        if (!validateContentSignature(publicKey, url, signature)) throw new Error("request failed verification");
+        let usr = getUser(userId);
+        let result: Rpc.PromoteLinkResponse = await pg.handlePromoteLink(userId, req)
         ctx.body = { id, result };
         break;
       }
       case "loadLink": {
         let req: Rpc.LoadLinkRequest = params;
-        let lnk = await pg.getLinkFromContent(req.url);
+        let lnk = await pg.findRootLinkForUrl(req.url);
         if (!lnk) {
           let result: Rpc.LoadLinkResponse = { found: false };
           ctx.body = { id, result };
@@ -364,8 +381,8 @@ router.post('/rpc', async function (ctx: any) {
         let promotions = await pg.deliverNewPromotions(userId);
         let connectedUsers = cache.getConnectedUserNames(userId);
         let reachableUserCount = cache.getReachableUserIds(userId).length;
-        let posts = await pg.getUserPosts(userId);
-        let result: Rpc.GetUserLinksResponse = { links, promotions, connectedUsers, reachableUserCount, posts };
+        let contents = await pg.getUserContents(userId);
+        let result: Rpc.GetUserLinksResponse = { links, promotions, connectedUsers, reachableUserCount, contents };
         ctx.body = { id, result };
         break;
       }
@@ -378,18 +395,18 @@ router.post('/rpc', async function (ctx: any) {
         ctx.body = { id, result };
         break;
       }
-      case "getPostBody": {
-        let req: Rpc.GetPostBodyRequest = params;
-        let body = await pg.getPostBody(req.postId);
-        let result: Rpc.GetPostBodyResponse = { body };
+      case "getContentBody": {
+        let req: Rpc.GetContentBodyRequest = params;
+        let body = await pg.getContentBody(req.contentId);
+        let result: Rpc.GetContentBodyResponse = { body };
         ctx.body = { id, result };
         break;
       }
-      case "savePost": {
-        let req: Rpc.SavePostRequest = params;
-        await pg.savePost(userId, req);
-        let posts = await pg.getUserPosts(userId);
-        let result: Rpc.SavePostResponse = { posts };
+      case "saveContent": {
+        let req: Rpc.SaveContentRequest = params;
+        await pg.saveContent(userId, req);
+        let contents = await pg.getUserContents(userId);
+        let result: Rpc.SaveContentResponse = { contents };
         ctx.body = { id, result };
         break;
 

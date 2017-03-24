@@ -1,5 +1,5 @@
 import { Url, format, parse } from 'url';
-import { UserLinkItem, PostInfoItem } from '../lib/rpc';
+import { UserLinkItem, ContentInfoItem } from '../lib/rpc';
 import * as Dbt from '../lib/datatypes';
 import *as Utils from '../lib/utils';
 
@@ -21,8 +21,8 @@ export interface AppState {
   promotions: Dbt.urlString[];
   connectedUsers: Dbt.userName[];
   reachableUserCount: Dbt.integer;
-  posts: PostInfoItem[];
-  currentPost: PostInfoItem;  // used to pass the target post to edit from settings page to postedit page. It is ephemeral!!
+  contents: ContentInfoItem[];
+  currentContent: ContentInfoItem;  // used to pass the target content to edit from settings page to postedit page. It is ephemeral!!
 }
 
 export function initState(): AppState {
@@ -30,7 +30,7 @@ export function initState(): AppState {
   return {
     publicKey: null, privateKey: null, links: new Map<string, LinkInfo>(), redirects: new Map<string, string>(),
     activeUrl: null, moniker: 'unknown', authprov: '', email: '', credits: 0, jwt: '', lastErrorMessage: '',
-    investments: [], promotions: [], connectedUsers: [], reachableUserCount: 0, posts: [], currentPost: null
+    investments: [], promotions: [], connectedUsers: [], reachableUserCount: 0, contents: [], currentContent: null
   };
 }
 

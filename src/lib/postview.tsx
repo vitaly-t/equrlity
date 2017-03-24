@@ -18,11 +18,10 @@ import * as Blueprint from "@blueprintjs/core";
 //import '@blueprintjs/core/dist/blueprint.css';
 
 export const rowStyle = { width: '100%', marginTop: 2, marginLeft: 5, padding: 6 };
-export const btnStyle= { height: '24', marginTop: 2, marginLeft: 5, marginRight: 5, display: 'inline-block' }; 
+export const btnStyle = { height: '24', marginTop: 2, marginLeft: 5, marginRight: 5, display: 'inline-block' };
 export const lhcolStyle = { width: '20%' };
 
-
-interface PostViewProps { post: Dbt.Post, creator: string };
+interface PostViewProps { post: Dbt.Content, creator: string };
 interface PostViewState { };
 
 let Tag = (props) => {
@@ -32,8 +31,11 @@ let Tag = (props) => {
 export class PostView extends React.Component<PostViewProps, PostViewState> {
 
   render() {
-    let {post,creator} = this.props;
-    let h = { __html: md.render(post.body) };
+    let { post, creator } = this.props;
+    let decoder = new TextDecoder();
+    let view = new DataView(post.content);
+    let body = decoder.decode(view);
+    let h = { __html: md.render(body) };
     let lstedit = post.updated ? oxiDate.toFormat(new Date(post.updated), "DDDD, MMMM D @ HH:MIP") : 'never';
     let pub = post.published ? oxiDate.toFormat(new Date(post.published), "DDDD, MMMM D @ HH:MIP") : 'never';
     let tags = post.tags

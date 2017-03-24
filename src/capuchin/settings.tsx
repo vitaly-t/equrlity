@@ -3,6 +3,7 @@ import * as ReactDOM from "react-dom";
 import { Button } from "@blueprintjs/core";
 import * as Dropzone from 'react-dropzone';
 import { Url, format } from 'url';
+import axios, { AxiosResponse, AxiosError } from 'axios';
 
 import * as Rpc from '../lib/rpc'
 import * as Utils from '../lib/utils';
@@ -11,7 +12,6 @@ import * as OxiDate from '../lib/oxidate';
 
 import { YesNoBox } from './dialogs';
 import { AppState, postDeserialize } from "./AppState";
-import { sendGetUserLinks } from './Comms';
 
 
 interface SettingsPageProps { appState?: AppState };
@@ -49,6 +49,18 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
   onDropAudios(acceptedFiles, rejectedFiles) {
     console.log('Accepted files: ', acceptedFiles);
     console.log('Rejected files: ', rejectedFiles);
+    if (rejectedFiles.length > 0) return;
+    if (acceptedFiles.length === 0) return;
+    var data = new FormData();
+    for (var f of acceptedFiles) {
+      data.append(f.name, f);
+    }
+    var config = {
+      onUploadProgress: function (progressEvent) {
+        var percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+      }
+    };
+    axios.put(Utils.serverUrl + '/upload/audio', data, config);
   }
 
   render() {
@@ -297,7 +309,7 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
           {vidsdiv}
           {vsp}
           <Dropzone onDrop={this.onDropVideos}>
-            <div>Try dropping some video files here, or click to select video filess to upload.</div>
+            <div>Try dropping some video files here, or click to select video files to upload.</div>
           </Dropzone>
           {vsp}
           <div>

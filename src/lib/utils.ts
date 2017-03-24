@@ -59,9 +59,24 @@ export function isPseudoQURL(url: Url): boolean {
   return url.host === srv.host && url.protocol === srv.protocol;
 }
 
+export function isPseudoQLinkURL(url: Url): boolean {
+  let srv = parse(serverUrl);
+  return url.host === srv.host && url.protocol === srv.protocol && url.path.startsWith("/link/");
+}
+
+export function isPseudoQContentURL(url: Url): boolean {
+  let srv = parse(serverUrl);
+  return url.host === srv.host && url.protocol === srv.protocol && url.path.startsWith("/content/");
+}
+
+export function getContentIdFromUrl(url: Url): Dbt.linkId {
+  if (!isPseudoQContentURL(url)) throw new Error("Not a PseudoQURL content url");
+  let linkId = parseInt(url.path.substring(9));
+  return linkId;
+}
+
 export function getLinkIdFromUrl(url: Url): Dbt.linkId {
-  if (!isPseudoQURL(url)) throw new Error("Not a PseudoQURL url");
-  if (!url.path.startsWith("/link/")) throw new Error("Malformed link path");
+  if (!isPseudoQLinkURL(url)) throw new Error("Not a PseudoQURL link url");
   let linkId = parseInt(url.path.substring(6));
   return linkId;
 }
@@ -74,4 +89,9 @@ export function linkToUrl(linkId: Dbt.linkId, desc: Dbt.linkDescription): Dbt.ur
   return format(srv);
 }
 
+export function contentToUrl(contentId: Dbt.contentId): Dbt.urlString {
+  let srv = parse(serverUrl);
+  srv.pathname = "/content/" + contentId.toString()
+  return format(srv);
+}
 
