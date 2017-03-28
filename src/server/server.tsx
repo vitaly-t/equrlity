@@ -26,7 +26,7 @@ import { promisify } from '../lib/promisify';
 import * as Utils from '../lib/utils';
 import * as Dbt from '../lib/datatypes'
 import * as Rpc from '../lib/rpc';
-import { PostView } from '../lib/postview';
+import { PostView, Post } from '../lib/postview';
 import { LinkLandingPage, HomePage } from '../lib/landingPages';
 import { validateContentSignature } from '../lib/Crypto';
 
@@ -107,11 +107,16 @@ publicRouter.get('/link/:id', async (ctx, next) => {
 
 });
 
-publicRouter.get('/content/:id', async (ctx, next) => {
-  let contentId = parseInt(ctx.params.id);
-  let cont = await pg.retrieveRecord<Dbt.Content>("contents", { contentId });
+publicRouter.get('/posts/:title', async (ctx, next) => {
+  let title = decodeURIComponent(ctx.params.title);
+  let cont = await pg.retrieveContentByTitle(title, "post");
   let creator = cache.users.get(cont.userId).userName;
-  let view = <PostView post={cont} creator={creator} />;
+  let decoder = new TextDecoder();
+  let dview = new DataView(cont.content);
+  let txt = decoder.decode(dview);
+  let post: Post = { body: txt, info: cont };
+
+  let view = <PostView post={post} creator={creator} />;
   let ins = ReactDOMServer.renderToStaticMarkup(view);
   let html = await readFileAsync('./assets/index.htmpl');
   let body = html.replace('{{{__BODY__}}}', ins);
@@ -404,7 +409,11 @@ router.post('/rpc', async function (ctx: any) {
       }
       case "saveContent": {
         let req: Rpc.SaveContentRequest = params;
-        await pg.saveContent(userId, req);
+        let contentId = req.contentId;
+        let cont = await pg.retrieveRecord<Dbt.Content>("contents", { contentId });
+        if (!cont) throw new Error("Invalid content id");
+        if (cont.userId !== userId) throw new Error("Invalid user for content");
+        await pg.saveContent(req);
         let contents = await pg.getUserContents(userId);
         let result: Rpc.SaveContentResponse = { contents };
         ctx.body = { id, result };

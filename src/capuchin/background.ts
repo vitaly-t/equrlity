@@ -90,7 +90,7 @@ export async function handleAsyncMessage(event: Message) {
       case "ChangeSettings":
         fn = await AsyncHandlers.ChangeSettings(st, event.settings);
         break;
-      case "Save": {
+      case "PromoteLink": {
         let curl = prepareUrl(st.activeUrl);
         if (!curl) return;
 
@@ -102,7 +102,7 @@ export async function handleAsyncMessage(event: Message) {
           //console.log("refreshing with correct state");
           chrome.runtime.sendMessage({ eventType: 'Render', appState: preSerialize(currentState()) });
         }, 5000);
-        fn = await AsyncHandlers.Save(st, event.linkDescription, event.amount);
+        fn = await AsyncHandlers.promoteLink(st, event.req.linkDescription, event.req.amount, event.req.tags);
         break;
       }
       case "Load": {
@@ -126,8 +126,8 @@ export async function handleAsyncMessage(event: Message) {
         fn = await AsyncHandlers.Load(st, t.url);
         break;
       }
-      case "SavePost": {
-        fn = await AsyncHandlers.SavePost(st, event.req);
+      case "SaveContent": {
+        fn = await AsyncHandlers.SaveContent(st, event.req);
         break;
       }
     }

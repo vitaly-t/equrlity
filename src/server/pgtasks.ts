@@ -1,17 +1,17 @@
 "use strict";
 
-import { Url, parse, format } from 'url';
-import * as Rpc from '../lib/rpc';
-import { CachedTable, CacheUpdate } from './cache';
-import * as Utils from '../lib/utils';
-
-import * as OxiDate from '../lib/oxidate';
-
 import { ITask } from 'pg-promise';
+import { Url, parse, format } from 'url';
+import { TextEncoder, TextDecoder } from 'text-encoding';
+
+import * as Rpc from '../lib/rpc';
+import * as Utils from '../lib/utils';
+import * as OxiDate from '../lib/oxidate';
 import * as Dbt from '../lib/datatypes'
 import * as OxiGen from '../lib/oxigen';
 import * as uuid from '../lib/uuid.js';
 
+import { CachedTable, CacheUpdate } from './cache';
 
 const oxb: OxiGen.IDbSchema = OxiGen.dbSchema;
 
@@ -37,6 +37,13 @@ export async function retrieveRecord<T>(t: ITask<any>, tblnm: string, pk: Object
   let tbl = oxb.tables.get(tblnm);
   let stmt = OxiGen.genRetrieveStatement(tbl, pk);
   let rslt = await t.any(stmt, pk);
+  if (rslt.length > 0) return rslt[0];
+  return null;
+}
+
+export async function retrieveContentByTitle(t: ITask<any>, title: string, contentType: Dbt.contentType): Promise<Dbt.Content> {
+  let ttl = title.replace(" ", "_");
+  let rslt = await t.any(`select * from contents where title = '${ttl}' and "contentType" = '${contentType}' `);
   if (rslt.length > 0) return rslt[0];
   return null;
 }
@@ -191,24 +198,7 @@ export async function deliveriesCount(t: ITask<any>, linkId: Dbt.linkId): Promis
   return parseInt(rslt.cnt);
 }
 
-export async function promoteContent(t: ITask<any>, userId: Dbt.userId, contentId: Dbt.contentId, amount: Dbt.integer): Promise<CacheUpdate[]> {
-  let usr = await retrieveRecord<Dbt.User>(t, "users", { userId });
-  let cont = await retrieveRecord<Dbt.Content>(t, "contents", { contentId });
-  if (amount > usr.credits) throw new Error("Negative balances not allowed");
-  let rslt: CacheUpdate[] = [];
-  let url = Utils.contentToUrl(contentId);
-  let links = await t.any(`select "linkId" from links where url = '${url}'`)
-  if (links.length > 0) throw new Error("Content has already been published")
-  let linkDescription = cont.title;
-  let link: Dbt.Link = { ...emptyLink(), userId, url, linkDescription, amount };
-  link = await insertRecord<Dbt.Link>(t, "links", link);
-  console.log("inserted link: " + link.linkId);
-  rslt.push({ table: "links" as CachedTable, record: link });
-  Array.prototype.push.apply(rslt, await adjustUserBalance(t, usr, -amount));
-  return rslt;
-}
-
-export async function promoteLink(t: ITask<any>, userId: Dbt.userId, linkurl: string, linkDescription, amount: Dbt.integer, contentType: Dbt.contentType = "url"): Promise<CacheUpdate[]> {
+export async function promoteLink(t: ITask<any>, userId: Dbt.userId, linkurl: string, linkDescription, amount: Dbt.integer): Promise<CacheUpdate[]> {
   let usr = await retrieveRecord<Dbt.User>(t, "users", { userId });
   if (amount > usr.credits) throw new Error("Negative balances not allowed");
   let ourl = parse(linkurl);
@@ -344,17 +334,36 @@ export async function getUserContents(t: ITask<any>, id: Dbt.userId): Promise<Rp
   return await t.any(`select "contentId","contentType",mime_ext,created,updated,published,title,tags from contents where "userId" = '${id}' order by updated desc`);
 }
 
-export async function getContentBody(t: ITask<any>, id: Dbt.contentId): Promise<string> {
-  let rslt = await t.one(`select body from posts where "postId" = '${id}' `);
-  return rslt.body;
+export async function getContentBody(t: ITask<any>, id: Dbt.contentId): Promise<Uint8Array> {
+  let rslt = await t.one(`select content from contents where "contentId" = '${id}' `);
+  return rslt.content;
 }
 
-export async function saveContent(t: ITask<any>, userId: Dbt.userId, req: Rpc.SaveContentRequest): Promise<Dbt.Content> {
-  if (req.contentId) return await updateRecord<Dbt.Content>(t, "contents", req);
-  return await insertRecord<Dbt.Content>(t, "contetts", req);
+let enc = new TextEncoder()
+export async function saveContent(t: ITask<any>, req: Rpc.SaveContentRequest): Promise<Dbt.Content> {
+  let contentId = req.contentId;
+  let cont = await retrieveRecord<Dbt.Content>(t, "contents", { contentId });
+  let content = req.content ? enc.encode(req.content) : cont.content;
+  cont = { ...cont, ...req, content };
+  return await updateRecord<Dbt.Content>(t, "contents", cont);
+}
+
+export async function addContent(t: ITask<any>, req: Rpc.AddContentRequest): Promise<Dbt.Content> {
+  let cont = OxiGen.emptyRec<Dbt.Content>(oxb.tables.get("contents"));
+  let content = req.content ? enc.encode(req.content) : cont.content;
+  cont = { ...cont, ...req, content };
+  return await insertRecord<Dbt.Content>(t, "contents", req);
 }
 
 export async function registerInvitation(t: ITask<any>, ipAddress: string, linkId: Dbt.linkId): Promise<Dbt.Invitation> {
   return await upsertRecord<Dbt.Invitation>(t, "invitations", { ipAddress, linkId });
 }
+
+export async function countRecordsInTable(t: ITask<any>, tblnm: string): Promise<number> {
+  let tbl = oxb.tables.get(tblnm);
+  if (!tbl) throw new Error("Table not known: " + tblnm);
+  let rslt = await t.one("select count(*) as count from " + tblnm);
+  return parseInt(rslt.count);
+}
+
 

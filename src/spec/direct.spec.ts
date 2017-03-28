@@ -1,17 +1,19 @@
 "use strict";
 
-import * as Utils from '../lib/utils';
-Utils.setTest(true);
-import * as pg from '../server/pgsql';
-import * as Dbt from '../lib/datatypes'
+import * as fs from "fs"
 import { Url, parse } from 'url';
-import * as Rpc from '../lib/rpc';
 import { it } from 'jasmine-promise-wrapper';
+
+import * as Dbt from '../lib/datatypes'
+import * as Rpc from '../lib/rpc';
+import * as Utils from '../lib/utils';
+Utils.setTest(true);  // Not sure this is kosher ...
+
+import * as pg from '../server/pgsql';
 import * as cache from '../server/cache';
 
 async function countLinks(): Promise<number> {
-  let rslt = await pg.db.one("select count(*) as count from links");
-  return parseInt(rslt.count);
+  return await pg.countRecordsInTable("links");
 }
 
 it("should work using direct calls", async () => {
@@ -64,7 +66,7 @@ it("should work using direct calls", async () => {
     expect(await countLinks()).toEqual(3);
 
     let ok = rsp as Rpc.PromoteLinkResponse;
-    expect(ok.link).toBeDefined("add content call failed");
+    expect(ok.link).toBeDefined("add handlePomoteLink call failed");
     let url = parse(ok.link);
     expect(Utils.isPseudoQURL(url)).toEqual(true);
     expect(Utils.isPseudoQLinkURL(url)).toEqual(true);
@@ -113,5 +115,18 @@ it("should work using direct calls", async () => {
       let rootLinks = await pg.getRootLinksForUrl(content);
       expect(rootLinks.length).toEqual(2);
     }
+
   }
 });
+
+it("should work for bytea types", async () => {
+  // test bytea content stuff
+  let u = await pg.createUser();
+  let content: Uint8Array = fs.readFileSync("/dev/pseudoqurl/spec/EarlyThisMorning.wav");
+  let rsp = await pg.insertContent(content, "wav", "audio", "Early This Morning", u.userId);
+  console.log(rsp.contentId);
+  let cont2 = await pg.retrieveContent(rsp.contentId)
+  let s1 = pg.pgp.as.buffer(content);
+  let s2 = pg.pgp.as.buffer(cont2);
+  expect(s1).toEqual(s2, "bytea cactus");
+}, 60000);

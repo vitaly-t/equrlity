@@ -91,6 +91,20 @@ export type InitializeResponse = {
   redirectUrl?: UrlString;
 }
 
+export type AddContentRequest = {
+  contentType: Dbt.contentType;
+  mime_ext: string;
+  title: string;
+  content: string;
+  tags: string[];
+  publish: boolean;
+  investment?: Dbt.integer;
+}
+
+export type AddContentResponse = {
+  contentId: Dbt.contentId;
+};
+
 /**
  * promoteContent method
  * 
@@ -363,17 +377,17 @@ export type AuthenticateResponse = { ok: boolean; }
 
 // aggregate the above types
 
-export type RequestBody = PromoteContentRequest | PromoteLinkRequest | InitializeRequest | LoadLinkRequest | GetRedirectRequest | ChangeSettingsRequest
+export type RequestBody = AddContentRequest | PromoteContentRequest | PromoteLinkRequest | InitializeRequest | LoadLinkRequest | GetRedirectRequest | ChangeSettingsRequest
   | GetUserLinksRequest | RedeemLinkRequest | GetContentBodyRequest | RemoveContentRequest | TransferCreditsRequest | AuthenticateRequest;
 
-export type ResponseBody = PromoteContentResponse & PromoteLinkResponse & InitializeResponse & LoadLinkResponse & GetRedirectResponse & ChangeSettingsResponse
+export type ResponseBody = AddContentResponse & PromoteContentResponse & PromoteLinkResponse & InitializeResponse & LoadLinkResponse & GetRedirectResponse & ChangeSettingsResponse
   & GetUserLinksResponse & RedeemLinkResponse & GetContentBodyResponse & RemoveContentResponse & TransferCreditsResponse & AuthenticateResponse;
 
 // internal to server.
-export type RecvRequestBody = PromoteContentRequest & PromoteLinkRequest & InitializeRequest & LoadLinkRequest & GetRedirectRequest & ChangeSettingsRequest
+export type RecvRequestBody = AddContentRequest & PromoteContentRequest & PromoteLinkRequest & InitializeRequest & LoadLinkRequest & GetRedirectRequest & ChangeSettingsRequest
   & GetUserLinksRequest & RedeemLinkRequest & GetContentBodyRequest & RemoveContentRequest & TransferCreditsRequest & AuthenticateRequest;
 
-export type SendResponseBody = PromoteContentResponse | PromoteLinkResponse | InitializeResponse | LoadLinkResponse | GetRedirectResponse | ChangeSettingsResponse
+export type SendResponseBody = AddContentResponse | PromoteContentResponse | PromoteLinkResponse | InitializeResponse | LoadLinkResponse | GetRedirectResponse | ChangeSettingsResponse
   | GetUserLinksResponse | RedeemLinkResponse | GetContentBodyResponse | RemoveContentResponse | TransferCreditsResponse | AuthenticateResponse;
 
 export type Handler<Request, Response> = (req: Request) => Promise<Response>;

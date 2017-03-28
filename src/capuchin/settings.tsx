@@ -15,7 +15,7 @@ import { AppState, postDeserialize } from "./AppState";
 
 
 interface SettingsPageProps { appState?: AppState };
-interface SettingsPageState { nickName: string, email: string, confirmDeletePost?: Rpc.PostInfoItem, transferAmount: number, transferTo: string };
+interface SettingsPageState { nickName: string, email: string, confirmDeleteContent?: Rpc.ContentInfoItem, transferAmount: number, transferTo: string };
 
 export class SettingsPage extends React.Component<SettingsPageProps, SettingsPageState> {
 
@@ -41,12 +41,7 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
     chrome.runtime.sendMessage({ eventType: "ChangeSettings", settings, async: true });
   }
 
-  onDropVideos(acceptedFiles, rejectedFiles) {
-    console.log('Accepted files: ', acceptedFiles);
-    console.log('Rejected files: ', rejectedFiles);
-  }
-
-  onDropAudios(acceptedFiles, rejectedFiles) {
+  onDropMedia(acceptedFiles, rejectedFiles) {
     console.log('Accepted files: ', acceptedFiles);
     console.log('Rejected files: ', rejectedFiles);
     if (rejectedFiles.length > 0) return;
@@ -92,7 +87,7 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
           <thead>
             <tr>
               <th></th>
-              <th>Content</th>
+              <th>URL</th>
               <th>Depth</th>
               <th>Promotions</th>
               <th>Deliveries</th>
@@ -107,28 +102,33 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
       );
     }
 
-    let postsdiv = <p>You do not currently have any uploaded posts.</p>
-    if (this.state.confirmDeletePost) {
+    let contsdiv = <p>You do not currently have any uploaded contents.</p>
+    if (this.state.confirmDeleteContent) {
       let msg = "Warning: Deleting a Post is irreversible. Are you sure you wish to Proceed?";
-      let onClose = () => this.setState({ confirmDeletePost: null });
-      let postId = this.state.confirmDeletePost.postId;
-      let onYes = () => chrome.runtime.sendMessage({ eventType: "RemovePost", postId, async: true });
-      postsdiv = <YesNoBox message={msg} onYes={onYes} onClose={onClose} />
+      let onClose = () => this.setState({ confirmDeleteContent: null });
+      let contentId = this.state.confirmDeleteContent.contentId;
+      let onYes = () => chrome.runtime.sendMessage({ eventType: "RemoveContent", contentId, async: true });
+      contsdiv = <YesNoBox message={msg} onYes={onYes} onClose={onClose} />
     }
-    else if (st.posts.length > 0) {
-      let postrows = st.posts.map(p => {
-        let onclick = () => { chrome.tabs.create({ active: true, url: p.contentUrl }); };
+    else if (st.contents.length > 0) {
+      let postrows = st.contents.map(p => {
+        let url = Utils.contentToUrl(p.contentId)
+        let onclick = () => { chrome.tabs.create({ active: true, url }); };
         let created = p.created ? OxiDate.toFormat(new Date(p.created), "DDDD, MMMM D @ HH:MIP") : '';
         let updated = p.updated ? OxiDate.toFormat(new Date(p.updated), "DDDD, MMMM D @ HH:MIP") : '';
         let published = p.published ? OxiDate.toFormat(new Date(p.updated), "DDDD, MMMM D @ HH:MIP") : '';
-
-        let edit = () => { chrome.runtime.sendMessage({ eventType: "LaunchPostEditPage", post: p }); };
-        let remove = () => { this.setState({ confirmDeletePost: p }) };
+        let postEdit = null;
+        if (p.contentType === "post") {
+          let edit = () => { chrome.runtime.sendMessage({ eventType: "LaunchPostEditPage", post: p }); };
+          postEdit = <Button onClick={edit} text="Edit" />;
+        }
+        let remove = () => { this.setState({ confirmDeleteContent: p }) };
         return (
-          <tr key={p.postId} >
-            <td><Button onClick={edit} text="Edit" /></td>
+          <tr key={p.contentId} >
+            <td>{postEdit}</td>
             <td><Button onClick={remove} text="Delete" /></td>
-            <td><a href="" onClick={onclick} >{p.contentUrl}</a></td>
+            <td><a href="" onClick={onclick} >{url}</a></td>
+            <td>{p.contentType}</td>
             <td>{p.title}</td>
             <td>{created}</td>
             <td>{updated}</td>
@@ -137,12 +137,13 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
           </tr>
         );
       });
-      postsdiv = (
+      contsdiv = (
         <table className="pt-table pt-striped pt-bordered" >
           <thead>
             <tr>
               <th></th>
               <th></th>
+              <th>Type</th>
               <th>Content</th>
               <th>Title</th>
               <th>Created</th>
@@ -156,8 +157,6 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
           </tbody>
         </table>);
     }
-    let vidsdiv = <p>You do not currently have any uploaded videos.</p>
-    let audsdiv = <p>You do not currently have any uploaded audios.</p>
 
     let links = st.promotions;
     let linkdiv = <p>There are no new promoted links for you.</p>
@@ -294,9 +293,9 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
         </div>
         {vsp}
         <div>
-          <h4>Your Posts : </h4>
+          <h4>Your Contents : </h4>
           {vsp}
-          {postsdiv}
+          {contsdiv}
           {vsp}
           <div style={divStyle}>
             <Button className="pt-intent-primary" onClick={() => chrome.runtime.sendMessage({ eventType: "CreatePost" })} text="Create New Post" />
@@ -304,23 +303,13 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
         </div>
         {vsp}
         <div>
-          <h4>Your Videos : </h4>
+          <h4>Your Media Uploads : </h4>
           {vsp}
-          {vidsdiv}
           {vsp}
-          <Dropzone onDrop={this.onDropVideos}>
-            <div>Try dropping some video files here, or click to select video files to upload.</div>
+          <Dropzone onDrop={this.onDropMedia}>
+            <div>Drop some audio/video/image files here, or click to select files to upload.</div>
           </Dropzone>
           {vsp}
-          <div>
-            <h4>Your Audios : </h4>
-            {vsp}
-            {audsdiv}
-            {vsp}
-            <Dropzone onDrop={this.onDropAudios} accept="audio/mpeg,audio/mp3,audio.wav,audio/mp4">
-              <div>Try dropping some audio files here, or click to select audio files to upload.</div>
-            </Dropzone>
-          </div>
         </div>
       </div>);
   }

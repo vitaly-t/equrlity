@@ -9,6 +9,7 @@ import { Url, parse, format } from 'url';
 import { AxiosResponse } from 'axios';
 import * as Rpc from '../lib/rpc';
 import * as Dbt from '../lib/datatypes';
+import * as Utils from '../lib/utils';
 
 export interface AddContent {
   eventType: "AddContent";
@@ -157,18 +158,8 @@ export namespace AsyncHandlers {
     return thunk;
   }
 
-  export async function addUrlContent(state: AppState, linkDescription: string, amount: number, tags: string[]): Promise<(st: AppState) => AppState> {
-    let curTab = await currentTab();
-    if (!curTab) console.log("No current tab");
-    if (curTab && prepareUrl(curTab.url) !== state.activeUrl) {
-      console.log("Wrong tab");
-      console.log("current : " + curTab.url)
-      console.log("active : " + state.activeUrl)
-      return () => state;
-    }
-    let src = state.activeUrl;
-    let url = expandedUrl(state, src);
-    let response = await Comms.sendAddUrlContent(state, url, linkDescription, amount, tags)
+  export async function promoteContent(state: AppState, contentId: Dbt.contentId, linkDescription: string, amount: number): Promise<(st: AppState) => AppState> {
+    let response = await Comms.sendPromoteContent(state, contentId, linkDescription, amount)
     let thunk = (st: AppState) => {
       st = extractHeadersToState(st, response);
       let rslt: Rpc.PromoteContentResponse = extractResult(response);
@@ -181,12 +172,13 @@ export namespace AsyncHandlers {
         return st;
       }
       console.log("received link: " + rslt.url)
+      let src = Utils.contentToUrl(contentId);
       return setLink(st, src, rslt.url, 0, st.moniker);
     };
     return thunk;
   }
 
-  export async function promoteLink(state: AppState, linkDescription: string, amount: number): Promise<(st: AppState) => AppState> {
+  export async function promoteLink(state: AppState, linkDescription: string, amount: number, tags: string[] = []): Promise<(st: AppState) => AppState> {
     let curTab = await currentTab();
     if (!curTab) console.log("No current tab");
     if (curTab && prepareUrl(curTab.url) !== state.activeUrl) {
@@ -197,10 +189,10 @@ export namespace AsyncHandlers {
     }
     let src = state.activeUrl;
     let url = expandedUrl(state, src);
-    let response = await Comms.sendAddUrlContent(state, url, linkDescription, amount)
+    let response = await Comms.sendPromoteLink(state, url, linkDescription, amount, tags)
     let thunk = (st: AppState) => {
       st = extractHeadersToState(st, response);
-      let rslt: Rpc.AddContentResponse = extractResult(response);
+      let rslt: Rpc.PromoteLinkResponse = extractResult(response);
       if (rslt.prevLink) {
         chrome.runtime.sendMessage({ eventType: 'RenderMessage', msg: "Content already registered." });
         // very naughty state mutation here ... so sue me!!
@@ -252,9 +244,9 @@ export namespace AsyncHandlers {
       let rslt: Rpc.GetUserLinksResponse = extractResult(response);
       let promotions = st.promotions;
       let investments = rslt.links;
-      let { connectedUsers, reachableUserCount, posts } = rslt;
+      let { connectedUsers, reachableUserCount, contents } = rslt;
       if (rslt.promotions.length > 0) promotions = [...promotions, ...rslt.promotions];
-      st = { ...st, investments, promotions, connectedUsers, reachableUserCount, posts };
+      st = { ...st, investments, promotions, connectedUsers, reachableUserCount, contents };
       return st;
     };
   }
@@ -291,14 +283,14 @@ export namespace AsyncHandlers {
     return thunk;
   }
 
-  export async function SavePost(state: AppState, req: Rpc.SavePostRequest): Promise<(st: AppState) => AppState> {
-    const response = await Comms.sendSavePost(state, req);
+  export async function SaveContent(state: AppState, req: Rpc.SaveContentRequest): Promise<(st: AppState) => AppState> {
+    const response = await Comms.sendSaveContent(state, req);
     if (req.publish) return await GetUserLinks(state);
     let thunk = (st: AppState) => {
       st = extractHeadersToState(state, response);
-      let rslt: Rpc.SavePostResponse = extractResult(response);
-      let posts = rslt.posts;
-      st = { ...st, posts };
+      let rslt: Rpc.SaveContentResponse = extractResult(response);
+      let contents = rslt.contents;
+      st = { ...st, contents };
       return st;
     }
     return thunk;

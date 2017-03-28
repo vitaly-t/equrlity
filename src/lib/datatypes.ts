@@ -3,9 +3,9 @@
 
 export type authId = string;
 export type authProvider = "facebook" | "github" | "twitter" | "linkedin" | "chrome";
-export type binary = ArrayBuffer;
-export type contentCryptId = ArrayBuffer;
-export type contentType = "url" | "video" | "post" | "audio" | "image";
+export type binary = Uint8Array;
+export type contentCryptId = Uint8Array;
+export type contentType = "video" | "post" | "audio" | "image";
 export type created = Date;
 export type date = Date;
 export type email = string;
@@ -23,7 +23,7 @@ export type userGroup = "admin" | "author" | "member";
 export type urlString = string;
 export type userName = string;
 export type uuid = string;
-export type content = ArrayBuffer;
+export type content = Uint8Array;
 export type contentId = number;
 export type userId = string;
 export type varchar_8 = string;
@@ -67,7 +67,8 @@ export interface Content {
   readonly mime_ext: varchar_8 | null,
   readonly title: varchar_254 | null,
   readonly tags: varchar_20[] | null,
-  readonly cryptHash: binary | null
+  readonly cryptHash: binary | null,
+  readonly published: timestamp | null
 };
 
 export interface Link {

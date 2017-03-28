@@ -14,7 +14,7 @@ export default {
       ]
     },
     "binary": {
-      "tsType": "ArrayBuffer",
+      "tsType": "Uint8Array",
       "sqlType": "bytea"
     },
     "boolean": {
@@ -22,13 +22,12 @@ export default {
       "sqlType": "boolean"
     },
     "contentCryptId": {
-      "tsType": "ArrayBuffer",
+      "tsType": "Uint8Array",
       "sqlType": "bytea"
     },
     "contentType": {
       "sqlType": "varchar(10)",
       "enum": [
-        "url",
         "video",
         "post",
         "audio",
@@ -120,6 +119,7 @@ export default {
       { "name": "title", "type": "varchar(254)" },
       { "name": "tags", "type": "varchar(20)", "multiValued": true },
       { "name": "cryptHash", "type": "binary" },
+      { "name": "published", "type": "timestamp" },
     ],
     "Invitation": ["ipAddress", "linkId", "created", "updated"],
     "Link": ["linkId", "userId", "linkDescription", "created", "updated",
@@ -177,6 +177,7 @@ export default {
       "foreignKeys": [
         { "ref": "users", "columns": ["userId"] },
       ],
+      "uniques": [["contentType", "title"]],
     },
     "links": {
       "rowType": "Link",

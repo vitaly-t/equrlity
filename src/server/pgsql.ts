@@ -1,22 +1,23 @@
 "use strict";
 
-import * as Utils from "../lib/utils";
 import { Url, parse, format } from 'url';
+import { IMain, IDatabase, ITask } from 'pg-promise';
+import * as pgPromise from 'pg-promise';
+import { TextEncoder, TextDecoder } from 'text-encoding';
+
+import * as Utils from "../lib/utils";
 import * as Rpc from '../lib/rpc';
+import * as OxiDate from '../lib/oxidate';
+import * as Dbt from '../lib/datatypes'
+import * as OxiGen from '../lib/oxigen';
+import * as uuid from '../lib/uuid.js';
+import { genInsertStatement } from "../lib/oxigen";
+
 import * as cache from './cache';
 import * as tasks from './pgtasks';
 
 export let connectUrl: string = Utils.isTest() ? process.env.DEV_PSEUDOQURL_TEST_URL : Utils.isDev() ? process.env.DEV_PSEUDOQURL_URL : process.env.PSEUDOQURL_URL;
 if (!connectUrl.startsWith('postgres:')) connectUrl = 'postgres:' + connectUrl;
-
-import * as OxiDate from '../lib/oxidate';
-
-import { IMain, IDatabase, ITask } from 'pg-promise';
-import * as pgPromise from 'pg-promise';
-import * as Dbt from '../lib/datatypes'
-import * as OxiGen from '../lib/oxigen';
-import * as uuid from '../lib/uuid.js';
-import { genInsertStatement } from "../lib/oxigen";
 
 // your protocol extensions:
 //interface IExtensions {
@@ -42,7 +43,7 @@ import { genInsertStatement } from "../lib/oxigen";
 // now you can use the extensions everywhere (including tasks and transactions):
 //db.findUser(123).then(...);
 
-const pgp: IMain = pgPromise({
+export const pgp: IMain = pgPromise({
   error: (err, e) => {
     // just for debugging ...
     // e.dc = Database Context
@@ -73,7 +74,7 @@ const oxb: OxiGen.IDbSchema = OxiGen.dbSchema;
 //pgp.pg.types.setTypeParser(1114, str => moment.utc(str).format());
 
 
-export const db: IDatabase<any> = pgp(connectUrl);
+const db: IDatabase<any> = pgp(connectUrl);
 
 export async function init() {
   console.log("pg init called. connected to:" + connectUrl);
@@ -166,6 +167,14 @@ export async function upsertRecord<T>(tblnm: string, rec: Object): Promise<T> {
 
 export async function retrieveRecord<T>(tblnm: string, pk: Object): Promise<T> {
   return await db.task(t => tasks.retrieveRecord(t, tblnm, pk));
+}
+
+export async function countRecordsInTable(tblnm: string): Promise<number> {
+  return await db.task(t => tasks.countRecordsInTable(t, tblnm));
+}
+
+export async function retrieveContentByTitle(title: string, contentType: Dbt.contentType): Promise<Dbt.Content> {
+  return await db.task(t => tasks.retrieveContentByTitle(t, title, contentType));
 }
 
 export async function deleteRecord<T>(tblnm: string, pk: Object): Promise<boolean> {
@@ -308,13 +317,6 @@ export async function promoteLink(link: Dbt.Link, amount: Dbt.integer): Promise<
   return await db.task(t => _promoteLink(t, link, amount));
 }
 
-export async function promoteContent(userId: Dbt.userId, content: string, linkDescription, amount: Dbt.integer, contentType: Dbt.contentType = "url"): Promise<cache.CacheUpdate[]> {
-  let rslt: cache.CacheUpdate[] = await db.task(t => tasks.promoteLink(t, userId, content, linkDescription, amount, contentType));
-  let linkUpdt = rslt.find(e => e.table === "links" as cache.CachedTable);
-  await promoteLink(linkUpdt.record, amount);
-  return rslt;
-}
-
 export async function redeemLink(link: Dbt.Link): Promise<void> {
   cache.update(await db.task(t => tasks.redeemLink(t, link)));
 }
@@ -358,6 +360,8 @@ export async function createUser(email?: string): Promise<Dbt.User> {
 };
 
 async function _handlePromoteContent(t: ITask<any>, userId, { publicKey, contentId, signature, amount }): Promise<[cache.CacheUpdate[], Rpc.PromoteContentResponse]> {
+  let usr = await tasks.retrieveRecord<Dbt.User>(t, "users", { userId });
+  if (amount > usr.credits) throw new Error("Negative balances not allowed");
   let cont = await tasks.retrieveRecord<Dbt.Content>(t, "contents", { contentId });
   if (userId !== cont.userId) throw new Error("Content owned by different user");
   let links = await tasks.getRootLinksForContentId(t, contentId);
@@ -447,10 +451,22 @@ export async function getContentBody(id: Dbt.contentId): Promise<string> {
   return await db.task(t => tasks.getContentBody(t, id));
 }
 
-export async function saveContent(userId: Dbt.userId, req: Rpc.SaveContentRequest): Promise<Dbt.Content> {
-  return await db.task(t => tasks.saveContent(t, userId, req));
+export async function saveContent(req: Rpc.SaveContentRequest): Promise<Dbt.Content> {
+  return await db.task(t => tasks.saveContent(t, req));
 }
 
 export async function registerInvitation(ipAddress: string, linkId: Dbt.linkId): Promise<Dbt.Invitation> {
   return await db.tx(t => tasks.registerInvitation(t, ipAddress, linkId));
+}
+
+export async function insertContent(content: Uint8Array, mime_ext: string, contentType: Dbt.contentType, title: string, userId: Dbt.userId): Promise<Dbt.Content> {
+  let cont = OxiGen.emptyRec<Dbt.Content>(oxb.tables.get("contents"));
+  cont = { ...cont, mime_ext, content, contentType, title, userId };
+  let rslt = await insertRecord<Dbt.Content>("contents", cont);
+  return rslt;
+}
+
+export async function retrieveContent(contentId: Dbt.contentId): Promise<Uint8Array> {
+  let cont = await retrieveRecord<Dbt.Content>("contents", { contentId });
+  return cont.content;
 }

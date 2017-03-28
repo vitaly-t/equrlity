@@ -13,7 +13,7 @@ module.exports = function (env) {
       main: './src/capuchin/main.tsx',
       background: './src/capuchin/background.ts',
       settings: './src/capuchin/settings.tsx',
-      post: './src/capuchin/post.tsx',
+      post: './src/capuchin/postEditor.tsx',
     },
     output: {
       path: outPath,

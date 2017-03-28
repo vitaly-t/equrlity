@@ -21,7 +21,12 @@ export const rowStyle = { width: '100%', marginTop: 2, marginLeft: 5, padding: 6
 export const btnStyle = { height: '24', marginTop: 2, marginLeft: 5, marginRight: 5, display: 'inline-block' };
 export const lhcolStyle = { width: '20%' };
 
-interface PostViewProps { post: Dbt.Content, creator: string };
+export type Post = {
+  readonly info: Rpc.ContentInfoItem;
+  readonly body: string;
+};
+
+interface PostViewProps { post: Post, creator: string };
 interface PostViewState { };
 
 let Tag = (props) => {
@@ -32,17 +37,15 @@ export class PostView extends React.Component<PostViewProps, PostViewState> {
 
   render() {
     let { post, creator } = this.props;
-    let decoder = new TextDecoder();
-    let view = new DataView(post.content);
-    let body = decoder.decode(view);
-    let h = { __html: md.render(body) };
-    let lstedit = post.updated ? oxiDate.toFormat(new Date(post.updated), "DDDD, MMMM D @ HH:MIP") : 'never';
-    //let pub = post.published ? oxiDate.toFormat(new Date(post.published), "DDDD, MMMM D @ HH:MIP") : 'never';
-    let tags = post.tags
+    let info = post.info;
+    let h = { __html: md.render(post.body) };
+    let lstedit = info.updated ? oxiDate.toFormat(new Date(info.updated), "DDDD, MMMM D @ HH:MIP") : 'never';
+    let pub = info.published ? oxiDate.toFormat(new Date(info.published), "DDDD, MMMM D @ HH:MIP") : 'never';
+    let tags = info.tags
     let tagbtns = tags.map(t => <Tag key={'tag:' + t} >{t}</Tag>);
     return (
       <div>
-        <h2>{post.title}</h2>
+        <h2>{info.title}</h2>
         <div style={rowStyle} dangerouslySetInnerHTML={h} />
         <div style={rowStyle} >
           <div style={{ display: 'inline' }}>Tags: </div>
