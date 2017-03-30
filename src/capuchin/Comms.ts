@@ -116,3 +116,7 @@ export async function sendGetContentBody(st: AppState): Promise<AxiosResponse> {
 export async function sendSaveContent(st: AppState, req: Rpc.SaveContentRequest): Promise<AxiosResponse> {
   return await sendApiRequest(st, "saveContent", req);
 }
+
+export async function sendTransferCredits(st: AppState, req: Rpc.TransferCreditsRequest): Promise<AxiosResponse> {
+  return await sendApiRequest(st, "transferCredits", req);
+}

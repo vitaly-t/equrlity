@@ -1,26 +1,23 @@
 "use strict";
 
+import * as React from 'react';
+import * as ReactDOM from 'react-dom';
+import * as Remarkable from 'remarkable';
+const md = new Remarkable({ html: true });
+import * as Blueprint from "@blueprintjs/core";
+
 import * as oxiDate from '../lib/oxidate';
 import * as utils from '../lib/utils';
 import * as uuid from '../lib/uuid.js';
-
 import { TimeSpan } from '../lib/timeSpan';
-
-import * as React from 'react';
-import * as ReactDOM from 'react-dom';
-import { sendGetContentBody, sendSaveContent } from './Comms';
+import { PostView, Post, rowStyle, btnStyle, lhcolStyle } from "../lib/postview";
 import * as Rpc from '../lib/rpc';
 import * as Dbt from '../lib/datatypes';
 
-import * as Remarkable from 'remarkable';
-const md = new Remarkable({ html: true });
-
-import * as Blueprint from "@blueprintjs/core";
-//import '@blueprintjs/core/dist/blueprint.css';
-
 import { AppState, postDeserialize } from "./AppState";
+import { sendGetContentBody, sendSaveContent } from './Comms';
+import * as Chrome from './chrome';
 
-import { PostView, Post, rowStyle, btnStyle, lhcolStyle } from "../lib/postview";
 
 interface PostProps { appState: AppState };
 interface PostState { title: string, body: string, tags: string, editing: boolean, isError: boolean, prevBody: string, investment: number };
@@ -67,7 +64,7 @@ export class PostEditor extends React.Component<PostProps, PostState> {
     let content = this.state.body;
     let investment = this.state.investment;
     let req: Rpc.SaveContentRequest = { contentId: this.props.appState.currentContent.contentId, contentType: "post", mime_ext: "txt", title, tags, content, publish, investment };
-    chrome.runtime.sendMessage({ eventType: "SaveContent", req, async: true });
+    Chrome.sendMessage({ eventType: "SaveContent", req });
   }
 
   publish() { this.save(true); }

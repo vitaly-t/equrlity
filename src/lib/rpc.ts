@@ -320,7 +320,7 @@ export type RedeemLinkResponse = { links: UserLinkItem[]; }
  * 
  * content: the url of the content to be removed 
  */
-export type RemoveContentRequest = { url: Dbt.urlString; }
+export type RemoveContentRequest = { contentId: Dbt.contentId; }
 
 /**
 * ok: true if successful, false probably indicates that content is not owned by the current user.

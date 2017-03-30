@@ -18,7 +18,9 @@ export interface PromoteContent {
 
 export interface PromoteLink {
   eventType: "PromoteLink";
-  req: Rpc.PromoteLinkRequest;
+  amount: number;
+  linkDescription: string;
+  tags?: string[];
 }
 
 export interface Initialize {
@@ -59,6 +61,16 @@ export interface SaveContent {
   req: Rpc.SaveContentRequest;
 }
 
+export interface RemoveContent {
+  eventType: "RemoveContent";
+  req: Rpc.RemoveContentRequest;
+}
+
+export interface TransferCredits {
+  eventType: "TransferCredits";
+  req: Rpc.TransferCreditsRequest;
+}
+
 export interface CreatePost {
   eventType: "CreatePost";
 }
@@ -83,7 +95,7 @@ export interface Thunk {
 }
 
 export type Message = PromoteContent | PromoteLink | Initialize | Load | ActivateTab | Render | ChangeSettings | LaunchSettingsPage
-  | LaunchPostEditPage | SaveContent | CreatePost | RedeemLink | GetUserLinks | DismissPromotion | Thunk;
+  | LaunchPostEditPage | SaveContent | RemoveContent | CreatePost | RedeemLink | GetUserLinks | DismissPromotion | TransferCredits | Thunk;
 
 export function getTab(tabId: number): Promise<chrome.tabs.Tab> {
   return new Promise(resolve => {
@@ -130,7 +142,7 @@ function extractResult<rspBody>(response: AxiosResponse): Rpc.ResponseBody {
 
 export namespace AsyncHandlers {
 
-  export async function Authenticate(userInfo: chrome.identity.UserInfo, authToken: string, publicKey: JsonWebKey): Promise<string> {
+  export async function authenticate(userInfo: chrome.identity.UserInfo, authToken: string, publicKey: JsonWebKey): Promise<string> {
     const response = await Comms.sendAuthRequest({ userInfo, publicKey }, "Bearer " + authToken);
     let result = "";
     if (response.status === 200) {
@@ -140,7 +152,7 @@ export namespace AsyncHandlers {
     return result;
   }
 
-  export async function Initialize(state: AppState): Promise<(st: AppState) => AppState> {
+  export async function initialize(state: AppState): Promise<(st: AppState) => AppState> {
     const rsp = await Comms.sendInitialize(state)
     let activeTab = await currentTab()
     let thunk = (st: AppState) => {
@@ -205,7 +217,7 @@ export namespace AsyncHandlers {
     return thunk;
   }
 
-  export async function GetRedirect(state: AppState, curl: string): Promise<(st: AppState) => AppState> {
+  export async function getRedirect(state: AppState, curl: string): Promise<(st: AppState) => AppState> {
     let response = await Comms.sendGetRedirect(state, curl);
     let tab = await currentTab();
     return (st: AppState) => {
@@ -221,7 +233,7 @@ export namespace AsyncHandlers {
     };
   }
 
-  export async function RedeemLink(state: AppState, linkId: Dbt.linkId): Promise<(st: AppState) => AppState> {
+  export async function redeemLink(state: AppState, linkId: Dbt.linkId): Promise<(st: AppState) => AppState> {
     let response = await Comms.sendRedeemLink(state, linkId);
     return (st: AppState) => {
       st = extractHeadersToState(st, response);
@@ -232,7 +244,7 @@ export namespace AsyncHandlers {
     };
   }
 
-  export async function GetUserLinks(state: AppState): Promise<(st: AppState) => AppState> {
+  export async function getUserLinks(state: AppState): Promise<(st: AppState) => AppState> {
     let response = await Comms.sendGetUserLinks(state);
     return (st: AppState) => {
       st = extractHeadersToState(st, response);
@@ -246,7 +258,7 @@ export namespace AsyncHandlers {
     };
   }
 
-  export async function Load(state: AppState, curl_: string): Promise<(st: AppState) => AppState> {
+  export async function load(state: AppState, curl_: string): Promise<(st: AppState) => AppState> {
     let curl = prepareUrl(curl_);
     if (!curl) return (st => { return { ...st, activeUrl: null }; });
     let tgt = getRedirectUrl(state, curl)
@@ -256,7 +268,7 @@ export namespace AsyncHandlers {
       chrome.tabs.update(tab.id, { url: tgt });
     }
     if (isSeen(state, curl)) return (st => { return { ...st, activeUrl: curl }; });
-    if (isPseudoQLink(parse(curl))) return GetRedirect(state, curl)
+    if (isPseudoQLink(parse(curl))) return getRedirect(state, curl)
     let response = await Comms.sendLoadLink(state, curl);
     let thunk = (st: AppState) => {
       st = extractHeadersToState(st, response);
@@ -268,7 +280,7 @@ export namespace AsyncHandlers {
     return thunk;
   }
 
-  export async function ChangeSettings(state: AppState, settings: Rpc.ChangeSettingsRequest): Promise<(st: AppState) => AppState> {
+  export async function changeSettings(state: AppState, settings: Rpc.ChangeSettingsRequest): Promise<(st: AppState) => AppState> {
     const response = await Comms.sendChangeSettings(state, settings);
     let thunk = (st: AppState) => {
       st = extractHeadersToState(state, response);
@@ -278,14 +290,27 @@ export namespace AsyncHandlers {
     return thunk;
   }
 
-  export async function SaveContent(state: AppState, req: Rpc.SaveContentRequest): Promise<(st: AppState) => AppState> {
+  export async function saveContent(state: AppState, req: Rpc.SaveContentRequest): Promise<(st: AppState) => AppState> {
     const response = await Comms.sendSaveContent(state, req);
-    if (req.publish) return await GetUserLinks(state);
+    if (req.publish) return await getUserLinks(state);
     let thunk = (st: AppState) => {
       st = extractHeadersToState(state, response);
       let rslt: Rpc.SaveContentResponse = extractResult(response);
       let contents = rslt.contents;
       st = { ...st, contents };
+      return st;
+    }
+    return thunk;
+  }
+
+  export async function transferCredits(state: AppState, req: Rpc.TransferCreditsRequest): Promise<(st: AppState) => AppState> {
+    const response = await Comms.sendTransferCredits(state, req);
+    let thunk = (st: AppState) => {
+      st = extractHeadersToState(state, response);
+      let rslt: Rpc.TransferCreditsResponse = extractResult(response);
+      if (!rslt.ok) {
+        // do something clever...
+      }
       return st;
     }
     return thunk;

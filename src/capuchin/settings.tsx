@@ -14,6 +14,7 @@ import { rowStyle, btnStyle, lhcolStyle } from "../lib/postview";
 import { YesNoBox } from './dialogs';
 import { AppState, postDeserialize } from "./AppState";
 import { uploadRequest } from "./Comms";
+import * as Chrome from './chrome';
 
 interface EditContentProps { info: Rpc.ContentInfoItem, onClose: () => void }
 interface EditContentState { title: string, tags: string, isOpen: boolean, investment: number }
@@ -46,7 +47,7 @@ export class EditContent extends React.Component<EditContentProps, EditContentSt
     let publish = investment > 0;
     let info = this.props.info;
     let req: Rpc.SaveContentRequest = { contentId: info.contentId, contentType: info.contentType, mime_ext: info.mime_ext, title, tags, publish, investment };
-    chrome.runtime.sendMessage({ eventType: "SaveContent", req, async: true });
+    Chrome.sendMessage({ eventType: "SaveContent", req });
     this.close();
   }
 
@@ -115,7 +116,7 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
   saveSettings = () => {
     console.log("saving settings");
     let settings: Rpc.ChangeSettingsRequest = { userName: this.state.nickName, email: this.state.email };
-    chrome.runtime.sendMessage({ eventType: "ChangeSettings", settings, async: true });
+    Chrome.sendMessage({ eventType: "ChangeSettings", settings });
   }
 
   onDropMedia = async (acceptedFiles, rejectedFiles) => {
@@ -153,7 +154,7 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
       let invrows = invs.map(l => {
         let linkId = l.linkId;
         let url = l.contentUrl;
-        let redeem = () => { chrome.runtime.sendMessage({ eventType: "RedeemLink", linkId, async: true }); };
+        let redeem = () => { Chrome.sendMessage({ eventType: "RedeemLink", linkId }); };
         let onclick = () => { chrome.tabs.create({ active: true, url }); };
 
         return (
@@ -193,7 +194,7 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
       let msg = "Warning: Deleting a Content Item is irreversible. Are you sure you wish to Proceed?";
       let onClose = () => this.setState({ confirmDeleteContent: null });
       let contentId = this.state.confirmDeleteContent.contentId;
-      let onYes = () => chrome.runtime.sendMessage({ eventType: "RemoveContent", contentId, async: true });
+      let onYes = () => Chrome.sendMessage({ eventType: "RemoveContent", req: { contentId } });
       contsdiv = <YesNoBox message={msg} onYes={onYes} onClose={onClose} />
     }
     else if (this.state.editingContent) {
@@ -212,7 +213,7 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
         let btns = [<Button onClick={remove} text="Delete" />];
         let tags = p.tags && p.tags.length > 0 ? p.tags.join(", ") : '';
         if (p.contentType === "post") {
-          let edit = () => { chrome.runtime.sendMessage({ eventType: "LaunchPostEditPage", post: p }); };
+          let edit = () => { Chrome.sendMessage({ eventType: "LaunchPostEditPage", post: p }); };
           btns.push(<Button onClick={edit} text="Edit" />);
         }
         else {
@@ -256,7 +257,7 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
     let linkdiv = <p>There are no new promoted links for you.</p>
     if (links.length > 0) {
       let linkrows = links.map(url => {
-        let dismiss = () => { chrome.runtime.sendMessage({ eventType: "DismissPromotion", url }); };
+        let dismiss = () => { Chrome.sendMessage({ eventType: "DismissPromotion", url }); };
         let onclick = () => { chrome.tabs.create({ active: true, url }); };
         let [tgt, desc] = url.split('#');
         if (desc) desc = desc.replace('_', ' ');
@@ -292,7 +293,7 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
       let transferTo = this.state.transferTo;
       let req: Rpc.TransferCreditsRequest = { transferTo, amount };
       if (amount > 0 && transferTo) {
-        chrome.runtime.sendMessage({ eventType: "TransferCredits", req, async: true });
+        Chrome.sendMessage({ eventType: "TransferCredits", req });
         this.setState({ transferAmount: 0 });
       }
     };
@@ -301,26 +302,28 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
     </div>
       : <p>You are not currently connected with any other users. Hence, no promotions can be issued on your behalf.</p>;
 
-    let authdiv = <p>You are currently authenticated via {st.authprov}</p>;
-    if (!st.authprov) {
-      let authClick = (provider) => {
-        let req: Rpc.AuthenticateRequest = { provider };
-        chrome.runtime.sendMessage({ eventType: "Authenticate", req, async: true });
-      }
-      let root = Utils.serverUrl + "/auth";
-      authdiv = (
-        <div>
-          <p>You are not currently authenticated.</p>
-          <p>You can authenticate via:</p>
-          <ul>
-            <li><a href="" onClick={() => authClick('facebook')} >Facebook</a></li>
-            <li><a href="" onClick={() => authClick('twitter')} >Twitter</a></li>
-            <li><a href="" onClick={() => authClick('github')} >GitHub</a></li>
-            <li><a href="" onClick={() => authClick('google')} >Google</a></li>
-          </ul>
-        </div>
-      )
-    };
+    /*
+        let authdiv = <p>You are currently authenticated via {st.authprov}</p>;
+        if (!st.authprov) {
+          let authClick = (provider) => {
+            let req: Rpc.AuthenticateRequest = { provider };
+            Chrome.sendMessage({ eventType: "Authenticate", req });
+          }
+          let root = Utils.serverUrl + "/auth";
+          authdiv = (
+            <div>
+              <p>You are not currently authenticated.</p>
+              <p>You can authenticate via:</p>
+              <ul>
+                <li><a href="" onClick={() => authClick('facebook')} >Facebook</a></li>
+                <li><a href="" onClick={() => authClick('twitter')} >Twitter</a></li>
+                <li><a href="" onClick={() => authClick('github')} >GitHub</a></li>
+                <li><a href="" onClick={() => authClick('google')} >Google</a></li>
+              </ul>
+            </div>
+          )
+        };
+    */
 
     let transferDiv = (
       <div>
@@ -342,7 +345,7 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
         <h3>Status and Settings.</h3>
         <div style={divStyle}>
           {userp}
-          {authdiv}
+          {/*authdiv*/}
         </div>
         {vsp}
         <h5>Your Settings:</h5>
@@ -392,7 +395,7 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
           {contsdiv}
           {vsp}
           <div style={divStyle}>
-            <Button className="pt-intent-primary" onClick={() => chrome.runtime.sendMessage({ eventType: "CreatePost" })} text="Create New Post" />
+            <Button className="pt-intent-primary" onClick={() => Chrome.sendSyncMessage({ eventType: "CreatePost" })} text="Create New Post" />
           </div>
         </div>
         {vsp}

@@ -4,6 +4,7 @@ import { Url, format } from 'url';
 import Form from 'react-input';
 import * as Rpc from '../lib/rpc'
 import { capuchinVersion, serverUrl } from '../lib/utils';
+import * as Chrome from './chrome';
 
 export interface PopupPanelProps { appState?: AppState; serverMessage?: string };
 export interface PopupPanelState { promoteAmount: number, description: string };
@@ -51,7 +52,7 @@ export class PopupPanel extends React.Component<PopupPanelProps, PopupPanelState
       let saveaction = () => {
         let amount = this.state.promoteAmount;
         let linkDescription = this.state.description
-        chrome.runtime.sendMessage({ eventType: "Save", amount, linkDescription, async: true });
+        Chrome.sendMessage({ eventType: "PromoteLink", amount, linkDescription });
       }
       let infoDiv = linkInfo ? <div>{`Promoted by: ${linkInfo.linkPromoter}, Link depth : ${linkInfo.linkDepth}`}</div> : null;
       let costPerView = linkInfo ? linkInfo.linkDepth + 1 : 1;
@@ -66,7 +67,7 @@ export class PopupPanel extends React.Component<PopupPanelProps, PopupPanelState
         <button onClick={saveaction} >{lbl}</button>
       </div>);
     }
-    let settingsAction = () => chrome.runtime.sendMessage({ eventType: "LaunchSettingsPage", async: true });
+    let settingsAction = () => Chrome.sendMessage({ eventType: "LaunchSettingsPage" });
     return <div>
       <p>Using Server Url: {serverUrl} </p>
       <p>Your PseudoQURL Nickname is: {st.moniker}</p>

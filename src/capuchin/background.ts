@@ -44,7 +44,7 @@ async function initialize() {
   await createKeyPairIf(keys);
   const publicKey = await localForage.getItem<JsonWebKey>('publicKey');
   const privateKey = await localForage.getItem<JsonWebKey>('privateKey');
-  const jwt = await AsyncHandlers.Authenticate(userInfo, chromeToken, publicKey);
+  const jwt = await AsyncHandlers.authenticate(userInfo, chromeToken, publicKey);
   if (!jwt) throw new Error("Unable to authenticate");
   await handleMessage({ eventType: "Thunk", fn: ((st: AppState) => { return { ...st, publicKey, privateKey, jwt } }) });
   handleAsyncMessage({ eventType: "Initialize" });
@@ -85,7 +85,7 @@ export async function handleAsyncMessage(event: Message) {
   try {
     switch (event.eventType) {
       case "Initialize":
-        fn = await AsyncHandlers.Initialize(st);
+        fn = await AsyncHandlers.initialize(st);
         break;
       case "ChangeSettings":
         fn = await AsyncHandlers.ChangeSettings(st, event.settings);
@@ -102,32 +102,36 @@ export async function handleAsyncMessage(event: Message) {
           //console.log("refreshing with correct state");
           chrome.runtime.sendMessage({ eventType: 'Render', appState: preSerialize(currentState()) });
         }, 5000);
-        fn = await AsyncHandlers.promoteLink(st, event.req.linkDescription, event.req.amount, event.req.tags);
+        fn = await AsyncHandlers.promoteLink(st, event.linkDescription, event.amount, event.tags);
         break;
       }
       case "Load": {
-        fn = await AsyncHandlers.Load(st, event.url);
+        fn = await AsyncHandlers.load(st, event.url);
         break;
       }
       case "RedeemLink": {
-        fn = await AsyncHandlers.RedeemLink(st, event.linkId);
+        fn = await AsyncHandlers.redeemLink(st, event.linkId);
         break;
       }
       case "LaunchSettingsPage":
         chrome.tabs.create({ 'url': chrome.extension.getURL('settings.html'), 'selected': true });
-        fn = await AsyncHandlers.GetUserLinks(st);
+        fn = await AsyncHandlers.getUserLinks(st);
         break;
       case "GetUserLinks": {
-        fn = await AsyncHandlers.GetUserLinks(st);
+        fn = await AsyncHandlers.getUserLinks(st);
         break;
       }
       case "ActivateTab": {
         let t = await getTab(event.tabId);
-        fn = await AsyncHandlers.Load(st, t.url);
+        fn = await AsyncHandlers.load(st, t.url);
         break;
       }
       case "SaveContent": {
-        fn = await AsyncHandlers.SaveContent(st, event.req);
+        fn = await AsyncHandlers.saveContent(st, event.req);
+        break;
+      }
+      case "TransferCredits": {
+        fn = await AsyncHandlers.transferCredits(st, event.req);
         break;
       }
     }
