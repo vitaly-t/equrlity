@@ -7,9 +7,7 @@ import { AppState } from './AppState';
 import * as Utils from '../lib/utils';
 import * as Dbt from '../lib/datatypes';
 
-
-
-async function apiRequest(st: AppState) {
+function apiRequest(st: AppState) {
   let headers = { 'content-type': 'application/json', 'Accept': 'application/json' };
   if (st.jwt) headers['Authorization'] = 'Bearer ' + st.jwt;
   headers['x-psq-client-version'] = 'capuchin-' + Utils.capuchinVersion();
@@ -25,11 +23,25 @@ async function apiRequest(st: AppState) {
   });
 }
 
+export function uploadRequest(st: AppState) {
+  let headers = { 'x-psq-client-version': 'capuchin-' + Utils.capuchinVersion() };
+  if (st.jwt) headers['Authorization'] = 'Bearer ' + st.jwt;
+  return axios.create({
+    timeout: 500000,
+    headers,
+    //responseType: 'json',
+    //transformRequest: (data) => {
+    // Do whatever you want to transform the data
+    //    return data;
+    //},
+  });
+}
+
 export async function sendAuthRequest(data: Object, authHeader: string): Promise<AxiosResponse> {
   let headers = { 'content-type': 'application/json', 'Accept': 'application/json' };
   headers['Authorization'] = authHeader;
   headers['x-psq-client-version'] = 'capuchin-' + Utils.capuchinVersion();
-  let req = await axios.create({
+  let req = axios.create({
     headers,
     responseType: 'json'
   });
@@ -38,7 +50,7 @@ export async function sendAuthRequest(data: Object, authHeader: string): Promise
 
 let id = 0;
 export async function sendApiRequest(st: AppState, method: Rpc.Method, params: any): Promise<AxiosResponse> {
-  let xhr = await apiRequest(st);
+  let xhr = apiRequest(st);
   id += 1;
   let data: Rpc.Request = { jsonrpc: "2.0", method, params, id };
   try {

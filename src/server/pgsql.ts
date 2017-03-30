@@ -470,6 +470,8 @@ export async function insertContent(content: Buffer, mime_ext: string, contentTy
   return rslt;
 }
 
+
+
 export async function retrieveContent(contentId: Dbt.contentId): Promise<Buffer> {
   let cont = await retrieveRecord<Dbt.Content>("contents", { contentId });
   return cont.content;

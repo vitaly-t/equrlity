@@ -4,7 +4,10 @@ console.log("dotenv loaded");
 
 // internal node
 import * as fs from "fs"
+import * as path from "path"
 import { Url, parse } from 'url';
+import * as concat from 'concat-stream';
+
 
 // node_modules
 import * as React from 'react';
@@ -14,7 +17,8 @@ import axios from 'axios';
 
 import * as Koa from "koa";
 import * as bodyParser from 'koa-bodyparser';
-import * as Router from 'koa-router';
+//import * as Router from 'koa-router';
+import * as Router from 'koa-joi-router';
 import * as send from 'koa-send';
 import * as cors from 'kcors';
 import * as koaBody from 'koa-body';
@@ -59,7 +63,8 @@ function readFileAsync(src: string): Promise<string> {
 const app = new Koa();
 app.keys = ['pseudoqurl'];  //@@GS what does this do again?
 
-const publicRouter = new Router();
+//const publicRouter = new Router();
+const publicRouter = Router();
 
 //app.use(session(app));
 //app.use(passport.initialize());
@@ -169,7 +174,8 @@ publicRouter.post('/auth', async (ctx, next) => {
   else ctx.throw(401, "Authentication failed!");
 });
 
-app.use(publicRouter.routes());
+//app.use(publicRouter.routes());
+app.use(publicRouter.middleware());
 
 // currently this needs to come after the public routes
 app.use(serve("assets", "./assets"));
@@ -265,11 +271,39 @@ async function handleRequest<I, O>(method: Rpc.Handler<I, O>, req: I): Promise<O
 }
 
 
-const router = new Router();
+//const router = new Router();
+const router = Router();
 
+router.route({
+  method: 'post',
+  path: '/upload/media',
+  validate: { type: 'multipart' },
+  handler: async (ctx) => {
+    const parts = ctx.request.parts;
+    const userId = ctx.userId.id;
 
-router.put('/upload/audio', async function (ctx: Koa.Context) {
-  console.log(this.request.body.files);
+    let part;
+
+    try {
+      while (part = await parts) {
+
+        var concatStream = concat(gotFile)
+        part.pipe(concatStream);
+
+        function gotFile(content: Buffer) {
+          console.log("got file: " + part.filename);
+          let pth = path.parse(part.filename);
+          let mime_ext = pth.ext
+          let contentType: Dbt.contentType = part.mime.substring(0, part.mime.indexOf("/"));
+          pg.insertContent(content, mime_ext, contentType, part.filename, userId);
+        }
+
+      }
+    } catch (err) {
+      console.log(err);
+      ctx.throw(err);
+    }
+  }
 });
 
 router.post('/rpc', async function (ctx: any) {
@@ -483,8 +517,9 @@ app.use(router.get('/auth/twitter', function *() {
 
 
 
-app.use(router.routes())
-app.use(router.allowedMethods());
+//app.use(router.routes())
+//app.use(router.allowedMethods());
+app.use(router.middleware())
 
 
 const port = parseInt(process.env.PORT, 10) || 8080;

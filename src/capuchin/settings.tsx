@@ -13,13 +13,15 @@ import { rowStyle, btnStyle, lhcolStyle } from "../lib/postview";
 
 import { YesNoBox } from './dialogs';
 import { AppState, postDeserialize } from "./AppState";
+import { uploadRequest } from "./Comms";
 
 interface EditContentProps { info: Rpc.ContentInfoItem, onClose: () => void }
 interface EditContentState { title: string, tags: string, isOpen: boolean, investment: number }
 export class EditContent extends React.Component<EditContentProps, EditContentState> {
   constructor(props: EditContentProps) {
     super(props);
-    this.state = { isOpen: true, investment: 0, title: props.info.title, tags: props.info.tags.join(", ") };
+    let tags = props.info.tags && props.info.tags.length > 0 ? props.info.tags.join(", ") : '';
+    this.state = { isOpen: true, investment: 0, title: props.info.title, tags };
   }
 
   ctrls: {
@@ -89,7 +91,7 @@ export class EditContent extends React.Component<EditContentProps, EditContentSt
   }
 }
 
-interface SettingsPageProps { appState?: AppState };
+interface SettingsPageProps { appState: AppState };
 interface SettingsPageState { nickName: string, email: string, editingContent?: Rpc.ContentInfoItem, confirmDeleteContent?: Rpc.ContentInfoItem, transferAmount: number, transferTo: string };
 
 export class SettingsPage extends React.Component<SettingsPageProps, SettingsPageState> {
@@ -116,7 +118,7 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
     chrome.runtime.sendMessage({ eventType: "ChangeSettings", settings, async: true });
   }
 
-  onDropMedia(acceptedFiles, rejectedFiles) {
+  onDropMedia = async (acceptedFiles, rejectedFiles) => {
     console.log('Accepted files: ', acceptedFiles);
     console.log('Rejected files: ', rejectedFiles);
     if (rejectedFiles.length > 0) return;
@@ -124,14 +126,23 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
     var data = new FormData();
     for (var f of acceptedFiles) {
       data.append(f.name, f);
+      //data.append(f.name,fs.createReadStream(__dirname + `${file}`));
     }
     var config = {
       onUploadProgress: function (progressEvent) {
         var percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
       }
     };
-    axios.put(Utils.serverUrl + '/upload/audio', data, config);
+    //axios.defaults.headers.common = form.getHeaders();
+    let req = uploadRequest(this.props.appState);
+    req.post(Utils.serverUrl + '/upload/media', data, config)
+      .then((response) => {
+        console.log(response.data)
+      })
+      .catch(e => { console.log(e) })
   }
+
+
 
   render() {
     let st = this.props.appState;
@@ -199,7 +210,7 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
         let postEdit = null;
         let remove = () => { this.setState({ confirmDeleteContent: p }) };
         let btns = [<Button onClick={remove} text="Delete" />];
-        let tags = p.tags.join(", ")''
+        let tags = p.tags && p.tags.length > 0 ? p.tags.join(", ") : '';
         if (p.contentType === "post") {
           let edit = () => { chrome.runtime.sendMessage({ eventType: "LaunchPostEditPage", post: p }); };
           btns.push(<Button onClick={edit} text="Edit" />);
