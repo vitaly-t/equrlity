@@ -166,11 +166,11 @@ export function handleMessage(event: Message, async: boolean = false): AppState 
         break;
       case "CreatePost":
         chrome.tabs.create({ 'url': chrome.extension.getURL('post.html'), 'selected': true });
-        st = { ...st, currentPost: { postId: 0, title: '', tags: [], published: null, contentUrl: null, created: null, updated: null } };
+        st = { ...st, currentContent: { contentId: 0, contentType: "post", mime_ext: "txt", title: '', tags: [], published: null, created: null, updated: null } };
         break;
       case "LaunchPostEditPage":
         chrome.tabs.create({ 'url': chrome.extension.getURL('post.html'), 'selected': true });
-        st = { ...st, currentPost: event.post };
+        st = { ...st, currentContent: event.post };
         break;
       default:
         throw new Error("Unknown eventType: " + event.eventType);

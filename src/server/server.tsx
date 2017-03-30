@@ -112,7 +112,7 @@ publicRouter.get('/posts/:title', async (ctx, next) => {
   let cont = await pg.retrieveContentByTitle(title, "post");
   let creator = cache.users.get(cont.userId).userName;
   let decoder = new TextDecoder();
-  let dview = new DataView(cont.content);
+  let dview = new DataView(cont.content.buffer);
   let txt = decoder.decode(dview);
   let post: Post = { body: txt, info: cont };
 
@@ -272,7 +272,6 @@ router.put('/upload/audio', async function (ctx: Koa.Context) {
   console.log(this.request.body.files);
 });
 
-
 router.post('/rpc', async function (ctx: any) {
   let { jsonrpc, method, params, id } = ctx.request.body;  // from bodyparser 
 
@@ -400,20 +399,25 @@ router.post('/rpc', async function (ctx: any) {
         ctx.body = { id, result };
         break;
       }
-      case "getContentBody": {
-        let req: Rpc.GetContentBodyRequest = params;
-        let body = await pg.getContentBody(req.contentId);
-        let result: Rpc.GetContentBodyResponse = { body };
+      case "getPostBody": {
+        let req: Rpc.GetPostBodyRequest = params;
+        let a = await pg.getContentBody(req.contentId);
+        let body = Utils.bufferToText(a);
+        let result: Rpc.GetPostBodyResponse = { body };
         ctx.body = { id, result };
         break;
       }
       case "saveContent": {
         let req: Rpc.SaveContentRequest = params;
         let contentId = req.contentId;
-        let cont = await pg.retrieveRecord<Dbt.Content>("contents", { contentId });
-        if (!cont) throw new Error("Invalid content id");
-        if (cont.userId !== userId) throw new Error("Invalid user for content");
-        await pg.saveContent(req);
+        let cont = null;
+        if (contentId) {
+          cont = await pg.retrieveRecord<Dbt.Content>("contents", { contentId });
+          if (!cont) throw new Error("Invalid content id");
+          if (cont.userId !== userId) throw new Error("Invalid user for content");
+          await pg.saveContent(req);
+        }
+        else await pg.addContent(req, userId);
         let contents = await pg.getUserContents(userId);
         let result: Rpc.SaveContentResponse = { contents };
         ctx.body = { id, result };

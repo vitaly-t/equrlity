@@ -11,11 +11,6 @@ import * as Rpc from '../lib/rpc';
 import * as Dbt from '../lib/datatypes';
 import * as Utils from '../lib/utils';
 
-export interface AddContent {
-  eventType: "AddContent";
-  req: Rpc.AddContentRequest;
-}
-
 export interface PromoteContent {
   eventType: "PromoteContent";
   req: Rpc.PromoteContentRequest;
@@ -87,7 +82,7 @@ export interface Thunk {
   fn: (st: AppState) => AppState;
 }
 
-export type Message = AddContent | PromoteContent | PromoteLink | Initialize | Load | ActivateTab | Render | ChangeSettings | LaunchSettingsPage
+export type Message = PromoteContent | PromoteLink | Initialize | Load | ActivateTab | Render | ChangeSettings | LaunchSettingsPage
   | LaunchPostEditPage | SaveContent | CreatePost | RedeemLink | GetUserLinks | DismissPromotion | Thunk;
 
 export function getTab(tabId: number): Promise<chrome.tabs.Tab> {

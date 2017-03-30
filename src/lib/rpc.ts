@@ -61,8 +61,8 @@ import * as Dbt from './datatypes';
  */
 
 //TODO: rename "getUserLinks" to "loadSettingsPage"
-export type Method = "initialize" | "authenticate" | "addContent" | "promoteContent" | "promoteLink" | "loadLink" | "getRedirect" | "changeSettings"
-  | "getUserLinks" | "redeemLink" | "getContentBody" | "saveContent" | "removeContent" | "transferCredits";
+export type Method = "initialize" | "authenticate" | "promoteContent" | "promoteLink" | "loadLink" | "getRedirect" | "changeSettings"
+  | "getUserLinks" | "redeemLink" | "getPostBody" | "saveContent" | "removeContent" | "transferCredits";
 
 /**
  * Informational type tags used to indicate intended usage.
@@ -90,20 +90,6 @@ export type InitializeResponse = {
   ok: boolean;
   redirectUrl?: UrlString;
 }
-
-export type AddContentRequest = {
-  contentType: Dbt.contentType;
-  mime_ext: string;
-  title: string;
-  content: string;
-  tags: string[];
-  publish: boolean;
-  investment?: Dbt.integer;
-}
-
-export type AddContentResponse = {
-  contentId: Dbt.contentId;
-};
 
 /**
  * promoteContent method
@@ -293,8 +279,8 @@ export type ContentInfoItem = {
   updated: Dbt.updated;
 };
 
-export type GetContentBodyRequest = { contentId: Dbt.contentId };
-export type GetContentBodyResponse = { body: string | null };
+export type GetPostBodyRequest = { contentId: Dbt.contentId };
+export type GetPostBodyResponse = { body: string | null };
 
 export type SaveContentRequest = {
   contentId: Dbt.contentId;
@@ -377,18 +363,18 @@ export type AuthenticateResponse = { ok: boolean; }
 
 // aggregate the above types
 
-export type RequestBody = AddContentRequest | PromoteContentRequest | PromoteLinkRequest | InitializeRequest | LoadLinkRequest | GetRedirectRequest | ChangeSettingsRequest
-  | GetUserLinksRequest | RedeemLinkRequest | GetContentBodyRequest | RemoveContentRequest | TransferCreditsRequest | AuthenticateRequest;
+export type RequestBody = PromoteContentRequest | PromoteLinkRequest | InitializeRequest | LoadLinkRequest | GetRedirectRequest | ChangeSettingsRequest
+  | GetUserLinksRequest | RedeemLinkRequest | GetPostBodyRequest | RemoveContentRequest | TransferCreditsRequest | AuthenticateRequest;
 
-export type ResponseBody = AddContentResponse & PromoteContentResponse & PromoteLinkResponse & InitializeResponse & LoadLinkResponse & GetRedirectResponse & ChangeSettingsResponse
-  & GetUserLinksResponse & RedeemLinkResponse & GetContentBodyResponse & RemoveContentResponse & TransferCreditsResponse & AuthenticateResponse;
+export type ResponseBody = PromoteContentResponse & PromoteLinkResponse & InitializeResponse & LoadLinkResponse & GetRedirectResponse & ChangeSettingsResponse
+  & GetUserLinksResponse & RedeemLinkResponse & GetPostBodyResponse & RemoveContentResponse & TransferCreditsResponse & AuthenticateResponse;
 
 // internal to server.
-export type RecvRequestBody = AddContentRequest & PromoteContentRequest & PromoteLinkRequest & InitializeRequest & LoadLinkRequest & GetRedirectRequest & ChangeSettingsRequest
-  & GetUserLinksRequest & RedeemLinkRequest & GetContentBodyRequest & RemoveContentRequest & TransferCreditsRequest & AuthenticateRequest;
+export type RecvRequestBody = PromoteContentRequest & PromoteLinkRequest & InitializeRequest & LoadLinkRequest & GetRedirectRequest & ChangeSettingsRequest
+  & GetUserLinksRequest & RedeemLinkRequest & GetPostBodyRequest & RemoveContentRequest & TransferCreditsRequest & AuthenticateRequest;
 
-export type SendResponseBody = AddContentResponse | PromoteContentResponse | PromoteLinkResponse | InitializeResponse | LoadLinkResponse | GetRedirectResponse | ChangeSettingsResponse
-  | GetUserLinksResponse | RedeemLinkResponse | GetContentBodyResponse | RemoveContentResponse | TransferCreditsResponse | AuthenticateResponse;
+export type SendResponseBody = PromoteContentResponse | PromoteLinkResponse | InitializeResponse | LoadLinkResponse | GetRedirectResponse | ChangeSettingsResponse
+  | GetUserLinksResponse | RedeemLinkResponse | GetPostBodyResponse | RemoveContentResponse | TransferCreditsResponse | AuthenticateResponse;
 
 export type Handler<Request, Response> = (req: Request) => Promise<Response>;
 

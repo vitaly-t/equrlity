@@ -55,7 +55,7 @@ export class PostEditor extends React.Component<PostProps, PostState> {
         this.setState({ body: "Server returned error: " + rsp.error.message, isError: true });
         return;
       }
-      let rslt: Rpc.GetContentBodyResponse = rsp.result;
+      let rslt: Rpc.GetPostBodyResponse = rsp.result;
       this.setState({ body: rslt.body, prevBody: rslt.body });
     })();
   }

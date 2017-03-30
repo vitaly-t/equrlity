@@ -334,25 +334,24 @@ export async function getUserContents(t: ITask<any>, id: Dbt.userId): Promise<Rp
   return await t.any(`select "contentId","contentType",mime_ext,created,updated,published,title,tags from contents where "userId" = '${id}' order by updated desc`);
 }
 
-export async function getContentBody(t: ITask<any>, id: Dbt.contentId): Promise<Uint8Array> {
+export async function getContentBody(t: ITask<any>, id: Dbt.contentId): Promise<Buffer> {
   let rslt = await t.one(`select content from contents where "contentId" = '${id}' `);
   return rslt.content;
 }
 
-let enc = new TextEncoder()
 export async function saveContent(t: ITask<any>, req: Rpc.SaveContentRequest): Promise<Dbt.Content> {
   let contentId = req.contentId;
   let cont = await retrieveRecord<Dbt.Content>(t, "contents", { contentId });
-  let content = req.content ? enc.encode(req.content) : cont.content;
+  let content = req.content ? Utils.textToBuffer(req.content) : cont.content;
   cont = { ...cont, ...req, content };
   return await updateRecord<Dbt.Content>(t, "contents", cont);
 }
 
-export async function addContent(t: ITask<any>, req: Rpc.AddContentRequest): Promise<Dbt.Content> {
+export async function addContent(t: ITask<any>, req: Rpc.SaveContentRequest, userId: Dbt.userId): Promise<Dbt.Content> {
   let cont = OxiGen.emptyRec<Dbt.Content>(oxb.tables.get("contents"));
-  let content = req.content ? enc.encode(req.content) : cont.content;
-  cont = { ...cont, ...req, content };
-  return await insertRecord<Dbt.Content>(t, "contents", req);
+  let content = req.content ? Utils.textToBuffer(req.content) : cont.content;
+  cont = { ...cont, ...req, content, userId };
+  return await insertRecord<Dbt.Content>(t, "contents", cont);
 }
 
 export async function registerInvitation(t: ITask<any>, ipAddress: string, linkId: Dbt.linkId): Promise<Dbt.Invitation> {

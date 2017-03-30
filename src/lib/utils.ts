@@ -2,6 +2,17 @@
 
 import * as Dbt from './datatypes';
 import { Url, parse, format } from 'url';
+import { TextEncoder, TextDecoder } from 'text-encoding';
+
+export function textToBuffer(s: string): Buffer {
+  let a = new TextEncoder().encode(s);
+  return new Buffer(a);
+}
+
+export function bufferToText(b: Buffer): string {
+  let a = new Uint8Array(b);
+  return new TextDecoder().decode(a);
+}
 
 export function isMember(grp) {
   let grps = localStorage.getItem('pseudoq.groups');

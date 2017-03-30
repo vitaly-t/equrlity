@@ -447,7 +447,7 @@ export async function getUserContents(id: Dbt.userId): Promise<Rpc.ContentInfoIt
   return await db.task(t => tasks.getUserContents(t, id));
 }
 
-export async function getContentBody(id: Dbt.contentId): Promise<string> {
+export async function getContentBody(id: Dbt.contentId): Promise<Buffer> {
   return await db.task(t => tasks.getContentBody(t, id));
 }
 
@@ -455,18 +455,22 @@ export async function saveContent(req: Rpc.SaveContentRequest): Promise<Dbt.Cont
   return await db.task(t => tasks.saveContent(t, req));
 }
 
+export async function addContent(req: Rpc.SaveContentRequest, userId: Dbt.userId): Promise<Dbt.Content> {
+  return await db.task(t => tasks.addContent(t, req, userId));
+}
+
 export async function registerInvitation(ipAddress: string, linkId: Dbt.linkId): Promise<Dbt.Invitation> {
   return await db.tx(t => tasks.registerInvitation(t, ipAddress, linkId));
 }
 
-export async function insertContent(content: Uint8Array, mime_ext: string, contentType: Dbt.contentType, title: string, userId: Dbt.userId): Promise<Dbt.Content> {
+export async function insertContent(content: Buffer, mime_ext: string, contentType: Dbt.contentType, title: string, userId: Dbt.userId): Promise<Dbt.Content> {
   let cont = OxiGen.emptyRec<Dbt.Content>(oxb.tables.get("contents"));
   cont = { ...cont, mime_ext, content, contentType, title, userId };
   let rslt = await insertRecord<Dbt.Content>("contents", cont);
   return rslt;
 }
 
-export async function retrieveContent(contentId: Dbt.contentId): Promise<Uint8Array> {
+export async function retrieveContent(contentId: Dbt.contentId): Promise<Buffer> {
   let cont = await retrieveRecord<Dbt.Content>("contents", { contentId });
   return cont.content;
 }

@@ -14,16 +14,12 @@ export default {
       ]
     },
     "binary": {
-      "tsType": "Uint8Array",
+      "tsType": "Buffer",
       "sqlType": "bytea"
     },
     "boolean": {
       "tsType": "boolean",
       "sqlType": "boolean"
-    },
-    "contentCryptId": {
-      "tsType": "Uint8Array",
-      "sqlType": "bytea"
     },
     "contentType": {
       "sqlType": "varchar(10)",
@@ -72,10 +68,6 @@ export default {
       "max": 100,
       "min": 0
     },
-    "publicKey": {
-      "sqlType": "bytea",
-      "tsType": "any"  // needs fixing
-    },
     "text": {
       "tsType": "string",
       "sqlType": "text"
@@ -110,6 +102,8 @@ export default {
   "typeAliases": {
     "content": "binary",
     "contentId": "integer",
+    "contentCryptId": "binary",
+    "publicKey": "binary",
     "userId": "uuid",
   },
   "tupleTypes": {

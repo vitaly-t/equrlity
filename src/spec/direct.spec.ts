@@ -3,6 +3,7 @@
 import * as fs from "fs"
 import { Url, parse } from 'url';
 import { it } from 'jasmine-promise-wrapper';
+import { TextEncoder, TextDecoder } from 'text-encoding';
 
 import * as Dbt from '../lib/datatypes'
 import * as Rpc from '../lib/rpc';
@@ -122,11 +123,23 @@ it("should work using direct calls", async () => {
 it("should work for bytea types", async () => {
   // test bytea content stuff
   let u = await pg.createUser();
-  let content: Uint8Array = fs.readFileSync("/dev/pseudoqurl/spec/EarlyThisMorning.wav");
+  let s = "test string"
+  let b = Utils.textToBuffer(s);
+  var s0 = Utils.bufferToText(b);
+  expect(s).toEqual(s0, "encode/decode fails");
+  let rsp0 = await pg.insertContent(b, "txt", "post", "A post", u.userId);
+  let cont = await pg.retrieveContent(rsp0.contentId)
+  s0 = Utils.bufferToText(cont);
+  expect(s).toEqual(s0, "insert/retrieve fails(2)");
+
+  //  too slow to run all the time
+  /*
+  let content: Buffer = fs.readFileSync("/dev/pseudoqurl/spec/EarlyThisMorning.wav");
   let rsp = await pg.insertContent(content, "wav", "audio", "Early This Morning", u.userId);
   console.log(rsp.contentId);
   let cont2 = await pg.retrieveContent(rsp.contentId)
   let s1 = pg.pgp.as.buffer(content);
   let s2 = pg.pgp.as.buffer(cont2);
   expect(s1).toEqual(s2, "bytea cactus");
+  */
 }, 60000);

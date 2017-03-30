@@ -1,6 +1,6 @@
 import * as React from 'react';
 import * as ReactDOM from "react-dom";
-import { Button } from "@blueprintjs/core";
+import { Button, Dialog, Intent } from "@blueprintjs/core";
 import * as Dropzone from 'react-dropzone';
 import { Url, format } from 'url';
 import axios, { AxiosResponse, AxiosError } from 'axios';
@@ -9,13 +9,88 @@ import * as Rpc from '../lib/rpc'
 import * as Utils from '../lib/utils';
 import * as Constants from '../lib/constants';
 import * as OxiDate from '../lib/oxidate';
+import { rowStyle, btnStyle, lhcolStyle } from "../lib/postview";
 
 import { YesNoBox } from './dialogs';
 import { AppState, postDeserialize } from "./AppState";
 
+interface EditContentProps { info: Rpc.ContentInfoItem, onClose: () => void }
+interface EditContentState { title: string, tags: string, isOpen: boolean, investment: number }
+export class EditContent extends React.Component<EditContentProps, EditContentState> {
+  constructor(props: EditContentProps) {
+    super(props);
+    this.state = { isOpen: true, investment: 0, title: props.info.title, tags: props.info.tags.join(", ") };
+  }
+
+  ctrls: {
+    title: HTMLInputElement,
+    tags: HTMLInputElement,
+    investment: HTMLInputElement,
+  } = { title: null, tags: null, investment: null };
+
+  changeTitle(e) { this.setState({ title: e.target.value }); }
+  changeTags(e) { this.setState({ tags: e.target.value }); }
+  changeInvestment(e) { this.setState({ investment: parseInt(e.target.value) }); }
+
+  close() {
+    this.props.onClose();
+    this.setState({ isOpen: false });
+  }
+
+  save() {
+    let title = this.state.title;
+    let tags = this.state.tags.split(',').map(t => t.trim());
+    let investment = this.state.investment;
+    let publish = investment > 0;
+    let info = this.props.info;
+    let req: Rpc.SaveContentRequest = { contentId: info.contentId, contentType: info.contentType, mime_ext: info.mime_ext, title, tags, publish, investment };
+    chrome.runtime.sendMessage({ eventType: "SaveContent", req, async: true });
+    this.close();
+  }
+
+  public render() {
+    if (!this.state.isOpen) return null;
+    let pubdiv = null;
+    let ttl = "Edit Content"
+    if (!this.props.info.published) {
+      ttl = "Edit / Publish Content"
+      pubdiv = (
+        <div style={rowStyle} >
+          <div style={{ display: 'inline' }}>Publish with Investment amount:</div>
+          <input type="number" style={{ display: 'inline', height: 24, marginTop: 6, width: '100px' }} ref={(e) => this.ctrls.investment = e} value={this.state.investment} onChange={e => this.changeInvestment(e)} />
+        </div>
+      );
+    }
+    return (
+      <Dialog iconName="inbox" isOpen={this.state.isOpen} title={ttl} onClose={() => this.close()} >
+        <div className="pt-dialog-body">
+          <div style={rowStyle} >
+            <div style={lhcolStyle}>Title:</div>
+            <input type="text" style={{ marginTop: 6, height: 30, width: '100%' }} ref={(e) => this.ctrls.title = e} value={this.state.title} onChange={e => this.changeTitle(e)} />
+          </div>
+          <div style={rowStyle} >
+            <div style={lhcolStyle}>Tags:</div>
+            <input type="text" style={{ height: 30, marginTop: 6, width: '100%' }} ref={(e) => this.ctrls.tags = e} value={this.state.tags} onChange={e => this.changeTags(e)} />
+          </div>
+          {pubdiv}
+        </div>
+        <div className="pt-dialog-footer">
+          <div className="pt-dialog-footer-actions">
+            <Button text="Cancel" onClick={() => this.close()} />
+            <Button
+              intent={Intent.PRIMARY}
+              onClick={() => this.save()}
+              text={this.state.investment ? "Publish" : "Save"}
+            />
+          </div>
+        </div>
+      </Dialog >
+    );
+  }
+}
 
 interface SettingsPageProps { appState?: AppState };
-interface SettingsPageState { nickName: string, email: string, confirmDeleteContent?: Rpc.ContentInfoItem, transferAmount: number, transferTo: string };
+interface SettingsPageState { nickName: string, email: string, editingContent?: Rpc.ContentInfoItem, confirmDeleteContent?: Rpc.ContentInfoItem, transferAmount: number, transferTo: string };
 
 export class SettingsPage extends React.Component<SettingsPageProps, SettingsPageState> {
 
@@ -104,11 +179,15 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
 
     let contsdiv = <p>You do not currently have any uploaded contents.</p>
     if (this.state.confirmDeleteContent) {
-      let msg = "Warning: Deleting a Post is irreversible. Are you sure you wish to Proceed?";
+      let msg = "Warning: Deleting a Content Item is irreversible. Are you sure you wish to Proceed?";
       let onClose = () => this.setState({ confirmDeleteContent: null });
       let contentId = this.state.confirmDeleteContent.contentId;
       let onYes = () => chrome.runtime.sendMessage({ eventType: "RemoveContent", contentId, async: true });
       contsdiv = <YesNoBox message={msg} onYes={onYes} onClose={onClose} />
+    }
+    else if (this.state.editingContent) {
+      let onClose = () => this.setState({ editingContent: null });
+      contsdiv = <EditContent info={this.state.editingContent} onClose={onClose} />
     }
     else if (st.contents.length > 0) {
       let postrows = st.contents.map(p => {
@@ -118,22 +197,27 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
         let updated = p.updated ? OxiDate.toFormat(new Date(p.updated), "DDDD, MMMM D @ HH:MIP") : '';
         let published = p.published ? OxiDate.toFormat(new Date(p.updated), "DDDD, MMMM D @ HH:MIP") : '';
         let postEdit = null;
+        let remove = () => { this.setState({ confirmDeleteContent: p }) };
+        let btns = [<Button onClick={remove} text="Delete" />];
+        let tags = p.tags.join(", ")''
         if (p.contentType === "post") {
           let edit = () => { chrome.runtime.sendMessage({ eventType: "LaunchPostEditPage", post: p }); };
-          postEdit = <Button onClick={edit} text="Edit" />;
+          btns.push(<Button onClick={edit} text="Edit" />);
         }
-        let remove = () => { this.setState({ confirmDeleteContent: p }) };
+        else {
+          let edit = () => { this.setState({ editingContent: p }) };
+          btns.push(<Button onClick={edit} text="Edit" />);
+        }
         return (
           <tr key={p.contentId} >
-            <td>{postEdit}</td>
-            <td><Button onClick={remove} text="Delete" /></td>
-            <td><a href="" onClick={onclick} >{url}</a></td>
             <td>{p.contentType}</td>
+            <td><a href="" onClick={onclick} >{url}</a></td>
             <td>{p.title}</td>
             <td>{created}</td>
             <td>{updated}</td>
             <td>{published}</td>
-            <td>{p.tags}</td>
+            <td>{tags}</td>
+            <td>{btns}</td>
           </tr>
         );
       });
@@ -141,8 +225,6 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
         <table className="pt-table pt-striped pt-bordered" >
           <thead>
             <tr>
-              <th></th>
-              <th></th>
               <th>Type</th>
               <th>Content</th>
               <th>Title</th>
@@ -150,6 +232,7 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
               <th>Updated</th>
               <th>Published</th>
               <th>Tags</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -303,8 +386,7 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
         </div>
         {vsp}
         <div>
-          <h4>Your Media Uploads : </h4>
-          {vsp}
+          <h4>Upload new Content(s) : </h4>
           {vsp}
           <Dropzone onDrop={this.onDropMedia}>
             <div>Drop some audio/video/image files here, or click to select files to upload.</div>
