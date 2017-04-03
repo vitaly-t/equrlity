@@ -188,3 +188,4 @@ export function isPossibleInvitation(ip, linkId) {
   let id = invitations.get(ip);
   return (id && id === linkId);
 }
+

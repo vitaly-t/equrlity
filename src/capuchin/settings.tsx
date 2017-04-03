@@ -213,7 +213,7 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
         let btns = [<Button onClick={remove} text="Delete" />];
         let tags = p.tags && p.tags.length > 0 ? p.tags.join(", ") : '';
         if (p.contentType === "post") {
-          let edit = () => { Chrome.sendMessage({ eventType: "LaunchPostEditPage", post: p }); };
+          let edit = () => { Chrome.sendSyncMessage({ eventType: "LaunchPostEditPage", post: p }); };
           btns.push(<Button onClick={edit} text="Edit" />);
         }
         else {

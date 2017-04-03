@@ -4,6 +4,10 @@ import * as Dbt from './datatypes';
 import { Url, parse, format } from 'url';
 import { TextEncoder, TextDecoder } from 'text-encoding';
 
+export function sleep(time) {
+  return new Promise((resolve) => setTimeout(resolve, time));
+}
+
 export function textToBuffer(s: string): Buffer {
   let a = new TextEncoder().encode(s);
   return new Buffer(a);

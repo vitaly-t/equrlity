@@ -4,9 +4,9 @@ import * as Koa from 'koa';
 
 export { sign, verify, decode } from 'jsonwebtoken';
 
-export function jwt(opts): (cxt: Koa.Context, next: () => Promise<any>) => any {
+export function jwt(opts): (cxt: any, next: () => Promise<any>) => any {
 
-  return async function (ctx: Koa.Context, next: () => Promise<any>) {
+  return async function (ctx: any, next: () => Promise<any>) {
     var token, user;
     let auth: string = ctx.header.authorization;
     if (auth) {

@@ -20,19 +20,18 @@ manual installation procedure will be removed.
 If you have a page opened that you would like to invest in, open the extension popup screen with your
 chosen tab selected, and choose the amount you wish to invest.  
 
-If the URL of the page has not been Promoted by anyone previously, congratulations!  
-You have first-mover advantage!  Simply click on Promote to make your investment.
+If the URL of the page has not previously been Promoted by anyone - congratulations!  
+You have first-mover advantage!  Simply set your investment amount and click on Promote.
 
 If the url has already been Promoted by someone else, you will be offered the option to "Re-Promote" the
 displayed PseudoQ URL, which promotes the displayed URL as opposed to the original URL itself.
 
-In either the case, the effect of Promoting will be to create a PseudoQ link URL, which you can then copy
-and forward to others as you see fit.  The system will itself automatically forward 
-the created link to other contacts in your PseudoQ social graph.  The generated link 
-retains knowledge of the URL it was generated from as a "parent link" - thus forming a chain of links back to the 
+In either the case, the effect of Promoting will be to create a PseudoQURL link url, which you can then copy
+and forward to others as you see fit.  The system will itself automatically forward the created link to other contacts in your PseudoQ social graph.  
+The generated link records the URL it was generated from as it's "parent link" - thus forming a chain of links back to the 
 original content.
 
-If you have already (re-)Promoted the content previously, the link you created earlier will be displayed, 
+If you have already (re-)Promoted the content previously, the link you previously created will be displayed, 
 and any investment you choose to make will simply be used to increase the balance in that link.
 
 ### Views

@@ -12,16 +12,16 @@ import * as concat from 'concat-stream';
 // node_modules
 import * as React from 'react';
 import * as ReactDOMServer from 'react-dom/server'
-import * as Remarkable from 'remarkable';
 import axios from 'axios';
 
 import * as Koa from "koa";
-import * as bodyParser from 'koa-bodyparser';
+//import * as bodyParser from 'koa-bodyparser';
 //import * as Router from 'koa-router';
 import * as Router from 'koa-joi-router';
 import * as send from 'koa-send';
 import * as cors from 'kcors';
 import * as koaBody from 'koa-body';
+import * as range from 'koa-range';
 
 // lib
 import * as OxiDate from '../lib/oxidate';
@@ -31,7 +31,7 @@ import * as Utils from '../lib/utils';
 import * as Dbt from '../lib/datatypes'
 import * as Rpc from '../lib/rpc';
 import { PostView, Post } from '../lib/postview';
-import { LinkLandingPage, HomePage } from '../lib/landingPages';
+import { LinkLandingPage, HomePage, ContentLandingPage } from '../lib/landingPages';
 import { validateContentSignature } from '../lib/Crypto';
 
 
@@ -42,7 +42,6 @@ import clientIP from './clientIP.js';
 import * as pg from './pgsql';
 import * as cache from './cache';
 
-const md = new Remarkable({ html: true });
 const jwt_secret = process.env.JWT_PSEUDOQURL_KEY;
 
 pg.init();
@@ -60,6 +59,30 @@ function readFileAsync(src: string): Promise<string> {
   });
 }
 
+function isValidClient(ctx: Koa.Context) {
+  let client_ver = ctx.headers['x-psq-client-version'];
+  if (!client_ver) return false;
+  let [client, version] = client_ver.split("-");
+  if (client !== 'capuchin') return false;
+  return true;
+}
+
+async function mediaPage(cont: Dbt.Content): Promise<string> {
+  let creator = cache.users.get(cont.userId).userName;
+  if (cont.contentType === "post") {
+    let txt = Utils.bufferToText(cont.content);
+    let post: Post = { body: txt, info: cont };
+    let view = <PostView post={post} creator={creator} />;
+    let ins = ReactDOMServer.renderToStaticMarkup(view);
+    let html = await readFileAsync('./assets/index.htmpl');
+    let body = html.replace('{{{__BODY__}}}', ins);
+    return body;
+  }
+  if (cont.contentType === "audio") {
+  }
+  return '';
+}
+
 const app = new Koa();
 app.keys = ['pseudoqurl'];  //@@GS what does this do again?
 
@@ -74,7 +97,6 @@ const publicRouter = Router();
 //app.use(bodyParser());
 app.use(koaBody({ formidable: { uploadDir: __dirname } }));
 
-
 app.use(
   cors({
     origin: "*",
@@ -83,6 +105,8 @@ app.use(
     exposeHeaders: ["x-psq-token", "x-psq-moniker", "x-psq-email", "x-psq-credits", "x-psq-groups"],
   }) as Koa.Middleware
 );
+
+app.use(range);
 
 // These are necessary because we are not serving static files yet.
 publicRouter.get('/download/pseudoq.zip', async function (ctx, next) {
@@ -99,11 +123,10 @@ publicRouter.get('/link/:id', async (ctx, next) => {
   let url = cache.getContentFromLinkId(linkId);
   let ip = clientIP(ctx);
   cache.registerPossibleInvitation(ip, linkId);
-  // logic: if invitation is still there in 1 second it wasn't a redirect
+  // logic: if invitation is not there in 1 second it was a redirect
   setTimeout(() => {
     if (cache.isPossibleInvitation(ip, linkId)) pg.registerInvitation(ip, linkId);
   }, 1000);
-
   let view = <LinkLandingPage url={url} />;
   let ins = ReactDOMServer.renderToStaticMarkup(view);
   let html = await readFileAsync('./assets/index.htmpl');
@@ -112,23 +135,18 @@ publicRouter.get('/link/:id', async (ctx, next) => {
 
 });
 
-publicRouter.get('/posts/:title', async (ctx, next) => {
-  let title = decodeURIComponent(ctx.params.title);
-  let cont = await pg.retrieveContentByTitle(title, "post");
-  let creator = cache.users.get(cont.userId).userName;
-  let decoder = new TextDecoder();
-  let dview = new DataView(cont.content.buffer);
-  let txt = decoder.decode(dview);
-  let post: Post = { body: txt, info: cont };
-
-  let view = <PostView post={post} creator={creator} />;
-  let ins = ReactDOMServer.renderToStaticMarkup(view);
-  let html = await readFileAsync('./assets/index.htmpl');
-  let body = html.replace('{{{__BODY__}}}', ins);
-  ctx.body = body;
+publicRouter.get('/content/*', async (ctx, next) => {
+  if (!isValidClient(ctx)) {
+    let view = <ContentLandingPage />;
+    let ins = ReactDOMServer.renderToStaticMarkup(view);
+    let html = await readFileAsync('./assets/index.htmpl');
+    let body = html.replace('{{{__BODY__}}}', ins);
+    ctx.body = body;
+  }
+  else await next();
 });
 
-// need to serve this route before static files are enabled
+// need to serve this route before static files are enabled??
 publicRouter.get('/', async (ctx, next) => {
   let view = <HomePage />;
   let ins = ReactDOMServer.renderToStaticMarkup(view);
@@ -201,7 +219,7 @@ app.use(async (ctx, next) => {
     return;
   }
   let [client, version] = client_ver.split("-");
-  if (client !== 'capuchin' && client !== 'lizard') {
+  if (client !== 'capuchin') {
     ctx.status = 400;
     ctx.body = { error: { message: 'Unknown Client' } };
     return;
@@ -274,9 +292,25 @@ async function handleRequest<I, O>(method: Rpc.Handler<I, O>, req: I): Promise<O
 //const router = new Router();
 const router = Router();
 
+router.get('/content/:contentType/:title', async (ctx, next) => {
+  let title = decodeURIComponent(ctx.params.title);
+  let contentType = decodeURIComponent(ctx.params.contentType) as Dbt.contentType;
+  let path = "/" + contentType + "/" + title;
+  let cont = await pg.retrieveContentByTitle(title, contentType);
+  if (!cont) ctx.throw(404);
+  ctx.body = await mediaPage(cont);
+});
+
+router.get('/content/:id', async (ctx, next) => {
+  let contentId = decodeURIComponent(ctx.params.id);
+  let cont = await pg.retrieveRecord<Dbt.Content>("contents", { contentId });
+  if (!cont) ctx.throw(404);
+  ctx.body = await mediaPage(cont);
+});
+
 router.route({
   method: 'post',
-  path: '/upload/media',
+  path: '/upload',
   validate: { type: 'multipart' },
   handler: async (ctx) => {
     const parts = ctx.request.parts;
@@ -293,7 +327,7 @@ router.route({
         function gotFile(content: Buffer) {
           console.log("got file: " + part.filename);
           let pth = path.parse(part.filename);
-          let mime_ext = pth.ext
+          let mime_ext = pth.ext.replace(".", "");
           let contentType: Dbt.contentType = part.mime.substring(0, part.mime.indexOf("/"));
           pg.insertContent(content, mime_ext, contentType, part.filename, userId);
         }
@@ -374,7 +408,7 @@ router.post('/rpc', async function (ctx: any) {
         let req: Rpc.GetRedirectRequest = params;
         let contentUrl = null;
         let url = parse(req.linkUrl);
-        if (Utils.isPseudoQURL(url)) {
+        if (Utils.isPseudoQLinkURL(url)) {
           let linkId = Utils.getLinkIdFromUrl(url);
           if (!linkId) throw new Error("invalid link");
           let ip = clientIP(ctx);
@@ -452,6 +486,9 @@ router.post('/rpc', async function (ctx: any) {
           await pg.saveContent(req);
         }
         else await pg.addContent(req, userId);
+        if (req.publish) {
+
+        }
         let contents = await pg.getUserContents(userId);
         let result: Rpc.SaveContentResponse = { contents };
         ctx.body = { id, result };

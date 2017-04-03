@@ -2,7 +2,6 @@
 
 import { ITask } from 'pg-promise';
 import { Url, parse, format } from 'url';
-import { TextEncoder, TextDecoder } from 'text-encoding';
 
 import * as Rpc from '../lib/rpc';
 import * as Utils from '../lib/utils';
@@ -42,7 +41,7 @@ export async function retrieveRecord<T>(t: ITask<any>, tblnm: string, pk: Object
 }
 
 export async function retrieveContentByTitle(t: ITask<any>, title: string, contentType: Dbt.contentType): Promise<Dbt.Content> {
-  let ttl = title.replace(" ", "_");
+  let ttl = title.replace(/_/g, " ");
   let rslt = await t.any(`select * from contents where title = '${ttl}' and "contentType" = '${contentType}' `);
   if (rslt.length > 0) return rslt[0];
   return null;
@@ -341,6 +340,7 @@ export async function getContentBody(t: ITask<any>, id: Dbt.contentId): Promise<
 
 export async function saveContent(t: ITask<any>, req: Rpc.SaveContentRequest): Promise<Dbt.Content> {
   let contentId = req.contentId;
+  req.title = req.title.replace(/_/g, " ");
   let cont = await retrieveRecord<Dbt.Content>(t, "contents", { contentId });
   let content = req.content ? Utils.textToBuffer(req.content) : cont.content;
   cont = { ...cont, ...req, content };
@@ -349,6 +349,7 @@ export async function saveContent(t: ITask<any>, req: Rpc.SaveContentRequest): P
 
 export async function addContent(t: ITask<any>, req: Rpc.SaveContentRequest, userId: Dbt.userId): Promise<Dbt.Content> {
   let cont = OxiGen.emptyRec<Dbt.Content>(oxb.tables.get("contents"));
+  req.title = req.title.replace(/_/g, " ");
   let content = req.content ? Utils.textToBuffer(req.content) : cont.content;
   cont = { ...cont, ...req, content, userId };
   return await insertRecord<Dbt.Content>(t, "contents", cont);

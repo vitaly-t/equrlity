@@ -13,6 +13,8 @@
     "https://pseudoqurl.heroku.com/*",
     "http://localhost:8080/*",
     "webNavigation",
+    "webRequest",
+    "webRequestBlocking",
     "identity",
     "identity.email",
     "https://accounts.google.com/*",

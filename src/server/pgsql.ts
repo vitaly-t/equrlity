@@ -3,7 +3,6 @@
 import { Url, parse, format } from 'url';
 import { IMain, IDatabase, ITask } from 'pg-promise';
 import * as pgPromise from 'pg-promise';
-import { TextEncoder, TextDecoder } from 'text-encoding';
 
 import * as Utils from "../lib/utils";
 import * as Rpc from '../lib/rpc';
@@ -465,6 +464,7 @@ export async function registerInvitation(ipAddress: string, linkId: Dbt.linkId):
 
 export async function insertContent(content: Buffer, mime_ext: string, contentType: Dbt.contentType, title: string, userId: Dbt.userId): Promise<Dbt.Content> {
   let cont = OxiGen.emptyRec<Dbt.Content>(oxb.tables.get("contents"));
+  title = title.replace(/_/g, " ");
   cont = { ...cont, mime_ext, content, contentType, title, userId };
   let rslt = await insertRecord<Dbt.Content>("contents", cont);
   return rslt;

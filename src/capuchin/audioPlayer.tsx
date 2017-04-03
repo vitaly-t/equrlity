@@ -3,22 +3,22 @@ import * as React from 'react';
 const DEFAULT_LISTEN_INTERVAL = 10000;
 
 export type AudioPlayerProps = {
-  autoPlay: boolean;
-  listenInterval: number;
-  listenTracker: any;
-  onAbort: any;
-  onCanPlay: any;
-  onCanPlayThrough: any;
-  onEnded: any;
-  onError: any;
-  onListen: any;
-  onPause: any;
-  onPlay: any;
-  onSeeked: any;
-  preload: string;
+  autoPlay?: boolean;
+  listenInterval?: number;
+  listenTracker?: any;
+  onAbort?: any;
+  onCanPlay?: any;
+  onCanPlayThrough?: any;
+  onEnded?: any;
+  onError?: any;
+  onListen?: any;
+  onPause?: any;
+  onPlay?: any;
+  onSeeked?: any;
+  preload?: string;
   src: string;
-  controls: boolean;
-  style: Object;
+  controls?: boolean;
+  style?: Object;
 };
 
 export type AudioPlayerState = {

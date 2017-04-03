@@ -91,12 +91,6 @@ export function expandedUrl(state: AppState, curl_: string = state.activeUrl): s
   return rslt;
 }
 
-export function isPseudoQLink(url: Url): boolean {
-  let srch = Utils.serverUrl
-  return (format(url).toLowerCase().startsWith(srch))
-    && (url.path.startsWith("/link/"))
-}
-
 export function getRedirectUrl(state: AppState, curl_: string): string | null {
   let curl = prepareUrl(curl_)
   return state.redirects.get(curl);

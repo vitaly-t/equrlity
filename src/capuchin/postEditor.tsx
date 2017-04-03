@@ -2,8 +2,6 @@
 
 import * as React from 'react';
 import * as ReactDOM from 'react-dom';
-import * as Remarkable from 'remarkable';
-const md = new Remarkable({ html: true });
 import * as Blueprint from "@blueprintjs/core";
 
 import * as oxiDate from '../lib/oxidate';
@@ -63,7 +61,7 @@ export class PostEditor extends React.Component<PostProps, PostState> {
     let tags = this.state.tags.split(',').map(t => t.trim());
     let content = this.state.body;
     let investment = this.state.investment;
-    let req: Rpc.SaveContentRequest = { contentId: this.props.appState.currentContent.contentId, contentType: "post", mime_ext: "txt", title, tags, content, publish, investment };
+    let req: Rpc.SaveContentRequest = { contentId: this.props.appState.currentContent.contentId, contentType: "post", mime_ext: "markdown", title, tags, content, publish, investment };
     Chrome.sendMessage({ eventType: "SaveContent", req });
   }
 

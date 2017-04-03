@@ -1,7 +1,4 @@
-import {
-  AppState, initState, setLink, expandedUrl, isSeen, setLoading,
-  getRedirectUrl, prepareUrl, isPseudoQLink
-} from './AppState';
+import { AppState, initState, setLink, expandedUrl, isSeen, setLoading, getRedirectUrl, prepareUrl} from './AppState';
 
 import * as localForage from "localforage";
 import * as Comms from './Comms';
@@ -146,7 +143,6 @@ export namespace AsyncHandlers {
     const response = await Comms.sendAuthRequest({ userInfo, publicKey }, "Bearer " + authToken);
     let result = "";
     if (response.status === 200) {
-      console.log(response);
       result = response.data.jwt;
     }
     return result;
@@ -268,7 +264,7 @@ export namespace AsyncHandlers {
       chrome.tabs.update(tab.id, { url: tgt });
     }
     if (isSeen(state, curl)) return (st => { return { ...st, activeUrl: curl }; });
-    if (isPseudoQLink(parse(curl))) return getRedirect(state, curl)
+    if (Utils.isPseudoQLinkURL(parse(curl))) return await getRedirect(state, curl)
     let response = await Comms.sendLoadLink(state, curl);
     let thunk = (st: AppState) => {
       st = extractHeadersToState(st, response);

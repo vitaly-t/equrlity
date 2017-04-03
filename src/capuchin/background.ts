@@ -1,7 +1,10 @@
 import * as localForage from "localforage";
-import * as Crypto from '../lib/Crypto'
 
-import { AppState, initState, expandedUrl, isSeen, setLoading, setWaiting, prepareUrl, preSerialize } from './AppState';
+import * as Crypto from '../lib/Crypto'
+import * as Utils from '../lib/utils';
+
+import { AppState, initState, expandedUrl, isSeen, setLoading, setWaiting, getRedirectUrl, prepareUrl, preSerialize } from './AppState';
+
 import { Url, parse, format } from 'url';
 import { Message, AsyncHandlers, getTab } from './Event';
 
@@ -68,6 +71,7 @@ chrome.runtime.onMessage.addListener((message, sender, cb) => {
 });
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  console.log("status: " + changeInfo.status + ", url: " + changeInfo.url);
   if (changeInfo.status == "loading" && changeInfo.url) {
     handleAsyncMessage({ eventType: "Load", url: changeInfo.url });
   }
@@ -77,7 +81,43 @@ chrome.tabs.onActivated.addListener(({ tabId, windowId }) => {
   handleAsyncMessage({ eventType: "ActivateTab", tabId });
 });
 
-//@@GS this is a bit hacky, but it's the best I could come up with for now.
+function addHeaders(details) {
+  let hdrs = details.requestHeaders;
+  if (details.method === "GET") {
+    hdrs.push({ name: 'x-psq-client-version', value: 'capuchin-' + Utils.capuchinVersion() });
+    if (__state && __state.jwt) hdrs.push({ name: 'Authorization', value: 'Bearer ' + __state.jwt });
+  }
+  return { requestHeaders: hdrs };
+}
+
+chrome.webRequest.onBeforeSendHeaders.addListener(addHeaders
+  , { urls: ["https://pseudoqurl.heroku.com/*", "http://localhost:8080/*"] }
+  , ["blocking", "requestHeaders"]);
+
+
+function checkRedirect(details: chrome.webRequest.WebRequestBodyDetails) {
+  //let hdrs = details.requestHeaders;
+  if (details.method === "GET") {
+    let curl = prepareUrl(details.url);
+    let tgt = getRedirectUrl(state, curl)
+    if (tgt) {
+      let tab = await currentTab();
+      console.log("redirecting to: " + tgt);
+      chrome.tabs.update(tab.id, { url: tgt });
+    }
+
+    //hdrs.push({ name: 'x-psq-client-version', value: 'capuchin-' + Utils.capuchinVersion() });
+    //if (__state && __state.jwt) hdrs.push({ name: 'Authorization', value: 'Bearer ' + __state.jwt });
+    //return { redirectUrl: 'dummy' };
+  }
+}
+
+chrome.webRequest.onBeforeRequest.addListener(checkRedirect
+  , { urls: ["https://pseudoqurl.heroku.com/link/*", "http://localhost:8080/link/*"] }
+  , ["blocking"]);
+
+
+//@@GS a bit hacky, but scanaftadoo.
 export async function handleAsyncMessage(event: Message) {
   let st = currentState();
   let fn = null;
@@ -88,7 +128,7 @@ export async function handleAsyncMessage(event: Message) {
         fn = await AsyncHandlers.initialize(st);
         break;
       case "ChangeSettings":
-        fn = await AsyncHandlers.ChangeSettings(st, event.settings);
+        fn = await AsyncHandlers.changeSettings(st, event.settings);
         break;
       case "PromoteLink": {
         let curl = prepareUrl(st.activeUrl);
