@@ -10,6 +10,7 @@
     "gen": "npm run mklib && node src/scripts/gentypes.js",
     "mk": "npm run mklib && npm run mksrv && npm run mkapp",
     "mkapp": "webpack --config webpack.capuchin.js",
+    "mkbndls": "webpack --config webpack.server.js",
     "mkrelease": "powershell src/scripts/cp2heroku.ps1",
     "mklib": "cd src/lib && tsc",
     "mksrv": "cd src/server && tsc",

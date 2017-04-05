@@ -1,57 +1,54 @@
-'use strict';
-
-/** 
- * @@GS. NB - this file is not currently used, as I was unable to make pg-promise play ball nicely with webpack.
- * If and when we can get that fixed we should revert to building the server with webpack.
- * The current system of file copying (see scripts/cp2heroku.ps1) blows big-time.
- * 
- */
-
 const webpack = require('webpack');
 const path = require('path');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
+const tgtdir = './assets';
+let outPath = path.resolve(__dirname, tgtdir);
 
-module.exports = {
-  cache: true,
-  entry: {
-    server: "./src/server/server.ts",
-  },
-  output: {
-    path: "../amplitude_heroku",
-    filename: "server.js",
-  },
-  resolve: {
-    extensions: [".ts", ".js"]
-  },
-  module: {
-    rules: [
-      {
-        test: /\.ts$/,
-        loader: 'ts-loader',
-        exclude: /node_modules/
-      },
-      {
-        enforce: 'pre',
-        test: /\.js$/,
-        loader: "source-map-loader"
-      }
-    ]
-  },
-  performance: {
-    hints: false
-  },
-
-  target: 'node',
-  plugins: [
-    new CopyWebpackPlugin([
-      { from: 'server/assets', to: '../amplitude_heroku/assets' }
-    ]),
-    new webpack.DefinePlugin({
-      'process.env.NODE_ENV': "production"
-    }),
-  ]
-
+module.exports = function (env) {
+  return {
+    entry: {
+      media: './src/server/media.tsx',
+    },
+    output: {
+      path: outPath,
+      filename: '[name]_bndl.js'
+    },
+    resolve: {
+      extensions: [".ts", ".tsx", ".js"]
+    },
+    module: {
+      rules: [
+        {
+          test: /\.tsx?$/,
+          loader: 'ts-loader',
+          exclude: /node_modules/
+        },
+        {
+          enforce: 'pre',
+          test: /\.js$/,
+          loader: "source-map-loader"
+        }
+      ]
+    },
+    performance: {
+      hints: false
+    },
+    plugins: [
+      new CopyWebpackPlugin([
+        {
+          from: 'node_modules/@blueprintjs/core/dist/*.css',
+          to: outPath
+        },
+        {
+          context: path.resolve(__dirname, 'node_modules/@blueprintjs/core/resources'),
+          from: '**/*',
+          to: path.resolve(outPath, 'node_modules/@blueprintjs/core/resources/')
+        },
+      ], { copyUnmodified: true }),
+      new webpack.DefinePlugin({
+        'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development')
+      }),
+    ],
+    devtool: 'inline-source-map'
+  }
 }
-
-
-

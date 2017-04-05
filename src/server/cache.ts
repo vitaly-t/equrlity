@@ -171,21 +171,3 @@ export function getReachableUserIds(userId): Dbt.userId[] {
   return rslt;
 }
 
-//not exported
-const invitations = new Map<string, Dbt.linkId>();
-
-export function registerPossibleInvitation(ip: string, linkId: Dbt.linkId) {
-  console.log("registering possible inv :" + ip)
-  invitations.set(ip, linkId);
-}
-
-export function cancelPossibleInvitation(ip: string) {
-  console.log("cancelling possible inv :" + ip)
-  invitations.delete(ip);
-}
-
-export function isPossibleInvitation(ip, linkId) {
-  let id = invitations.get(ip);
-  return (id && id === linkId);
-}
-

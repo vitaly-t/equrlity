@@ -8,7 +8,6 @@ import * as path from "path"
 import { Url, parse } from 'url';
 import * as concat from 'concat-stream';
 
-
 // node_modules
 import * as React from 'react';
 import * as ReactDOMServer from 'react-dom/server'
@@ -78,9 +77,11 @@ async function mediaPage(cont: Dbt.Content): Promise<string> {
     let body = html.replace('{{{__BODY__}}}', ins);
     return body;
   }
-  if (cont.contentType === "audio") {
-  }
-  return '';
+  let mime_type = cont.contentType + "/" + cont.mime_ext;
+  let ins = `<div id="app" data-content-id="${cont.contentId}" data-mime-type="${mime_type}"></div>`;
+  let html = await readFileAsync('./assets/media.htmpl');
+  let body = html.replace('{{{__BODY__}}}', ins);
+  return body;
 }
 
 const app = new Koa();
@@ -119,14 +120,15 @@ publicRouter.get('/download/pseudoq.tar.gz', async function (ctx, next) {
 
 
 publicRouter.get('/link/:id', async (ctx, next) => {
+  if (isValidClient(ctx)) {
+    // tab should be redirected by client
+    ctx.body = "tab should redirect";
+    return;
+  }
   let linkId: Dbt.linkId = parseInt(ctx.params.id);
   let url = cache.getContentFromLinkId(linkId);
   let ip = clientIP(ctx);
-  cache.registerPossibleInvitation(ip, linkId);
-  // logic: if invitation is not there in 1 second it was a redirect
-  setTimeout(() => {
-    if (cache.isPossibleInvitation(ip, linkId)) pg.registerInvitation(ip, linkId);
-  }, 1000);
+  pg.registerInvitation(ip, linkId);
   let view = <LinkLandingPage url={url} />;
   let ins = ReactDOMServer.renderToStaticMarkup(view);
   let html = await readFileAsync('./assets/index.htmpl');
@@ -136,14 +138,14 @@ publicRouter.get('/link/:id', async (ctx, next) => {
 });
 
 publicRouter.get('/content/*', async (ctx, next) => {
-  if (!isValidClient(ctx)) {
+  if (isValidClient(ctx)) await next();
+  else {
     let view = <ContentLandingPage />;
     let ins = ReactDOMServer.renderToStaticMarkup(view);
     let html = await readFileAsync('./assets/index.htmpl');
     let body = html.replace('{{{__BODY__}}}', ins);
     ctx.body = body;
   }
-  else await next();
 });
 
 // need to serve this route before static files are enabled??
@@ -191,6 +193,7 @@ publicRouter.post('/auth', async (ctx, next) => {
   }
   else ctx.throw(401, "Authentication failed!");
 });
+
 
 //app.use(publicRouter.routes());
 app.use(publicRouter.middleware());
@@ -301,8 +304,16 @@ router.get('/content/:contentType/:title', async (ctx, next) => {
   ctx.body = await mediaPage(cont);
 });
 
+router.get('/stream/content/:id', async (ctx, next) => {
+  let contentId = parseInt(ctx.params.id);
+  let cont = await pg.retrieveRecord<Dbt.Content>("contents", { contentId });
+  if (!cont) ctx.throw(404);
+  ctx.body = cont.content
+});
+
+
 router.get('/content/:id', async (ctx, next) => {
-  let contentId = decodeURIComponent(ctx.params.id);
+  let contentId = parseInt(ctx.params.id);
   let cont = await pg.retrieveRecord<Dbt.Content>("contents", { contentId });
   if (!cont) ctx.throw(404);
   ctx.body = await mediaPage(cont);
@@ -310,7 +321,7 @@ router.get('/content/:id', async (ctx, next) => {
 
 router.route({
   method: 'post',
-  path: '/upload',
+  path: '/upload/media',
   validate: { type: 'multipart' },
   handler: async (ctx) => {
     const parts = ctx.request.parts;
@@ -392,15 +403,13 @@ router.post('/rpc', async function (ctx: any) {
       case "loadLink": {
         let req: Rpc.LoadLinkRequest = params;
         let lnk = await pg.findRootLinkForUrl(req.url);
-        if (!lnk) {
-          let result: Rpc.LoadLinkResponse = { found: false };
-          ctx.body = { id, result };
-          return;
+        let result: Rpc.LoadLinkResponse = { found: false };
+        if (lnk) {
+          let url = cache.linkToUrl(lnk.linkId);
+          let linkDepth = cache.getLinkDepth(lnk);
+          let linkPromoter = cache.users.get(lnk.userId).userName;
+          result = { found: true, url, linkDepth, linkPromoter };
         }
-        let url = cache.linkToUrl(lnk.linkId);
-        let linkDepth = cache.getLinkDepth(lnk);
-        let linkPromoter = cache.users.get(lnk.userId).userName;
-        let result: Rpc.LoadLinkResponse = { found: true, url, linkDepth, linkPromoter };
         ctx.body = { id, result };
         break;
       }
@@ -408,11 +417,10 @@ router.post('/rpc', async function (ctx: any) {
         let req: Rpc.GetRedirectRequest = params;
         let contentUrl = null;
         let url = parse(req.linkUrl);
+        let result: Rpc.GetRedirectResponse = { found: false };
         if (Utils.isPseudoQLinkURL(url)) {
           let linkId = Utils.getLinkIdFromUrl(url);
           if (!linkId) throw new Error("invalid link");
-          let ip = clientIP(ctx);
-          cache.cancelPossibleInvitation(ip);
           if (!(await pg.hasViewed(userId, linkId))) {
             console.log("attention gots to get paid for!!!");
             await pg.payForView(userId, linkId)
@@ -421,11 +429,8 @@ router.post('/rpc', async function (ctx: any) {
           let link = cache.links.get(linkId);
           let linkDepth = cache.getLinkDepth(link);
           let linkPromoter = cache.users.get(link.userId).userName;
-          let result: Rpc.GetRedirectResponse = { found: true, contentUrl, linkDepth, linkPromoter };
-          ctx.body = { id, result };
-          break;
+          result = { found: true, contentUrl, linkDepth, linkPromoter };
         }
-        let result: Rpc.GetRedirectResponse = { found: false };
         ctx.body = { id, result };
         break;
       }

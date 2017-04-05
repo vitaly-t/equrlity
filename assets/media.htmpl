@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <link href="/assets/blueprint.css" rel="stylesheet" />
+    <link href="/assets/video-js.css" rel="stylesheet" />
+</head>
+
+<body>
+  <script type="text/javascript" src="/assets/media_bndl.js"></script>
+  {{{__BODY__}}}
+</body>
+
+</html>

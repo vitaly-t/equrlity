@@ -91,29 +91,21 @@ function addHeaders(details) {
 }
 
 chrome.webRequest.onBeforeSendHeaders.addListener(addHeaders
-  , { urls: ["https://pseudoqurl.heroku.com/*", "http://localhost:8080/*"] }
+  , { urls: [Utils.serverUrl + "/*"] }
   , ["blocking", "requestHeaders"]);
 
 
 function checkRedirect(details: chrome.webRequest.WebRequestBodyDetails) {
-  //let hdrs = details.requestHeaders;
   if (details.method === "GET") {
     let curl = prepareUrl(details.url);
-    let tgt = getRedirectUrl(state, curl)
-    if (tgt) {
-      let tab = await currentTab();
-      console.log("redirecting to: " + tgt);
-      chrome.tabs.update(tab.id, { url: tgt });
-    }
-
-    //hdrs.push({ name: 'x-psq-client-version', value: 'capuchin-' + Utils.capuchinVersion() });
-    //if (__state && __state.jwt) hdrs.push({ name: 'Authorization', value: 'Bearer ' + __state.jwt });
-    //return { redirectUrl: 'dummy' };
+    let tgt = getRedirectUrl(__state, curl)
+    if (tgt) return { redirectUrl: tgt };
   }
+  return null;
 }
 
 chrome.webRequest.onBeforeRequest.addListener(checkRedirect
-  , { urls: ["https://pseudoqurl.heroku.com/link/*", "http://localhost:8080/link/*"] }
+  , { urls: [Utils.serverUrl + "/link/*"] }
   , ["blocking"]);
 
 
