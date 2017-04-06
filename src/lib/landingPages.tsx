@@ -1,6 +1,6 @@
 import * as React from "react";
 import * as ReactDOM from "react-dom";
-import { PostView } from "../lib/postview";
+import { ContentView } from "../lib/contentView";
 import * as Dbt from "../lib/datatypes";
 import * as Remarkable from 'remarkable';
 const md = new Remarkable({ html: true });

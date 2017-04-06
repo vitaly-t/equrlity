@@ -201,11 +201,11 @@ export function handleMessage(event: Message, async: boolean = false): AppState 
         }
         break;
       case "CreatePost":
-        chrome.tabs.create({ 'url': chrome.extension.getURL('post.html'), 'selected': true });
-        st = { ...st, currentContent: { contentId: 0, contentType: "post", mime_ext: "txt", title: '', tags: [], published: null, created: null, updated: null } };
+        chrome.tabs.create({ 'url': chrome.extension.getURL('content.html'), 'selected': true });
+        st = { ...st, currentContent: { contentId: 0, content: '', contentType: "post", mime_ext: "markdown", title: '', tags: [], published: null, created: null, updated: null } };
         break;
-      case "LaunchPostEditPage":
-        chrome.tabs.create({ 'url': chrome.extension.getURL('post.html'), 'selected': true });
+      case "LaunchContentEditPage":
+        chrome.tabs.create({ 'url': chrome.extension.getURL('content.html'), 'selected': true });
         st = { ...st, currentContent: event.post };
         break;
       default:

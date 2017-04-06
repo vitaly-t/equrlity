@@ -330,7 +330,7 @@ export async function createUser(t: ITask<any>, email?: string): Promise<Dbt.Use
 };
 
 export async function getUserContents(t: ITask<any>, id: Dbt.userId): Promise<Rpc.ContentInfoItem[]> {
-  return await t.any(`select "contentId","contentType",mime_ext,created,updated,published,title,tags from contents where "userId" = '${id}' order by updated desc`);
+  return await t.any(`select "contentId","contentType",content,mime_ext,created,updated,published,title,tags from contents where "userId" = '${id}' order by updated desc`);
 }
 
 export async function getContentBody(t: ITask<any>, id: Dbt.contentId): Promise<Buffer> {
@@ -342,16 +342,14 @@ export async function saveContent(t: ITask<any>, req: Rpc.SaveContentRequest): P
   let contentId = req.contentId;
   req.title = req.title.replace(/_/g, " ");
   let cont = await retrieveRecord<Dbt.Content>(t, "contents", { contentId });
-  let content = req.content ? Utils.textToBuffer(req.content) : cont.content;
-  cont = { ...cont, ...req, content };
+  cont = { ...cont, ...req };
   return await updateRecord<Dbt.Content>(t, "contents", cont);
 }
 
 export async function addContent(t: ITask<any>, req: Rpc.SaveContentRequest, userId: Dbt.userId): Promise<Dbt.Content> {
   let cont = OxiGen.emptyRec<Dbt.Content>(oxb.tables.get("contents"));
   req.title = req.title.replace(/_/g, " ");
-  let content = req.content ? Utils.textToBuffer(req.content) : cont.content;
-  cont = { ...cont, ...req, content, userId };
+  cont = { ...cont, ...req, userId };
   return await insertRecord<Dbt.Content>(t, "contents", cont);
 }
 

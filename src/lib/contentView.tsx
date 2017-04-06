@@ -21,24 +21,18 @@ export const rowStyle = { width: '100%', marginTop: 2, marginLeft: 5, padding: 6
 export const btnStyle = { height: '24', marginTop: 2, marginLeft: 5, marginRight: 5, display: 'inline-block' };
 export const lhcolStyle = { width: '20%' };
 
-export type Post = {
-  readonly info: Rpc.ContentInfoItem;
-  readonly body: string;
-};
-
-interface PostViewProps { post: Post, creator: string };
-interface PostViewState { };
+interface ContentViewProps { info: Rpc.ContentInfoItem, creator: string };
+interface ContentViewState { };
 
 let Tag = (props) => {
   return (<button className="pt-intent-primary" style={{ marginLeft: 3, marginRight: 3 }} {...props} >{props.children}</button>);
 };
 
-export class PostView extends React.Component<PostViewProps, PostViewState> {
+export class ContentView extends React.Component<ContentViewProps, ContentViewState> {
 
   render() {
-    let { post, creator } = this.props;
-    let info = post.info;
-    let h = { __html: md.render(post.body) };
+    let { info, creator } = this.props;
+    let h = { __html: md.render(info.content) };
     let lstedit = info.updated ? oxiDate.toFormat(new Date(info.updated), "DDDD, MMMM D @ HH:MIP") : 'never';
     let pub = info.published ? oxiDate.toFormat(new Date(info.published), "DDDD, MMMM D @ HH:MIP") : 'never';
     let tags = info.tags

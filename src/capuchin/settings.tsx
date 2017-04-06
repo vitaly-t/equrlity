@@ -9,7 +9,7 @@ import * as Rpc from '../lib/rpc'
 import * as Utils from '../lib/utils';
 import * as Constants from '../lib/constants';
 import * as OxiDate from '../lib/oxidate';
-import { rowStyle, btnStyle, lhcolStyle } from "../lib/postview";
+import { rowStyle, btnStyle, lhcolStyle } from "../lib/contentView";
 
 import { YesNoBox } from './dialogs';
 import { AppState, postDeserialize } from "./AppState";
@@ -213,7 +213,7 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
         let btns = [<Button onClick={remove} text="Delete" />];
         let tags = p.tags && p.tags.length > 0 ? p.tags.join(", ") : '';
         if (p.contentType === "post") {
-          let edit = () => { Chrome.sendSyncMessage({ eventType: "LaunchPostEditPage", post: p }); };
+          let edit = () => { Chrome.sendSyncMessage({ eventType: "LaunchContentEditPage", post: p }); };
           btns.push(<Button onClick={edit} text="Edit" />);
         }
         else {

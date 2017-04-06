@@ -17,6 +17,8 @@ pids
 # .vscode/
 node_modules/
 dist/
+assets/
+
 *.crx
 *.pem
 *.zip

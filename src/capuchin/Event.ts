@@ -1,4 +1,4 @@
-import { AppState, initState, setLink, expandedUrl, isSeen, setLoading, getRedirectUrl, prepareUrl} from './AppState';
+import { AppState, initState, setLink, expandedUrl, isSeen, setLoading, getRedirectUrl, prepareUrl } from './AppState';
 
 import * as localForage from "localforage";
 import * as Comms from './Comms';
@@ -48,8 +48,8 @@ export interface LaunchSettingsPage {
   eventType: "LaunchSettingsPage";
 }
 
-export interface LaunchPostEditPage {
-  eventType: "LaunchPostEditPage";
+export interface LaunchContentEditPage {
+  eventType: "LaunchContentEditPage";
   post: Rpc.ContentInfoItem;
 }
 
@@ -92,7 +92,7 @@ export interface Thunk {
 }
 
 export type Message = PromoteContent | PromoteLink | Initialize | Load | ActivateTab | Render | ChangeSettings | LaunchSettingsPage
-  | LaunchPostEditPage | SaveContent | RemoveContent | CreatePost | RedeemLink | GetUserLinks | DismissPromotion | TransferCredits | Thunk;
+  | LaunchContentEditPage | SaveContent | RemoveContent | CreatePost | RedeemLink | GetUserLinks | DismissPromotion | TransferCredits | Thunk;
 
 export function getTab(tabId: number): Promise<chrome.tabs.Tab> {
   return new Promise(resolve => {

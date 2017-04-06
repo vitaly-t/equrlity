@@ -2,10 +2,12 @@
 import * as Koa from 'koa';
 import * as send from "koa-send";
 
-export function serve(path, root): (cxt: Koa.Context, next: () => Promise<any>) => any  {
+export function serve(path, root): (cxt: Koa.Context, next: () => Promise<any>) => any {
   //path = path.replace(/^\/+/, "");
 
-  return async function (ctx: Koa.Context, next: () => Promise<any>)  {
+  return async function (ctx: Koa.Context, next: () => Promise<any>) {
+    console.log(ctx.path);
+
     if (ctx.method == "GET" || ctx.method == "HEAD") {
 
       let req_path_array = ctx.path.slice(1).split("/");
@@ -19,6 +21,6 @@ export function serve(path, root): (cxt: Koa.Context, next: () => Promise<any>) 
         }
       }
     }
-    return next();
+    next();
   }
 };

@@ -21,6 +21,7 @@ import * as send from 'koa-send';
 import * as cors from 'kcors';
 import * as koaBody from 'koa-body';
 import * as range from 'koa-range';
+import { createReadStream } from 'streamifier';
 
 // lib
 import * as OxiDate from '../lib/oxidate';
@@ -29,7 +30,7 @@ import { promisify } from '../lib/promisify';
 import * as Utils from '../lib/utils';
 import * as Dbt from '../lib/datatypes'
 import * as Rpc from '../lib/rpc';
-import { PostView, Post } from '../lib/postview';
+import { ContentView } from '../lib/contentview';
 import { LinkLandingPage, HomePage, ContentLandingPage } from '../lib/landingPages';
 import { validateContentSignature } from '../lib/Crypto';
 
@@ -37,6 +38,7 @@ import { validateContentSignature } from '../lib/Crypto';
 // local
 import * as jwt from './jwt';
 import { serve } from './koa-static';
+import * as favicon from 'koa-favicon';
 import clientIP from './clientIP.js';
 import * as pg from './pgsql';
 import * as cache from './cache';
@@ -66,21 +68,48 @@ function isValidClient(ctx: Koa.Context) {
   return true;
 }
 
-async function mediaPage(cont: Dbt.Content): Promise<string> {
+function htmlPage(body) {
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <link href="/node_modules/@blueprintjs/core/dist/blueprint.css" rel="stylesheet" />
+  <link rel="shortcut icon" href="/favicon.ico" />
+</head>
+<body>
+  ${body}
+</body>
+</html>
+`;
+}
+
+function postPage(cont: Dbt.Content): string {
   let creator = cache.users.get(cont.userId).userName;
-  if (cont.contentType === "post") {
-    let txt = Utils.bufferToText(cont.content);
-    let post: Post = { body: txt, info: cont };
-    let view = <PostView post={post} creator={creator} />;
-    let ins = ReactDOMServer.renderToStaticMarkup(view);
-    let html = await readFileAsync('./assets/index.htmpl');
-    let body = html.replace('{{{__BODY__}}}', ins);
-    return body;
-  }
+  let view = <ContentView info={cont} creator={creator} />;
+  let ins = ReactDOMServer.renderToStaticMarkup(view);
+  let body = htmlPage(ins);
+  return body;
+}
+
+function mediaPage(cont: Dbt.Content): string {
+  if (cont.contentType === 'post') return postPage(cont);
   let mime_type = cont.contentType + "/" + cont.mime_ext;
-  let ins = `<div id="app" data-content-id="${cont.contentId}" data-mime-type="${mime_type}"></div>`;
-  let html = await readFileAsync('./assets/media.htmpl');
-  let body = html.replace('{{{__BODY__}}}', ins);
+  let body = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <link href="/node_modules/@blueprintjs/core/dist/blueprint.css" rel="stylesheet" />
+  <link href="/node_modules/video.js/dist/video-js.css" rel="stylesheet" />
+  <link rel="shortcut icon" href="/favicon.ico" />
+</head>
+<body>
+  <script type="text/javascript" src="/dist/media_bndl.js"></script>
+  <div id="app" data-content-id="${cont.contentId}" data-mime-type="${mime_type}"></div>
+</body>
+</html>  
+`;
   return body;
 }
 
@@ -96,6 +125,12 @@ const publicRouter = Router();
 //app.use(flash());
 
 //app.use(bodyParser());
+
+app.use(async (ctx, next) => {
+  console.log(ctx.path);
+  await next();
+});
+
 app.use(koaBody({ formidable: { uploadDir: __dirname } }));
 
 app.use(
@@ -108,8 +143,10 @@ app.use(
 );
 
 app.use(range);
+app.use(serve("node_modules", "./node_modules"));
+app.use(serve("dist", "./dist"));
+app.use(favicon(__dirname + '/assets/favicon.ico'));
 
-// These are necessary because we are not serving static files yet.
 publicRouter.get('/download/pseudoq.zip', async function (ctx, next) {
   await send(ctx, './assets/pseudoq-plugin.zip');
 });
@@ -131,8 +168,7 @@ publicRouter.get('/link/:id', async (ctx, next) => {
   pg.registerInvitation(ip, linkId);
   let view = <LinkLandingPage url={url} />;
   let ins = ReactDOMServer.renderToStaticMarkup(view);
-  let html = await readFileAsync('./assets/index.htmpl');
-  let body = html.replace('{{{__BODY__}}}', ins);
+  let body = htmlPage(ins);
   ctx.body = body;
 
 });
@@ -142,8 +178,7 @@ publicRouter.get('/content/*', async (ctx, next) => {
   else {
     let view = <ContentLandingPage />;
     let ins = ReactDOMServer.renderToStaticMarkup(view);
-    let html = await readFileAsync('./assets/index.htmpl');
-    let body = html.replace('{{{__BODY__}}}', ins);
+    let body = htmlPage(ins);
     ctx.body = body;
   }
 });
@@ -152,8 +187,7 @@ publicRouter.get('/content/*', async (ctx, next) => {
 publicRouter.get('/', async (ctx, next) => {
   let view = <HomePage />;
   let ins = ReactDOMServer.renderToStaticMarkup(view);
-  let html = await readFileAsync('./assets/index.htmpl');
-  let body = html.replace('{{{__BODY__}}}', ins);
+  let body = htmlPage(ins);
   ctx.body = body;
 
 });
@@ -182,7 +216,7 @@ publicRouter.post('/auth', async (ctx, next) => {
   let email = userInfo.email;
   let authRsp = await axios.create({ responseType: "json" }).get(Utils.chromeAuthUrl + token);
   if (authRsp.status === 200 && authRsp.data.user_id === authId) {
-    let user = await pg.getUserByAuthId(authId, "chrome");  //@@GS - pretty sure this should just be "google" - no need for "chrome"
+    let user = await pg.getUserByAuthId(authId, "chrome");
     if (!user) {
       user = await pg.createUser(email);
       await pg.createAuth(authId, user.userId, "chrome");
@@ -194,14 +228,7 @@ publicRouter.post('/auth', async (ctx, next) => {
   else ctx.throw(401, "Authentication failed!");
 });
 
-
-//app.use(publicRouter.routes());
 app.use(publicRouter.middleware());
-
-// currently this needs to come after the public routes
-app.use(serve("assets", "./assets"));
-
-//app.use(publicRouter.allowedMethods());
 
 //  From here on, it's for known client(s) only
 
@@ -306,9 +333,11 @@ router.get('/content/:contentType/:title', async (ctx, next) => {
 
 router.get('/stream/content/:id', async (ctx, next) => {
   let contentId = parseInt(ctx.params.id);
-  let cont = await pg.retrieveRecord<Dbt.Content>("contents", { contentId });
-  if (!cont) ctx.throw(404);
-  ctx.body = cont.content
+  let cont = cache.contents.get(contentId);
+  if (!cont || !cont.blobId) ctx.throw(404);
+  let blob = await pg.retrieveRecord<Dbt.Blob>("blobs", cont.blobId)
+  let strm = createReadStream(blob.blobContent);
+  ctx.body = strm;
 });
 
 
@@ -335,12 +364,12 @@ router.route({
         var concatStream = concat(gotFile)
         part.pipe(concatStream);
 
-        function gotFile(content: Buffer) {
+        function gotFile(blob: Buffer) {
           console.log("got file: " + part.filename);
           let pth = path.parse(part.filename);
           let mime_ext = pth.ext.replace(".", "");
           let contentType: Dbt.contentType = part.mime.substring(0, part.mime.indexOf("/"));
-          pg.insertContent(content, mime_ext, contentType, part.filename, userId);
+          pg.insertBlobContent(blob, '', mime_ext, contentType, part.filename, userId);
         }
 
       }
@@ -472,14 +501,6 @@ router.post('/rpc', async function (ctx: any) {
         ctx.body = { id, result };
         break;
       }
-      case "getPostBody": {
-        let req: Rpc.GetPostBodyRequest = params;
-        let a = await pg.getContentBody(req.contentId);
-        let body = Utils.bufferToText(a);
-        let result: Rpc.GetPostBodyResponse = { body };
-        ctx.body = { id, result };
-        break;
-      }
       case "saveContent": {
         let req: Rpc.SaveContentRequest = params;
         let contentId = req.contentId;
@@ -516,14 +537,14 @@ router.post('/rpc', async function (ctx: any) {
 router.get('/auth/facebook', function (ctx, next) {
   passport.authenticate('facebook')
 });
-
+ 
 router.get('/auth/facebook/callback', async function (ctx, next) {
   return passport.authenticate('facebook', async function (err, authId, info, status) {
     await authent(ctx, 'facebook', authId);
     ctx.body = { ok: true };
   })(ctx, next);
 });
-
+ 
 app.use(router.get('/auth/google', function *() {
     var ctx = this
     yield passport.authenticate('google', function *(err, authId, info) {
@@ -534,7 +555,7 @@ app.use(router.get('/auth/google', function *() {
         ctx.redirect('/#/refresh');
     }).call(this);
 }));
-
+ 
 app.use(router.get('/auth/github', function *() {
     var ctx = this
     yield passport.authenticate('github', function*(err, authId, info) {
@@ -544,7 +565,7 @@ app.use(router.get('/auth/github', function *() {
         ctx.redirect('/#/refresh');
     }).call(this);
 }));
-
+ 
 app.use(router.get('/auth/twitter', function *() {
     var ctx = this
     yield passport.authenticate('twitter', function*(err, authId, info) {
@@ -554,7 +575,7 @@ app.use(router.get('/auth/twitter', function *() {
         ctx.redirect('/#/refresh');
     }).call(this);
 }));
-
+ 
 */
 
 

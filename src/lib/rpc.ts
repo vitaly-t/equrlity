@@ -271,6 +271,7 @@ export type UserLinkItem = {
 export type ContentInfoItem = {
   contentId: Dbt.contentId;
   contentType: Dbt.contentType;
+  content: string;
   mime_ext: string;
   title: string;
   tags: string[];
@@ -278,9 +279,6 @@ export type ContentInfoItem = {
   created: Dbt.created;
   updated: Dbt.updated;
 };
-
-export type GetPostBodyRequest = { contentId: Dbt.contentId };
-export type GetPostBodyResponse = { body: string | null };
 
 export type SaveContentRequest = {
   contentId: Dbt.contentId;
@@ -364,17 +362,17 @@ export type AuthenticateResponse = { ok: boolean; }
 // aggregate the above types
 
 export type RequestBody = PromoteContentRequest | PromoteLinkRequest | InitializeRequest | LoadLinkRequest | GetRedirectRequest | ChangeSettingsRequest
-  | GetUserLinksRequest | RedeemLinkRequest | GetPostBodyRequest | RemoveContentRequest | TransferCreditsRequest | AuthenticateRequest;
+  | GetUserLinksRequest | RedeemLinkRequest | RemoveContentRequest | TransferCreditsRequest | AuthenticateRequest;
 
 export type ResponseBody = PromoteContentResponse & PromoteLinkResponse & InitializeResponse & LoadLinkResponse & GetRedirectResponse & ChangeSettingsResponse
-  & GetUserLinksResponse & RedeemLinkResponse & GetPostBodyResponse & RemoveContentResponse & TransferCreditsResponse & AuthenticateResponse;
+  & GetUserLinksResponse & RedeemLinkResponse & RemoveContentResponse & TransferCreditsResponse & AuthenticateResponse;
 
 // internal to server.
 export type RecvRequestBody = PromoteContentRequest & PromoteLinkRequest & InitializeRequest & LoadLinkRequest & GetRedirectRequest & ChangeSettingsRequest
-  & GetUserLinksRequest & RedeemLinkRequest & GetPostBodyRequest & RemoveContentRequest & TransferCreditsRequest & AuthenticateRequest;
+  & GetUserLinksRequest & RedeemLinkRequest & RemoveContentRequest & TransferCreditsRequest & AuthenticateRequest;
 
 export type SendResponseBody = PromoteContentResponse | PromoteLinkResponse | InitializeResponse | LoadLinkResponse | GetRedirectResponse | ChangeSettingsResponse
-  | GetUserLinksResponse | RedeemLinkResponse | GetPostBodyResponse | RemoveContentResponse | TransferCreditsResponse | AuthenticateResponse;
+  | GetUserLinksResponse | RedeemLinkResponse | RemoveContentResponse | TransferCreditsResponse | AuthenticateResponse;
 
 export type Handler<Request, Response> = (req: Request) => Promise<Response>;
 

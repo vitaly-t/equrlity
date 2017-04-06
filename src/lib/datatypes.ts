@@ -21,7 +21,8 @@ export type userGroup = "admin" | "author" | "member";
 export type urlString = string;
 export type userName = string;
 export type uuid = string;
-export type content = Buffer;
+export type content = string;
+export type blobId = number;
 export type contentId = number;
 export type contentCryptId = Buffer;
 export type publicKey = Buffer;
@@ -57,10 +58,18 @@ export interface Auth {
   readonly updated: updated | null
 };
 
+export interface Blob {
+  readonly blobId: blobId | null,
+  readonly created: created | null,
+  readonly updated: updated | null,
+  readonly blobContent: binary | null
+};
+
 export interface Content {
   readonly contentId: contentId | null,
   readonly contentType: contentType | null,
   readonly userId: userId | null,
+  readonly blobId: blobId | null,
   readonly content: content | null,
   readonly created: created | null,
   readonly updated: updated | null,
