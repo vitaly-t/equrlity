@@ -127,8 +127,8 @@ it("should work for bytea types", async () => {
   let b = Utils.textToBuffer(s);
   var s0 = Utils.bufferToText(b);
   expect(s).toEqual(s0, "encode/decode fails");
-  let rsp0 = await pg.insertContent(b, "txt", "post", "A post", u.userId);
-  let cont = await pg.retrieveContent(rsp0.contentId)
+  let rsp0 = await pg.insertBlobContent(b, "", "txt", "post", "A post", u.userId);
+  let cont = await pg.retrieveBlobContent(rsp0.contentId)
   s0 = Utils.bufferToText(cont);
   expect(s).toEqual(s0, "insert/retrieve fails(2)");
 

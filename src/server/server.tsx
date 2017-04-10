@@ -30,7 +30,7 @@ import { promisify } from '../lib/promisify';
 import * as Utils from '../lib/utils';
 import * as Dbt from '../lib/datatypes'
 import * as Rpc from '../lib/rpc';
-import { ContentView } from '../lib/contentview';
+import { ContentView } from '../lib/contentView';
 import { LinkLandingPage, HomePage, ContentLandingPage } from '../lib/landingPages';
 import { validateContentSignature } from '../lib/Crypto';
 
@@ -74,6 +74,7 @@ function htmlPage(body) {
 <html>
 <head>
   <meta charset="UTF-8">
+  <meta name="google-site-verification" content="mJoHqP8RhSQWE6NhUmdXDjo8oWgUC6nrBELkQS8bEZU" />
   <link href="/node_modules/@blueprintjs/core/dist/blueprint.css" rel="stylesheet" />
   <link rel="shortcut icon" href="/favicon.ico" />
 </head>
@@ -126,10 +127,12 @@ const publicRouter = Router();
 
 //app.use(bodyParser());
 
+/*
 app.use(async (ctx, next) => {
   console.log(ctx.path);
   await next();
 });
+*/
 
 app.use(koaBody({ formidable: { uploadDir: __dirname } }));
 
@@ -142,19 +145,24 @@ app.use(
   }) as Koa.Middleware
 );
 
-app.use(range);
-app.use(serve("node_modules", "./node_modules"));
-app.use(serve("dist", "./dist"));
-app.use(favicon(__dirname + '/assets/favicon.ico'));
+//app.use(range);
+//app.use(serve("node_modules", "./node_modules"));
+//app.use(serve("dist", "./dist"));
+//app.use(favicon(__dirname + '/assets/favicon.ico'));
+//
 
-publicRouter.get('/download/pseudoq.zip', async function (ctx, next) {
+publicRouter.get('/download/pseudoqurl.crx', async function (ctx, next) {
+  ctx.headers['Content-Type'] = "application/x-chrome-extension";
+  await send(ctx, './assets/pseudoqurl.crx');
+});
+
+publicRouter.get('/download/pseudoqurl.zip', async function (ctx, next) {
   await send(ctx, './assets/pseudoq-plugin.zip');
 });
 
-publicRouter.get('/download/pseudoq.tar.gz', async function (ctx, next) {
+publicRouter.get('/download/pseudoqurl.tar.gz', async function (ctx, next) {
   await send(ctx, './assets/pseudoq-plugin.tar.gz');
 });
-
 
 publicRouter.get('/link/:id', async (ctx, next) => {
   if (isValidClient(ctx)) {
@@ -222,7 +230,7 @@ publicRouter.post('/auth', async (ctx, next) => {
       await pg.createAuth(authId, user.userId, "chrome");
     }
     let id = user.userId;
-    let token = jwt.sign({ id, publicKey, email }, jwt_secret);
+    token = jwt.sign({ id, publicKey, email }, jwt_secret);
     ctx.body = { jwt: token };
   }
   else ctx.throw(401, "Authentication failed!");
@@ -364,12 +372,12 @@ router.route({
         var concatStream = concat(gotFile)
         part.pipe(concatStream);
 
-        function gotFile(blob: Buffer) {
+        async function gotFile(blob: Buffer) {
           console.log("got file: " + part.filename);
           let pth = path.parse(part.filename);
           let mime_ext = pth.ext.replace(".", "");
           let contentType: Dbt.contentType = part.mime.substring(0, part.mime.indexOf("/"));
-          pg.insertBlobContent(blob, '', mime_ext, contentType, part.filename, userId);
+          await pg.insertBlobContent(blob, '', mime_ext, contentType, part.filename, userId);
         }
 
       }

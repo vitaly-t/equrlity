@@ -6,7 +6,6 @@ export function serve(path, root): (cxt: Koa.Context, next: () => Promise<any>) 
   //path = path.replace(/^\/+/, "");
 
   return async function (ctx: Koa.Context, next: () => Promise<any>) {
-    console.log(ctx.path);
 
     if (ctx.method == "GET" || ctx.method == "HEAD") {
 

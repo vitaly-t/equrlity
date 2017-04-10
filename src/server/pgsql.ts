@@ -470,9 +470,9 @@ export async function insertContent(content: string, mime_ext: string, contentTy
   return rslt;
 }
 
-export async function insertBlobContent(blob: Buffer, content: string, mime_ext: string, contentType: Dbt.contentType, title: string, userId: Dbt.userId): Promise<Dbt.Content> {
+export async function insertBlobContent(blobContent: Buffer, content: string, mime_ext: string, contentType: Dbt.contentType, title: string, userId: Dbt.userId): Promise<Dbt.Content> {
   let rblob = OxiGen.emptyRec<Dbt.Content>(oxb.tables.get("blobs"));
-  let b = await insertRecord<Dbt.Blob>("blobs", { blob });
+  let b = await insertRecord<Dbt.Blob>("blobs", { blobContent });
   let cont = OxiGen.emptyRec<Dbt.Content>(oxb.tables.get("contents"));
   title = title.replace(/_/g, " ");
   cont = { ...cont, mime_ext, content, contentType, title, userId, blobId: b.blobId };
@@ -480,7 +480,10 @@ export async function insertBlobContent(blob: Buffer, content: string, mime_ext:
   return rslt;
 }
 
-export async function retrieveBlobContent(contentId: Dbt.contentId): Promise<string> {
+export async function retrieveBlobContent(contentId: Dbt.contentId): Promise<Buffer> {
   let cont = await retrieveRecord<Dbt.Content>("contents", { contentId });
-  return cont.content;
+  let blobId = cont.blobId;
+  if (!blobId) return null;
+  let blob = await retrieveRecord<Dbt.Blob>("blobs", { blobId });
+  return blob.blobContent;
 }

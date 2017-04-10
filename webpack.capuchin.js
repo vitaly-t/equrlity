@@ -1,8 +1,8 @@
 const webpack = require('webpack');
 const path = require('path');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
-const tgtdir = process.env.NODE_ENV === 'development' ? 'dist/capuchin_dev' : 'dist/capuchin_rel';
-const google_id = process.env.GOOGLE_ID;
+const isDev = process.env.NODE_ENV === 'development';
+const tgtdir = isDev ? 'dist/capuchin_dev' : 'dist/capuchin_rel';
 const { capuchinVersion } = require('./dist/lib/utils');
 const { TextEncoder, TextDecoder } = require('text-encoding');
 let outPath = path.resolve(__dirname, tgtdir);
@@ -48,7 +48,9 @@ module.exports = function (env) {
               console.log("transforming: " + path);
               var str = (new TextDecoder('utf-8')).decode(content);
               str = str.replace("__CAPUCHIN_VERSION__", capuchinVersion());
-              //str = str.replace("__GOOGLE_ID__", google_id);
+              if (!isDev) {
+                str = str.replace(/\"key\".+$/gm, "");
+              }
               return (new TextEncoder()).encode(str);
             }
             return content;

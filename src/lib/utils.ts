@@ -38,10 +38,10 @@ export function setTest(l: boolean) {
 }
 
 export function capuchinVersion() {
-  return "0.8.5";
+  return "0.9.0";
 }
 
-export const serverUrl = isDev() ? "http://localhost:8080" : "https://pseudoqurl.herokuapp.com";
+export const serverUrl = isDev() ? "http://localhost:8080" : "https://www.pseudoq.com";
 export const chromeAuthUrl = "https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=";
 
 

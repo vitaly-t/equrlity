@@ -212,14 +212,14 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
         let remove = () => { this.setState({ confirmDeleteContent: p }) };
         let btns = [<Button onClick={remove} text="Delete" />];
         let tags = p.tags && p.tags.length > 0 ? p.tags.join(", ") : '';
-        if (p.contentType === "post") {
-          let edit = () => { Chrome.sendSyncMessage({ eventType: "LaunchContentEditPage", post: p }); };
-          btns.push(<Button onClick={edit} text="Edit" />);
-        }
-        else {
-          let edit = () => { this.setState({ editingContent: p }) };
-          btns.push(<Button onClick={edit} text="Edit" />);
-        }
+        //if (p.contentType === "post") {
+        let edit = () => { Chrome.sendSyncMessage({ eventType: "LaunchContentEditPage", post: p }); };
+        btns.push(<Button onClick={edit} text="Edit" />);
+        //}
+        //else {
+        //  let edit = () => { this.setState({ editingContent: p }) };
+        //  btns.push(<Button onClick={edit} text="Edit" />);
+        //}
         return (
           <tr key={p.contentId} >
             <td>{p.contentType}</td>

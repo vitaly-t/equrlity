@@ -3,7 +3,6 @@
   "version": "__CAPUCHIN_VERSION__",
   "manifest_version": 3,
   "description": "PROMOTE THIS!",
-  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAt6DeW4sEKS+u5s7vXkUwQQqMiHNpVlwg3B6fD1ciWq/fZR+ZsLNYsCIUj13XErkzI2sYzat3JdlAZMqN+ipWuzVUcpscFBNkHn5AqwhmzIR2JWfaKqgFnIDCjtzYZnJZrLrpzQeuQIL/+a6x8mpdEi9+Afp17o909ekGUYIokgU3LXMSGtMdW5f3GZl5U7SZ0uUiSWIcexJNhV9NKbXaKUEHqk/4iswQ7qZMbkT1t3w2vBnAw8uTng8qPuOkKYuBE4es9vtkJD4KEz8VvP2QPK99dp9p3Ez1SxQcWwKCqBNVOwO4nPCP2CKts3zPpxIfUfRnAOdt+pqpgJDhR5GbxQIDAQAB",
   "browser_action": {
     "default_title": "PseudoQURL Extension",
     "default_popup": "popup.html"
@@ -20,8 +19,9 @@
     "https://accounts.google.com/*",
     "https://www.googleapis.com/*"
   ],
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAm6d6YAsux6DwZwsrlp3e/V+2EdbSLxidSNNn6w4Crrf1WqwR//BeouiWTjdNpKGkEGJ4KltUkIy9hSUxpkhAKSooNlRwu+nOOOrgGezorZ/kL0rv547euZ0g8UpdcnN4Wpf1Fv8TbzODWdZ5kU1wO5sNPZX4uhSjcQSU/vm/6QYJw4m0r4VMEO31mYzx7nXyRB8GLqqwaLw9e4z+RlqKC+42gRlE34NWjUdxOSAa3QIAc/yz652jwhdchowMqmPazIwgUPO+rkkXudHPh99MClER/51O9saFWI+ZKjhyQPefM2iy5vT2dokpuwdJVnr9bqVh2jaerE9Y8Nwi/NK3UQIDAQAB",
   "oauth2": {
-    "client_id": "1046837153851-12v7fe2tbmmlu4qnm1n6jnhuc71htkfk.apps.googleusercontent.com",
+    "client_id": "23837795632-i1o9fs39uh43132jb10gqcvjl4h006cd.apps.googleusercontent.com",
     "scopes": [
       "https://www.googleapis.com/auth/plus.login"
     ]
