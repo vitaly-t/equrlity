@@ -2,11 +2,12 @@
 
 import * as React from 'react';
 import * as ReactDOM from 'react-dom';
-import * as Blueprint from "@blueprintjs/core";
+import { Button } from "@blueprintjs/core";
 
 import * as oxiDate from '../lib/oxidate';
 import * as utils from '../lib/utils';
 import * as uuid from '../lib/uuid.js';
+import { TagGroupEditor } from '../lib/tags';
 import { TimeSpan } from '../lib/timeSpan';
 import { ContentView, rowStyle, btnStyle, lhcolStyle } from "../lib/contentView";
 import * as Rpc from '../lib/rpc';
@@ -18,11 +19,7 @@ import * as Chrome from './chrome';
 
 
 interface ContentProps { appState: AppState };
-interface ContentState { title: string, content: string, tags: string, editing: boolean, isError: boolean, prevContent: string, investment: number };
-
-let Tag = (props) => {
-  return (<button className="pt-intent-primary" style={{ marginLeft: 3, marginRight: 3 }} {...props} >{props.children}</button>);
-};
+interface ContentState { title: string, content: string, tags: string[], editing: boolean, isError: boolean, prevContent: string, investment: number };
 
 
 export class ContentEditor extends React.Component<ContentProps, ContentState> {
@@ -31,23 +28,23 @@ export class ContentEditor extends React.Component<ContentProps, ContentState> {
     super(props);
     let p = props.appState.currentContent;
     let { title, tags, content } = p
-    this.state = { title, content, tags: tags.join(","), editing: true, isError: false, prevContent: content, investment: 20 };
+    this.state = { title, content, tags, editing: true, isError: false, prevContent: content, investment: 20 };
   }
 
   ctrls: {
     title: HTMLInputElement,
     body: HTMLTextAreaElement,
-    tags: HTMLInputElement,
     investment: HTMLInputElement,
-  } = { title: null, body: null, tags: null, investment: null };
+  } = { title: null, body: null, investment: null };
 
   save(publish: boolean = false) {
     if (this.state.isError) return;
     let title = this.state.title;
-    let tags = this.state.tags.split(',').map(t => t.trim());
+    let tags = this.state.tags;
+    let cont = this.props.appState.currentContent;
     let content = this.state.content;
     let investment = this.state.investment;
-    let req: Rpc.SaveContentRequest = { contentId: this.props.appState.currentContent.contentId, contentType: "post", mime_ext: "markdown", title, tags, content, publish, investment };
+    let req: Rpc.SaveContentRequest = { contentId: cont.contentId, contentType: cont.contentType, mime_ext: cont.mime_ext, title, tags, content, publish, investment };
     Chrome.sendMessage({ eventType: "SaveContent", req });
   }
 
@@ -59,15 +56,23 @@ export class ContentEditor extends React.Component<ContentProps, ContentState> {
 
   changeTitle(e) { this.setState({ title: e.target.value }); }
   changeBody(e) { this.setState({ content: e.target.value }); }
-  changeTags(e) { this.setState({ tags: e.target.value }); }
   changeInvestment(e) { this.setState({ investment: parseInt(e.target.value) }); }
+
+  removeTag(lbl) {
+    let tags = this.state.tags;
+    let i = tags.indexOf(lbl);
+    if (i >= 0) {
+      tags = tags.splice(i, 1);
+      this.setState({ tags });
+    }
+  }
 
   render() {
     let currInfo = this.props.appState.currentContent;
     let creator = this.props.appState.moniker
     if (!currInfo) return null;
     let rowStyle = { width: '100%', marginTop: 2, marginLeft: 5, padding: 6 };
-    let btnStyle = { height: '24', marginTop: 2, marginLeft: 5, marginRight: 5, display: 'inline-block' };
+    //let btnStyle = { height: '24', marginTop: 2, marginLeft: 5, marginRight: 5, display: 'inline-block' };
     let lhcolStyle = { width: '20%' };
     if (this.state.editing) {
 
@@ -82,33 +87,32 @@ export class ContentEditor extends React.Component<ContentProps, ContentState> {
             <textarea style={{ width: '100%', minHeight: 400 }} ref={(e) => this.ctrls.body = e} value={this.state.content} onChange={e => this.changeBody(e)} />
           </div>
           <div style={rowStyle} >
-            <div style={lhcolStyle}>Tags:</div>
-            <input type="text" style={{ height: 30, marginTop: 6, width: '100%' }} ref={(e) => this.ctrls.tags = e} value={this.state.tags} onChange={e => this.changeTags(e)} />
+            <span style={lhcolStyle}>Tags: </span>
+            <TagGroupEditor tags={this.state.tags} removeTag={lbl => this.removeTag(lbl)} />
           </div>
           <div style={rowStyle} >
-            <button key='review' className="pt-intent-primary" style={btnStyle} onClick={() => this.stopEdit()} >Review</button>
-            <button key='stop' className="pt-intent-primary" style={btnStyle} onClick={() => this.abandonEdit()} >Abandon</button>
+            <Button key='review' className="pt-intent-primary" style={btnStyle} onClick={() => this.stopEdit()} text="Save" />
+            <Button key='stop' style={btnStyle} onClick={() => this.abandonEdit()} text="Abandon" />
           </div>
         </div>
       );
     } else {
-      let tags = this.state.tags.split(',').map(t => t.trim());
-      let content = this.state.content;
-      let info: Rpc.ContentInfoItem = { ...currInfo, content, title: this.state.title, tags, userId: '', contentId: 0 };
+      let { content, title, tags } = this.state;
+      let info: Rpc.ContentInfoItem = { ...currInfo, content, title, tags, userId: '', contentId: 0 };
       let pubdiv = null;
       if (!currInfo.published) {
         pubdiv = <div style={rowStyle} >
           <div style={{ display: 'inline' }}>Investment: </div>
           <input type="text" style={{ display: 'inline', height: 24, marginTop: 6, width: '100' }} ref={(e) => this.ctrls.investment = e} value={this.state.investment} onChange={e => this.changeInvestment(e)} />
-          <button key='publish' className="pt-intent-primary" style={btnStyle} onClick={() => this.publish()} >Publish</button>
+          <Button key='publish' className="pt-intent-success" style={btnStyle} onClick={() => this.publish()} text="Publish" />
         </div>;
       }
       return (
         <div>
           <ContentView info={info} creator={creator} />
           <div style={rowStyle} >
-            <button key='edit' className="pt-intent-primary" style={btnStyle} onClick={() => this.startEdit()} >Edit</button>
-            <button key='save' className="pt-intent-primary" style={btnStyle} onClick={() => this.save()} >Save</button>
+            <Button key='edit' className="pt-intent-primary" style={btnStyle} onClick={() => this.startEdit()} >Edit</Button>
+            <Button key='save' className="pt-intent-primary" style={btnStyle} onClick={() => this.save()} >Save</Button>
           </div>
           {pubdiv}
         </div>

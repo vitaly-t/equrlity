@@ -3,6 +3,7 @@
 import { Url, parse, format } from 'url';
 import { IMain, IDatabase, ITask } from 'pg-promise';
 import * as pgPromise from 'pg-promise';
+import { createWriteStream, createReadStream } from 'fs';
 
 import * as Utils from "../lib/utils";
 import * as Rpc from '../lib/rpc';
@@ -366,7 +367,7 @@ async function _handlePromoteContent(t: ITask<any>, userId, { publicKey, content
   let links = await tasks.getRootLinksForContentId(t, contentId);
   if (links.length > 0) throw new Error("Content already promoted");
   let url = Utils.contentToUrl(contentId);
-  let updts = await tasks.promoteLink(t, userId, url, cont.title, amount);
+  let updts = await tasks.promoteLink(t, userId, url, cont.title, cont.content, amount);
   let link = updts.find(e => e.table === "links" as cache.CachedTable).record;
   await _promoteLink(t, link, amount);
   let rsp: Rpc.PromoteContentResponse = { url };
@@ -381,7 +382,8 @@ export async function handlePromoteContent(userId, { publicKey, contentId, signa
   return rsp;
 }
 
-async function _handlePromoteLink(t: ITask<any>, userId, { publicKey, url, signature, linkDescription, amount }): Promise<[cache.CacheUpdate[], Rpc.PromoteLinkResponse]> {
+async function _handlePromoteLink(t: ITask<any>, userId, req: Rpc.PromoteLinkRequest): Promise<[cache.CacheUpdate[], Rpc.PromoteLinkResponse]> {
+  let { publicKey, url, signature, title, comment, amount } = req;
   let ourl = parse(url);
   let linkId = 0;
   let link = null;
@@ -400,21 +402,24 @@ async function _handlePromoteLink(t: ITask<any>, userId, { publicKey, url, signa
       cache.connectUsers(userId, link.userId);
       let prevId = await tasks.getLinkAlreadyInvestedIn(t, userId, url);
       if (prevId) throw new Error("user has previously invested in this content");
-      rslt = await tasks.promoteLink(t, userId, url, linkDescription, amount);
+      rslt = await tasks.promoteLink(t, userId, url, title, comment, amount);
       linkDepth += 1;
     }
   }
   else {
-    rslt = await tasks.promoteLink(t, userId, url, linkDescription, amount);
+    rslt = await tasks.promoteLink(t, userId, url, title, comment, amount);
   }
+  if (amount == 0) return [rslt, { linkDepth: -1 }];
+
   link = rslt.find(e => e.table === "links" as cache.CachedTable).record;
+  if (!link) throw new Error("no link generated");
   await _promoteLink(t, link, amount);
   let linkPromoter = cache.users.get(userId).userName;
-  return [rslt, { link: Utils.linkToUrl(link.linkId, linkDescription), linkDepth, linkPromoter }];
+  return [rslt, { link: Utils.linkToUrl(link.linkId, title), linkDepth, linkPromoter }];
 }
 
-export async function handlePromoteLink(userId, { publicKey, url, signature, linkDescription, amount }): Promise<Rpc.PromoteLinkResponse> {
-  let pr = await db.tx(t => _handlePromoteLink(t, userId, { publicKey, url, signature, linkDescription, amount }));
+export async function handlePromoteLink(userId, req: Rpc.PromoteLinkRequest): Promise<Rpc.PromoteLinkResponse> {
+  let pr = await db.tx(t => _handlePromoteLink(t, userId, req));
   let updts: cache.CacheUpdate[] = pr[0];
   let rsp: Rpc.PromoteLinkResponse = pr[1];
   cache.update(updts);
@@ -425,14 +430,17 @@ async function _getUserLinks(t: ITask<any>, id: Dbt.userId): Promise<Rpc.UserLin
   let a = await tasks.getLinksForUser(t, id);
   let rslt: Rpc.UserLinkItem[] = []
   for (const l of a) {
-    let linkId = l.linkId;
+    let { linkId, contentId } = l;
+    let cont = await tasks.retrieveRecord<Dbt.Content>(t, "contents", { contentId });
+    let { title, content, contentType, mime_ext, tags, published, created, updated } = cont;
     let contentUrl = l.url
     let linkDepth = cache.getLinkDepth(l);
     let viewCount = await tasks.viewCount(t, linkId);
     let promotionsCount = await tasks.promotionsCount(t, linkId);
     let deliveriesCount = await tasks.deliveriesCount(t, linkId);
     let amount = l.amount;
-    let rl: Rpc.UserLinkItem = { linkId, contentUrl, linkDepth, viewCount, promotionsCount, deliveriesCount, amount };
+    let info: Rpc.ContentInfoItem = { contentId, contentType, mime_ext, title, content, tags, published, created, updated };
+    let rl: Rpc.UserLinkItem = { linkId, contentUrl, info, linkDepth, viewCount, promotionsCount, deliveriesCount, amount };
     rslt.push(rl);
   };
   return rslt;
@@ -444,10 +452,6 @@ export async function getUserLinks(id: Dbt.userId): Promise<Rpc.UserLinkItem[]> 
 
 export async function getUserContents(id: Dbt.userId): Promise<Rpc.ContentInfoItem[]> {
   return await db.task(t => tasks.getUserContents(t, id));
-}
-
-export async function getContentBody(id: Dbt.contentId): Promise<Buffer> {
-  return await db.task(t => tasks.getContentBody(t, id));
 }
 
 export async function saveContent(req: Rpc.SaveContentRequest): Promise<Dbt.Content> {
@@ -470,20 +474,24 @@ export async function insertContent(content: string, mime_ext: string, contentTy
   return rslt;
 }
 
-export async function insertBlobContent(blobContent: Buffer, content: string, mime_ext: string, contentType: Dbt.contentType, title: string, userId: Dbt.userId): Promise<Dbt.Content> {
-  let rblob = OxiGen.emptyRec<Dbt.Content>(oxb.tables.get("blobs"));
-  let b = await insertRecord<Dbt.Blob>("blobs", { blobContent });
-  let cont = OxiGen.emptyRec<Dbt.Content>(oxb.tables.get("contents"));
-  title = title.replace(/_/g, " ");
-  cont = { ...cont, mime_ext, content, contentType, title, userId, blobId: b.blobId };
-  let rslt = await insertRecord<Dbt.Content>("contents", cont);
-  return rslt;
+export async function insertBlobContent(strm: any, content: string, mime_ext: string, contentType: Dbt.contentType, title: string, userId: Dbt.userId): Promise<Dbt.Content> {
+  return await db.tx(async t => {
+    let blobId = await tasks.insertLargeObject(t, strm);
+    let cont = OxiGen.emptyRec<Dbt.Content>(oxb.tables.get("contents"));
+    title = title.replace(/_/g, " ");
+    cont = { ...cont, mime_ext, content, contentType, title, userId, blobId };
+    let rslt = await tasks.insertRecord<Dbt.Content>(t, "contents", cont);
+    return rslt;
+  });
 }
 
 export async function retrieveBlobContent(contentId: Dbt.contentId): Promise<Buffer> {
-  let cont = await retrieveRecord<Dbt.Content>("contents", { contentId });
-  let blobId = cont.blobId;
-  if (!blobId) return null;
-  let blob = await retrieveRecord<Dbt.Blob>("blobs", { blobId });
-  return blob.blobContent;
+  return await db.tx(async t => {
+    let cont = await tasks.retrieveRecord<Dbt.Content>(t, "contents", { contentId });
+    let blobId = cont.blobId;
+    if (!blobId) return null;
+    //let blob = await retrieveRecord<Dbt.Blob>("blobs", { blobId });
+    //return blob.blobContent;
+    return await tasks.retrieveLargeObject(t, blobId);
+  });
 }

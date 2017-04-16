@@ -154,18 +154,29 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
       let invrows = invs.map(l => {
         let linkId = l.linkId;
         let url = l.contentUrl;
+        let i = l.info;
+        let tags = i.tags && i.tags.length > 0 ? i.tags.join(", ") : '';
         let redeem = () => { Chrome.sendMessage({ eventType: "RedeemLink", linkId }); };
-        let onclick = () => { chrome.tabs.create({ active: true, url }); };
+        let redeemText = l.amount > 0 ? "Redeem" : "Delete";
+        let btns = [<Button onClick={redeem} text={redeemText} />];
+        let onUrlClick = () => { chrome.tabs.create({ active: true, url }); };
+        let edit = () => { Chrome.sendSyncMessage({ eventType: "LaunchContentEditPage", info: i }); };
+        btns.push(<Button onClick={edit} text="Edit" />);
 
         return (
           <tr key={l.linkId} >
-            <td><Button onClick={redeem}>Redeem</Button></td>
-            <td><a href="" onClick={onclick} >{url}</a></td>
+            <td><a href="" onClick={onUrlClick} >{url}</a></td>
+            <td>{i.content}</td>
             <td>{l.linkDepth}</td>
             <td>{l.promotionsCount}</td>
             <td>{l.deliveriesCount}</td>
             <td>{l.viewCount}</td>
             <td>{l.amount}</td>
+            <td>{i.created}</td>
+            <td>{i.updated}</td>
+            <td>{i.published}</td>
+            <td>{tags}</td>
+            <td>{btns}</td>
           </tr>
         );
       });
@@ -173,13 +184,18 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
         <table className="pt-table pt-striped pt-bordered" >
           <thead>
             <tr>
-              <th></th>
               <th>URL</th>
+              <th>Comment</th>
               <th>Depth</th>
               <th>Promotions</th>
               <th>Deliveries</th>
               <th>Views</th>
               <th>Balance</th>
+              <th>Created</th>
+              <th>Updated</th>
+              <th>Published</th>
+              <th>Tags</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
@@ -213,7 +229,7 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
         let btns = [<Button onClick={remove} text="Delete" />];
         let tags = p.tags && p.tags.length > 0 ? p.tags.join(", ") : '';
         //if (p.contentType === "post") {
-        let edit = () => { Chrome.sendSyncMessage({ eventType: "LaunchContentEditPage", post: p }); };
+        let edit = () => { Chrome.sendSyncMessage({ eventType: "LaunchContentEditPage", info: p }); };
         btns.push(<Button onClick={edit} text="Edit" />);
         //}
         //else {
@@ -344,6 +360,7 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
       <div>
         <h3>Status and Settings.</h3>
         <div style={divStyle}>
+          <p>Using Server Url: {Utils.serverUrl}. Version: {Utils.capuchinVersion()} </p>
           {userp}
           {/*authdiv*/}
         </div>

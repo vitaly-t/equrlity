@@ -28,6 +28,7 @@ export default {
         "post",
         "audio",
         "image",
+        "link",
       ]
     },
     "created": {
@@ -58,7 +59,7 @@ export default {
       "tsType": "number",
       "sqlType": "integer"
     },
-    "linkDescription": {
+    "title": {
       "tsType": "string",
       "sqlType": "varchar(100)"
     },
@@ -68,6 +69,10 @@ export default {
       "max": 100,
       "min": 0
     },
+    "tag": {
+      "tsType": "string",
+      "sqlType": "varchar(20)"
+    },
     "text": {
       "tsType": "string",
       "sqlType": "text"
@@ -75,6 +80,10 @@ export default {
     "timestamp": {
       "tsType": "Date",
       "sqlType": "timestamptz"
+    },
+    "title": {
+      "tsType": "string",
+      "sqlType": "varchar(254)"
     },
     "updated": {
       "tsType": "Date",
@@ -105,26 +114,20 @@ export default {
     "contentId": "integer",
     "contentCryptId": "binary",
     "publicKey": "binary",
+    "published": "timestamp",
     "userId": "uuid",
   },
   "tupleTypes": {
     "Auth": ["authProvider", "authId", "userId", "created", "updated"],
-    "Blob": ["blobId", "created", "updated",
-      { "name": "blobContent", "type": "binary" },
-    ],
-    "Content": ["contentId", "contentType", "userId", "blobId", "content", "created", "updated",
+    "Content": ["contentId", "contentType", "title", "userId", "blobId", "content", "created", "updated", "published",
       { "name": "mime_ext", "type": "varchar(8)" },
-      { "name": "title", "type": "varchar(254)" },
-      { "name": "tags", "type": "varchar(20)", "multiValued": true },
+      { "name": "tags", "type": "tag", "multiValued": true },
       { "name": "cryptHash", "type": "binary" },
-      { "name": "published", "type": "timestamp" },
     ],
     "Invitation": ["ipAddress", "linkId", "created", "updated"],
-    "Link": ["linkId", "userId", "linkDescription", "created", "updated",
+    "Link": ["linkId", "userId", "contentId",
       { "name": "url", "type": "urlString" },
-      { "name": "tags", "type": "varchar(20)", "multiValued": true },
       { "name": "prevLink", "type": "linkId" },
-      { "name": "hitCount", "type": "integer", "default": "0" },
       { "name": "amount", "type": "integer" },
     ],
     "Promotion": ["linkId", "userId", "created", "updated",
@@ -137,7 +140,7 @@ export default {
     "UserLink": [
       { "name": "user_A", "type": "userId" },
       { "name": "user_B", "type": "userId" },
-      { "name": "tags", "type": "varchar(20)", "multiValued": true },
+      { "name": "tags", "type": "tag", "multiValued": true },
       "created",
       "updated",
     ],
@@ -167,12 +170,6 @@ export default {
         { "ref": "users", "columns": ["userId"] }
       ],
     },
-    "blobs": {
-      "rowType": "Blob",
-      "primaryKey": ["blobId"],
-      "autoIncrement": "blobId",
-      "updated": "updated",
-    },
     "contents": {
       "rowType": "Content",
       "primaryKey": ["contentId"],
@@ -180,7 +177,6 @@ export default {
       "updated": "updated",
       "foreignKeys": [
         { "ref": "users", "columns": ["userId"] },
-        { "ref": "blobs", "columns": ["blobId"] },
       ],
       "uniques": [["contentType", "title"]],
     },
@@ -190,6 +186,7 @@ export default {
       "autoIncrement": "linkId",
       "foreignKeys": [
         { "ref": "users", "columns": ["userId"] },
+        { "ref": "contents", "columns": ["contentId"] },
         { "ref": "links", "columns": ["prevLink"] },
       ],
       "uniques": [["url", "userId"]],

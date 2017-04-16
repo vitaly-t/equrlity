@@ -75,13 +75,13 @@ export async function sendPromoteContent(st: AppState, contentId: Dbt.contentId,
   return await sendApiRequest(st, "promoteContent", req);
 }
 
-export async function sendPromoteLink(st: AppState, url: string, linkDescription: string, amount: number, tags: string[]): Promise<AxiosResponse> {
+export async function sendPromoteLink(st: AppState, url: string, title: string, comment: string, amount: number, tags: string[]): Promise<AxiosResponse> {
   const privateCryptoKey: CryptoKey = await Crypto.importPrivateKeyfromJWK(st.privateKey);
   const signature: ArrayBuffer = await Crypto.signData(privateCryptoKey, UTF8.stringToUtf8ByteArray(url).buffer);
   const uint8ArraySignature = new Uint8Array(signature);
   const sig = Utils.printBase64Binary(new Uint8Array(signature));
   const mime_ext = "txt";
-  let req: Rpc.PromoteLinkRequest = { publicKey: st.publicKey, url, signature: sig, linkDescription, amount, tags };
+  let req: Rpc.PromoteLinkRequest = { publicKey: st.publicKey, url, signature: sig, title, comment, amount, tags };
   return await sendApiRequest(st, "promoteLink", req);
 }
 

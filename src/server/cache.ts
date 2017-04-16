@@ -135,7 +135,8 @@ export function getContentFromLinkId(linkId: Dbt.linkId): Dbt.urlString | null {
 }
 
 export function linkToUrl(linkId: Dbt.linkId): Dbt.urlString {
-  let desc = links.get(linkId).linkDescription;
+  let contentId = links.get(linkId).contentId;
+  let desc = contents.get(contentId).title;
   return Utils.linkToUrl(linkId, desc);
 }
 

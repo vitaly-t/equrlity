@@ -16,7 +16,8 @@ export interface PromoteContent {
 export interface PromoteLink {
   eventType: "PromoteLink";
   amount: number;
-  linkDescription: string;
+  title: string;
+  comment: string;
   tags?: string[];
 }
 
@@ -50,7 +51,7 @@ export interface LaunchSettingsPage {
 
 export interface LaunchContentEditPage {
   eventType: "LaunchContentEditPage";
-  post: Rpc.ContentInfoItem;
+  info: Rpc.ContentInfoItem;
 }
 
 export interface SaveContent {
@@ -181,7 +182,7 @@ export namespace AsyncHandlers {
     return thunk;
   }
 
-  export async function promoteLink(state: AppState, linkDescription: string, amount: number, tags: string[] = []): Promise<(st: AppState) => AppState> {
+  export async function promoteLink(state: AppState, title: string, comment: string, amount: number, tags: string[] = []): Promise<(st: AppState) => AppState> {
     let curTab = await currentTab();
     if (!curTab) console.log("No current tab");
     if (curTab && prepareUrl(curTab.url) !== state.activeUrl) {
@@ -192,7 +193,7 @@ export namespace AsyncHandlers {
     }
     let src = state.activeUrl;
     let url = expandedUrl(state, src);
-    let response = await Comms.sendPromoteLink(state, url, linkDescription, amount, tags)
+    let response = await Comms.sendPromoteLink(state, url, title, comment, amount, tags)
     let thunk = (st: AppState) => {
       st = extractHeadersToState(st, response);
       let rslt: Rpc.PromoteLinkResponse = extractResult(response);
@@ -265,6 +266,8 @@ export namespace AsyncHandlers {
     }
     if (isSeen(state, curl)) return (st => { return { ...st, activeUrl: curl }; });
     if (Utils.isPseudoQLinkURL(parse(curl))) return await getRedirect(state, curl)
+    return (st: AppState) => st;
+    /*
     let response = await Comms.sendLoadLink(state, curl);
     let thunk = (st: AppState) => {
       st = extractHeadersToState(st, response);
@@ -274,6 +277,7 @@ export namespace AsyncHandlers {
       return st;
     };
     return thunk;
+    */
   }
 
   export async function changeSettings(state: AppState, settings: Rpc.ChangeSettingsRequest): Promise<(st: AppState) => AppState> {

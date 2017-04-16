@@ -20,6 +20,6 @@ export function serve(path, root): (cxt: Koa.Context, next: () => Promise<any>) 
         }
       }
     }
-    next();
+    await next();
   }
 };

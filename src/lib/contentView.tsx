@@ -11,6 +11,8 @@ import * as ReactDOM from 'react-dom';
 import * as Rpc from '../lib/rpc';
 import * as Dbt from '../lib/datatypes';
 
+import { TagGroup } from './tags';
+
 import * as Remarkable from 'remarkable';
 const md = new Remarkable({ html: true });
 
@@ -24,10 +26,6 @@ export const lhcolStyle = { width: '20%' };
 interface ContentViewProps { info: Rpc.ContentInfoItem, creator: string };
 interface ContentViewState { };
 
-let Tag = (props) => {
-  return (<button className="pt-intent-primary" style={{ marginLeft: 3, marginRight: 3 }} {...props} >{props.children}</button>);
-};
-
 export class ContentView extends React.Component<ContentViewProps, ContentViewState> {
 
   render() {
@@ -36,7 +34,7 @@ export class ContentView extends React.Component<ContentViewProps, ContentViewSt
     let lstedit = info.updated ? oxiDate.toFormat(new Date(info.updated), "DDDD, MMMM D @ HH:MIP") : 'never';
     let pub = info.published ? oxiDate.toFormat(new Date(info.published), "DDDD, MMMM D @ HH:MIP") : 'never';
     let tags = info.tags
-    let tagbtns = tags.map(t => <Tag key={'tag:' + t} >{t}</Tag>);
+    let tagbtns = <TagGroup tags={tags} />;
     return (
       <div>
         <h2>{info.title}</h2>

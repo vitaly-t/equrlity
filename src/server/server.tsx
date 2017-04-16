@@ -38,7 +38,7 @@ import { validateContentSignature } from '../lib/Crypto';
 // local
 import * as jwt from './jwt';
 import { serve } from './koa-static';
-import * as favicon from 'koa-favicon';
+//import * as favicon from 'koa-favicon';
 import clientIP from './clientIP.js';
 import * as pg from './pgsql';
 import * as cache from './cache';
@@ -69,6 +69,8 @@ function isValidClient(ctx: Koa.Context) {
 }
 
 function htmlPage(body) {
+  // <link rel="shortcut icon" href="/favicon.ico" />
+
   return `
 <!DOCTYPE html>
 <html>
@@ -76,7 +78,6 @@ function htmlPage(body) {
   <meta charset="UTF-8">
   <meta name="google-site-verification" content="mJoHqP8RhSQWE6NhUmdXDjo8oWgUC6nrBELkQS8bEZU" />
   <link href="/node_modules/@blueprintjs/core/dist/blueprint.css" rel="stylesheet" />
-  <link rel="shortcut icon" href="/favicon.ico" />
 </head>
 <body>
   ${body}
@@ -96,6 +97,9 @@ function postPage(cont: Dbt.Content): string {
 function mediaPage(cont: Dbt.Content): string {
   if (cont.contentType === 'post') return postPage(cont);
   let mime_type = cont.contentType + "/" + cont.mime_ext;
+
+  //<link rel="shortcut icon" href="/favicon.ico" />
+
   let body = `
 <!DOCTYPE html>
 <html>
@@ -103,7 +107,6 @@ function mediaPage(cont: Dbt.Content): string {
   <meta charset="UTF-8">
   <link href="/node_modules/@blueprintjs/core/dist/blueprint.css" rel="stylesheet" />
   <link href="/node_modules/video.js/dist/video-js.css" rel="stylesheet" />
-  <link rel="shortcut icon" href="/favicon.ico" />
 </head>
 <body>
   <script type="text/javascript" src="/dist/media_bndl.js"></script>
@@ -145,9 +148,9 @@ app.use(
   }) as Koa.Middleware
 );
 
-//app.use(range);
-//app.use(serve("node_modules", "./node_modules"));
-//app.use(serve("dist", "./dist"));
+app.use(range);
+app.use(serve("node_modules", "./node_modules"));
+app.use(serve("dist", "./dist"));
 //app.use(favicon(__dirname + '/assets/favicon.ico'));
 //
 
@@ -157,11 +160,11 @@ publicRouter.get('/download/pseudoqurl.crx', async function (ctx, next) {
 });
 
 publicRouter.get('/download/pseudoqurl.zip', async function (ctx, next) {
-  await send(ctx, './assets/pseudoq-plugin.zip');
+  await send(ctx, './assets/pseudoqurl-plugin.zip');
 });
 
 publicRouter.get('/download/pseudoqurl.tar.gz', async function (ctx, next) {
-  await send(ctx, './assets/pseudoq-plugin.tar.gz');
+  await send(ctx, './assets/pseudoqurl-plugin.tar.gz');
 });
 
 publicRouter.get('/link/:id', async (ctx, next) => {
@@ -341,11 +344,23 @@ router.get('/content/:contentType/:title', async (ctx, next) => {
 
 router.get('/stream/content/:id', async (ctx, next) => {
   let contentId = parseInt(ctx.params.id);
-  let cont = cache.contents.get(contentId);
-  if (!cont || !cont.blobId) ctx.throw(404);
-  let blob = await pg.retrieveRecord<Dbt.Blob>("blobs", cont.blobId)
-  let strm = createReadStream(blob.blobContent);
+  let lob = await pg.retrieveBlobContent(contentId);
+  let strm = createReadStream(lob);
+  /*
+    async function gotFile(blob: Buffer) {
+      console.log("file: " + part.filename);
+      let pth = path.parse(part.filename);
+      let mime_ext = pth.ext.replace(".", "");
+      let contentType: Dbt.contentType = part.mime.substring(0, part.mime.indexOf("/"));
+      await pg.insertBlobContent(blob, '', mime_ext, contentType, part.filename, userId);
+    }
+    //let blob = await pg.retrieveRecord<Dbt.Blob>("blobs", { blobId: cont.blobId })
+    //let strm = createReadStream(blob.blobContent);
+    var concatStream = concat(gotFile)
+  */
+
   ctx.body = strm;
+  //ctx.body = blob.blobContent;
 });
 
 
@@ -368,7 +383,11 @@ router.route({
 
     try {
       while (part = await parts) {
-
+        let pth = path.parse(part.filename);
+        let mime_ext = pth.ext.replace(".", "");
+        let contentType: Dbt.contentType = part.mime.substring(0, part.mime.indexOf("/"));
+        await pg.insertBlobContent(part, '', mime_ext, contentType, part.filename, userId);
+        /*
         var concatStream = concat(gotFile)
         part.pipe(concatStream);
 
@@ -379,6 +398,7 @@ router.route({
           let contentType: Dbt.contentType = part.mime.substring(0, part.mime.indexOf("/"));
           await pg.insertBlobContent(blob, '', mime_ext, contentType, part.filename, userId);
         }
+        */
 
       }
     } catch (err) {
@@ -437,6 +457,7 @@ router.post('/rpc', async function (ctx: any) {
         ctx.body = { id, result };
         break;
       }
+      /*
       case "loadLink": {
         let req: Rpc.LoadLinkRequest = params;
         let lnk = await pg.findRootLinkForUrl(req.url);
@@ -450,6 +471,7 @@ router.post('/rpc', async function (ctx: any) {
         ctx.body = { id, result };
         break;
       }
+      */
       case "getRedirect": {
         let req: Rpc.GetRedirectRequest = params;
         let contentUrl = null;

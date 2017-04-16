@@ -57,6 +57,10 @@ module.exports = function (env) {
           }
         },
         {
+          from: 'node_modules/react-simple-flex-grid/lib/*.css',
+          to: outPath
+        },
+        {
           from: 'node_modules/@blueprintjs/core/dist/*.css',
           to: outPath
         },

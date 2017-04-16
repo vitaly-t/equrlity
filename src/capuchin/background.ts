@@ -38,6 +38,16 @@ function getChromeAccessToken(): Promise<string> {
   });
 }
 
+let settingsTabId = -1;
+function createSettingsTab(): Promise<chrome.tabs.Tab> {
+  return new Promise(resolve => {
+    chrome.tabs.create({ 'url': chrome.extension.getURL('settings.html'), 'selected': true }, t => {
+      if (t.id) settingsTabId = t.id;
+      return t;
+    });
+  });
+}
+
 async function initialize() {
   console.log("initializing...");
   localForage.config({ name: 'pseudoq-capuchin' });
@@ -108,8 +118,6 @@ chrome.webRequest.onBeforeRequest.addListener(checkRedirect
   , { urls: [Utils.serverUrl + "/link/*"] }
   , ["blocking"]);
 
-
-//@@GS a bit hacky, but scanaftadoo.
 export async function handleAsyncMessage(event: Message) {
   let st = currentState();
   let fn = null;
@@ -134,7 +142,7 @@ export async function handleAsyncMessage(event: Message) {
           //console.log("refreshing with correct state");
           chrome.runtime.sendMessage({ eventType: 'Render', appState: preSerialize(currentState()) });
         }, 5000);
-        fn = await AsyncHandlers.promoteLink(st, event.linkDescription, event.amount, event.tags);
+        fn = await AsyncHandlers.promoteLink(st, event.title, event.comment, event.amount, event.tags);
         break;
       }
       case "Load": {
@@ -146,7 +154,17 @@ export async function handleAsyncMessage(event: Message) {
         break;
       }
       case "LaunchSettingsPage":
-        chrome.tabs.create({ 'url': chrome.extension.getURL('settings.html'), 'selected': true });
+        if (settingsTabId > 0) {
+          try {
+            let tab = await getTab(settingsTabId);
+            chrome.tabs.highlight({ windowId: tab.windowId, tabs: tab.index }, w => {
+              chrome.windows.update(tab.windowId, { focused: true });
+            });
+            return;
+          }
+          catch (e) { }
+        }
+        await createSettingsTab();
         fn = await AsyncHandlers.getUserLinks(st);
         break;
       case "GetUserLinks": {
@@ -206,7 +224,7 @@ export function handleMessage(event: Message, async: boolean = false): AppState 
         break;
       case "LaunchContentEditPage":
         chrome.tabs.create({ 'url': chrome.extension.getURL('content.html'), 'selected': true });
-        st = { ...st, currentContent: event.post };
+        st = { ...st, currentContent: event.info };
         break;
       default:
         throw new Error("Unknown eventType: " + event.eventType);

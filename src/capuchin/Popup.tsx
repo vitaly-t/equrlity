@@ -1,29 +1,37 @@
 import * as React from 'react';
-import { AppState, expandedUrl, isWaiting, getLinked } from "./AppState";
 import { Url, format } from 'url';
-import Form from 'react-input';
+import { Row, Col } from 'react-simple-flex-grid';
+import TextareaAutosize from 'react-autosize-textarea';
+import { Button, Intent } from "@blueprintjs/core";
+
 import * as Rpc from '../lib/rpc'
-import { capuchinVersion, serverUrl } from '../lib/utils';
+
 import * as Chrome from './chrome';
+import { AppState, expandedUrl, isWaiting, getLinked } from "./AppState";
+
 
 export interface PopupPanelProps { appState?: AppState; serverMessage?: string };
-export interface PopupPanelState { promoteAmount: number, description: string };
+export interface PopupPanelState { promoteAmount: number, title: string, comment: string, tags: string[] };
 
 export class PopupPanel extends React.Component<PopupPanelProps, PopupPanelState> {
 
   constructor(props) {
     super(props);
-    this.state = { promoteAmount: 20, description: props.appState.activeUrl };
+    this.state = { promoteAmount: 0, title: props.appState.activeUrl, comment: '', tags: [] };
   }
 
-  ctrls: { amountInput?: HTMLInputElement, descriptionInput?: HTMLInputElement } = {}
+  ctrls: { amountInput?: HTMLInputElement, title?: HTMLTextAreaElement, comment?: HTMLTextAreaElement } = {}
 
   changePromoteAmount() {
     this.setState({ promoteAmount: parseInt(this.ctrls.amountInput.value) });
   }
 
-  changeDescription() {
-    this.setState({ description: this.ctrls.descriptionInput.value });
+  changeTitle() {
+    this.setState({ title: this.ctrls.title.value });
+  }
+
+  changeComment() {
+    this.setState({ comment: this.ctrls.comment.value });
   }
 
   render() {
@@ -39,42 +47,83 @@ export class PopupPanel extends React.Component<PopupPanelProps, PopupPanelState
       return <div>Waiting for response from Server</div>;
     }
     console.log("rendering popup...");
-    let versionDiv = (<p>Version: {capuchinVersion()}.</p>);
+    let settingsAction = () => Chrome.sendMessage({ eventType: "LaunchSettingsPage" });
+    let gutter = 20;
+    let lspan = 3;
+    let rspan = 9;
+    let btnStyle = { marginRight: 10 };
+    let rowStyle = { marginBottom: 10 };
+    let btnRow = (
+      <Row style={rowStyle} gutter={gutter} justify="end" align="top">
+        <Button style={btnStyle} onClick={() => window.close()} text="Close" />
+        <Button style={btnStyle} className="pt-intent-primary" onClick={settingsAction} text="Settings" />
+      </Row>
+    );
 
-    if (st.lastErrorMessage) return <div>Error: {st.lastErrorMessage}</div>
-    let pnl = <div>No active URL found</div>
+    let pnl = <div>
+      <p>No active URL found</p>
+    </div>
+    if (st.lastErrorMessage) pnl = <div>Error: {st.lastErrorMessage}</div>
     if (curl) {
       let tgt = expandedUrl(st);
-      let desc = this.state.description;
-      console.log("rendering for target :" + tgt);
       let linkInfo = getLinked(st, curl);
-      let lbl = linkInfo ? (linkInfo.linkPromoter === st.moniker ? "Re-Invest" : "Re-Promote") : "Promote";
+      let lbl = "Save";
       let saveaction = () => {
         let amount = this.state.promoteAmount;
-        let linkDescription = this.state.description
-        Chrome.sendMessage({ eventType: "PromoteLink", amount, linkDescription });
+        let title = this.state.title;
+        let comment = this.state.comment;
+        Chrome.sendMessage({ eventType: "PromoteLink", amount, title, comment });
       }
-      let infoDiv = linkInfo ? <div>{`Promoted by: ${linkInfo.linkPromoter}, Link depth : ${linkInfo.linkDepth}`}</div> : null;
-      let costPerView = linkInfo ? linkInfo.linkDepth + 1 : 1;
+      let infoDiv = null;
+      let promTxt = null;
+      if (this.state.promoteAmount > 0) {
+        lbl = linkInfo ? (linkInfo.linkPromoter === st.moniker ? "Re-Invest" : "Re-Promote") : "Promote";
+        if (linkInfo) {
+          infoDiv = (
+            <Row style={rowStyle} gutter={gutter} align="top">
+              <Col>Promoted by: {linkInfo.linkPromoter}</Col>
+              <Col>Link depth : {linkInfo.linkDepth}</Col>
+            </Row>
+          )
+        }
+        let costPerView = linkInfo ? linkInfo.linkDepth + 1 : 1;
+        promTxt = `(= max. ${Math.floor(this.state.promoteAmount / costPerView)} promotions)`;
+      }
+      btnRow = (
+        <Row style={rowStyle} gutter={gutter} justify="end" align="top">
+          <Button style={btnStyle} onClick={() => window.close()} text="Close" />
+          <Button style={btnStyle} className="pt-intent-success" onClick={settingsAction} text="Settings" />
+          <Button style={btnStyle} className="pt-intent-primary" onClick={saveaction} text={lbl} />
+        </Row>
+      );
       pnl = (<div>
-        <p>Target : <textarea style={{ width: 450 }}>{tgt}</textarea></p>
+        <Row style={rowStyle} gutter={gutter} align="top">
+          <Col span={lspan}>Source URL : </Col>
+          <Col span={rspan}><TextareaAutosize style={{ width: '100%', readonly: true }} value={tgt} /></Col>
+        </Row>
         {infoDiv}
-        <p>Investment amount: <input type="number" ref={(e) => this.ctrls.amountInput = e} max={st.credits}
-          value={this.state.promoteAmount} onChange={(e) => this.changePromoteAmount()} /></p>
-        <p>This will provide for a maximum of {Math.floor(this.state.promoteAmount / costPerView)} promotions.</p>
-        <p>Description: <input type="string" style={{ width: 400 }} ref={(e) => this.ctrls.descriptionInput = e}
-          value={desc} onChange={(e) => this.changeDescription()} /></p>
-        <button onClick={saveaction} >{lbl}</button>
+        <Row style={rowStyle} gutter={gutter} align="top">
+          <Col span={lspan}>Investment amount</Col>
+          <Col span={2}><input style={{ width: '100%' }} type="number" ref={(e) => this.ctrls.amountInput = e} max={st.credits}
+            value={this.state.promoteAmount} onChange={(e) => this.changePromoteAmount()} /></Col>
+          <Col span={3}> / {st.credits} available.</Col>
+          <Col span={4}>{promTxt}</Col>
+        </Row>
+        <Row style={rowStyle} gutter={gutter} align="top">
+          <Col span={lspan}>Link Description: </Col>
+          <Col span={rspan}><TextareaAutosize style={{ width: '100%' }} ref={(e) => this.ctrls.title = e}
+            value={this.state.title} onChange={(e) => this.changeTitle()} /></Col>
+        </Row>
+        <Row style={rowStyle} gutter={gutter} align="top">
+          <Col span={lspan}>Comment:</Col>
+          <Col span={rspan}><TextareaAutosize style={{ width: '100%' }} ref={(e) => this.ctrls.comment = e}
+            value={this.state.comment} onChange={(e) => this.changeComment()} /></Col>
+        </Row>
       </div>);
     }
-    let settingsAction = () => Chrome.sendMessage({ eventType: "LaunchSettingsPage" });
     return <div>
-      <p>Using Server Url: {serverUrl} </p>
-      <p>Your PseudoQURL Nickname is: {st.moniker}</p>
-      <p>Your current Account Balance is: {st.credits}</p>
-      <p><button onClick={settingsAction}>View/Edit Settings</button></p>
       {pnl}
-      {versionDiv}
-    </div>
+      {btnRow}
+    </div >
   }
 }

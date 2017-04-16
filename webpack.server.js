@@ -1,6 +1,7 @@
 const webpack = require('webpack');
 const path = require('path');
-const tgtdir = process.env.NODE_ENV === 'development' ? 'dist' : 'dist/bundles_rel';
+//const tgtdir = process.env.NODE_ENV === 'development' ? 'dist' : 'dist/bundles_rel';
+const tgtdir = 'dist';
 let outPath = path.resolve(__dirname, tgtdir);
 
 module.exports = function (env) {

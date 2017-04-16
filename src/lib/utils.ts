@@ -96,7 +96,7 @@ export function getLinkIdFromUrl(url: Url): Dbt.linkId {
   return linkId;
 }
 
-export function linkToUrl(linkId: Dbt.linkId, desc: Dbt.linkDescription): Dbt.urlString {
+export function linkToUrl(linkId: Dbt.linkId, desc: Dbt.title): Dbt.urlString {
   let srv = parse(serverUrl);
   if (desc) desc = desc.replace(/ /g, '_');
   srv.pathname = "/link/" + linkId.toString()

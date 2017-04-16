@@ -54,8 +54,8 @@ const extensionClause = <div>
   <p>The chrome extension is an experimental implementation of an <b>Attention Economy</b></p>
   <p>The latest release can be downloaded by clicking any of these links:</p>
   <ul>
-    <li><a href="/download/pseudoq.zip" download >Zip file (Windows)</a></li>
-    <li><a href="/download/pseudoq.tar.gz" download >Tar.gz file (Linux  / Mac)</a></li>
+    <li><a href="/download/pseudoqurl.zip" download >Zip file (Windows)</a></li>
+    <li><a href="/download/pseudoqurl.tar.gz" download >Tar.gz file (Linux  / Mac)</a></li>
     <li><a href="/download/pseudoqurl.crx" download >Crx file (Chrome format)</a></li>
   </ul>
   <p>To install it you will have to unzip/untar the file into a directory, then go in to your

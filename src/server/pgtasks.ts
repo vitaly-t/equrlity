@@ -2,6 +2,8 @@
 
 import { ITask } from 'pg-promise';
 import { Url, parse, format } from 'url';
+import { LargeObjectManager } from 'pg-large-object';
+import * as concat from 'concat-stream';
 
 import * as Rpc from '../lib/rpc';
 import * as Utils from '../lib/utils';
@@ -172,7 +174,9 @@ export async function isPromoted(t: ITask<any>, userId: Dbt.userId, linkId: Dbt.
 
 export async function linkToUrl(t: ITask<any>, linkId: Dbt.linkId): Promise<Dbt.urlString> {
   let link = await retrieveRecord<Dbt.Link>(t, "links", { linkId });
-  let desc = link.linkDescription;
+  let contentId = link.contentId;
+  let cont = await retrieveRecord<Dbt.Content>(t, "contents", { contentId });
+  let desc = cont.title;
   if (desc) desc = desc.replace(/ /g, '_');
   let url = parse(Utils.serverUrl);
   url.path = "/link/" + linkId.toString() + (desc ? "#" + desc : '')
@@ -197,24 +201,31 @@ export async function deliveriesCount(t: ITask<any>, linkId: Dbt.linkId): Promis
   return parseInt(rslt.cnt);
 }
 
-export async function promoteLink(t: ITask<any>, userId: Dbt.userId, linkurl: string, linkDescription, amount: Dbt.integer): Promise<CacheUpdate[]> {
+export async function promoteLink(t: ITask<any>, userId: Dbt.userId, linkurl: string, title, content: string, amount: Dbt.integer): Promise<CacheUpdate[]> {
   let usr = await retrieveRecord<Dbt.User>(t, "users", { userId });
   if (amount > usr.credits) throw new Error("Negative balances not allowed");
   let ourl = parse(linkurl);
-  let link: Dbt.Link = null;
-  if (Utils.isPseudoQLinkURL(ourl)) {
-    let prevLink = Utils.getLinkIdFromUrl(parse(linkurl));
-    let prv = await retrieveRecord<Dbt.Link>(t, "links", { linkId: prevLink });
-    link = { ...prv, userId, prevLink, linkDescription, amount };
-  }
-  else {
-    link = { ...emptyLink(), userId, url: linkurl, linkDescription, amount };
-  }
+  let cont = OxiGen.emptyRec<Dbt.Content>(oxb.tables.get("contents"));
   let rslt: CacheUpdate[] = [];
-  link = await insertRecord<Dbt.Link>(t, "links", link);
-  console.log("inserted link: " + link.linkId);
-  rslt.push({ table: "links" as CachedTable, record: link });
-  Array.prototype.push.apply(rslt, await adjustUserBalance(t, usr, -amount));
+  cont = { ...cont, userId, title, contentType: "link", content }
+  cont = await insertRecord<Dbt.Content>(t, "contents", cont);
+  rslt.push({ table: "contents" as CachedTable, record: cont });
+  if (amount > 0) {
+    let { contentId } = cont;
+    let link: Dbt.Link = null;
+    if (Utils.isPseudoQLinkURL(ourl)) {
+      let prevLink = Utils.getLinkIdFromUrl(parse(linkurl));
+      let prv = await retrieveRecord<Dbt.Link>(t, "links", { linkId: prevLink });
+      link = { ...prv, userId, prevLink, contentId, amount };
+    }
+    else {
+      link = { ...emptyLink(), userId, url: linkurl, contentId, amount };
+    }
+    link = await insertRecord<Dbt.Link>(t, "links", link);
+    console.log("inserted link: " + link.linkId);
+    rslt.push({ table: "links" as CachedTable, record: link });
+    Array.prototype.push.apply(rslt, await adjustUserBalance(t, usr, -amount));
+  }
   return rslt;
 }
 
@@ -333,11 +344,6 @@ export async function getUserContents(t: ITask<any>, id: Dbt.userId): Promise<Rp
   return await t.any(`select "contentId","contentType",content,mime_ext,created,updated,published,title,tags from contents where "userId" = '${id}' order by updated desc`);
 }
 
-export async function getContentBody(t: ITask<any>, id: Dbt.contentId): Promise<Buffer> {
-  let rslt = await t.one(`select content from contents where "contentId" = '${id}' `);
-  return rslt.content;
-}
-
 export async function saveContent(t: ITask<any>, req: Rpc.SaveContentRequest): Promise<Dbt.Content> {
   let contentId = req.contentId;
   req.title = req.title.replace(/_/g, " ");
@@ -351,6 +357,29 @@ export async function addContent(t: ITask<any>, req: Rpc.SaveContentRequest, use
   req.title = req.title.replace(/_/g, " ");
   cont = { ...cont, ...req, userId };
   return await insertRecord<Dbt.Content>(t, "contents", cont);
+}
+
+export async function insertLargeObject(t: ITask<any>, strm: any): Promise<number> {
+  const man = new LargeObjectManager({ pgPromise: t });
+  let [oid, lo_strm] = await man.createAndWritableStreamAsync(16384)
+  strm.pipe(lo_strm);
+  await new Promise(resolve => {
+    lo_strm.on('finish', resolve);
+  });
+  return oid;
+}
+
+export async function retrieveLargeObject(t: ITask<any>, oid: number): Promise<Buffer> {
+  const man = new LargeObjectManager({ pgPromise: t });
+  let [size, lo_strm] = await man.openAndReadableStreamAsync(oid, 16384);
+  // definitely NQR - needs to be reworked
+  let outstrm = concat(gotFile)
+  let rslt: Buffer;
+  async function gotFile(blob: Buffer) { rslt = blob; };
+
+  lo_strm.pipe(outstrm);
+  await new Promise(resolve => { outstrm.on('finish', resolve); });
+  return rslt;
 }
 
 export async function registerInvitation(t: ITask<any>, ipAddress: string, linkId: Dbt.linkId): Promise<Dbt.Invitation> {
