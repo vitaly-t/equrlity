@@ -5,6 +5,7 @@ import TextareaAutosize from 'react-autosize-textarea';
 import { Button, Intent } from "@blueprintjs/core";
 
 import * as Rpc from '../lib/rpc'
+import { TagGroupEditor } from '../lib/tags';
 
 import * as Chrome from './chrome';
 import { AppState, expandedUrl, isWaiting, getLinked } from "./AppState";
@@ -34,6 +35,11 @@ export class PopupPanel extends React.Component<PopupPanelProps, PopupPanelState
     this.setState({ comment: this.ctrls.comment.value });
   }
 
+  changeTags(tags: string[]) {
+    this.setState({ tags });
+    Chrome.sendSyncMessage({ eventType: "SaveTags", tags })
+  }
+
   render() {
     let props = this.props;
     if (props.serverMessage) {
@@ -53,13 +59,10 @@ export class PopupPanel extends React.Component<PopupPanelProps, PopupPanelState
     let rspan = 9;
     let btnStyle = { marginRight: 10 };
     let rowStyle = { marginBottom: 10 };
-    let btnRow = (
-      <Row style={rowStyle} gutter={gutter} justify="end" align="top">
-        <Button style={btnStyle} onClick={() => window.close()} text="Close" />
-        <Button style={btnStyle} className="pt-intent-primary" onClick={settingsAction} text="Settings" />
-      </Row>
-    );
-
+    let btns = [
+      <Button key="Close" style={btnStyle} onClick={() => window.close()} text="Close" />,
+      <Button key="Settings" style={btnStyle} className="pt-intent-success" onClick={settingsAction} text="Settings" />
+    ]
     let pnl = <div>
       <p>No active URL found</p>
     </div>
@@ -72,7 +75,8 @@ export class PopupPanel extends React.Component<PopupPanelProps, PopupPanelState
         let amount = this.state.promoteAmount;
         let title = this.state.title;
         let comment = this.state.comment;
-        Chrome.sendMessage({ eventType: "PromoteLink", amount, title, comment });
+        let tags = this.state.tags;
+        Chrome.sendMessage({ eventType: "PromoteLink", amount, title, comment, tags });
       }
       let infoDiv = null;
       let promTxt = null;
@@ -89,13 +93,7 @@ export class PopupPanel extends React.Component<PopupPanelProps, PopupPanelState
         let costPerView = linkInfo ? linkInfo.linkDepth + 1 : 1;
         promTxt = `(= max. ${Math.floor(this.state.promoteAmount / costPerView)} promotions)`;
       }
-      btnRow = (
-        <Row style={rowStyle} gutter={gutter} justify="end" align="top">
-          <Button style={btnStyle} onClick={() => window.close()} text="Close" />
-          <Button style={btnStyle} className="pt-intent-success" onClick={settingsAction} text="Settings" />
-          <Button style={btnStyle} className="pt-intent-primary" onClick={saveaction} text={lbl} />
-        </Row>
-      );
+      btns.push(<Button key="Save" style={btnStyle} className="pt-intent-primary" onClick={saveaction} text={lbl} />);
       pnl = (<div>
         <Row style={rowStyle} gutter={gutter} align="top">
           <Col span={lspan}>Source URL : </Col>
@@ -119,8 +117,17 @@ export class PopupPanel extends React.Component<PopupPanelProps, PopupPanelState
           <Col span={rspan}><TextareaAutosize style={{ width: '100%' }} ref={(e) => this.ctrls.comment = e}
             value={this.state.comment} onChange={(e) => this.changeComment()} /></Col>
         </Row>
+        <Row style={rowStyle} gutter={gutter} align="top">
+          <Col span={lspan}>Tags:</Col>
+          <Col span={rspan}><TagGroupEditor tags={this.state.tags} allTags={this.props.appState.allTags} onChange={(tags) => this.changeTags(tags)} /></Col>
+        </Row>
       </div>);
     }
+    let btnRow = (
+      <Row style={rowStyle} gutter={gutter} justify="end" align="top">
+        {btns}
+      </Row>
+    );
     return <div>
       {pnl}
       {btnRow}

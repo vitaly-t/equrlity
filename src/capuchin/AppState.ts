@@ -2,8 +2,10 @@ import { Url, format, parse } from 'url';
 import { UserLinkItem, ContentInfoItem } from '../lib/rpc';
 import * as Dbt from '../lib/datatypes';
 import *as Utils from '../lib/utils';
+import { TagSelectOption } from '../lib/tags';
 
 export interface LinkInfo { pseudoqUrl: Url, linkDepth: number, linkPromoter: string };
+
 
 export interface AppState {
   publicKey: JsonWebKey | null;
@@ -22,6 +24,7 @@ export interface AppState {
   connectedUsers: Dbt.userName[];
   reachableUserCount: Dbt.integer;
   contents: ContentInfoItem[];
+  allTags: TagSelectOption[];
   currentContent: ContentInfoItem;  // used to pass the target content to edit from settings page to postedit page. It is ephemeral!!
 }
 
@@ -30,7 +33,7 @@ export function initState(): AppState {
   return {
     publicKey: null, privateKey: null, links: new Map<string, LinkInfo>(), redirects: new Map<string, string>(),
     activeUrl: null, moniker: 'unknown', authprov: '', email: '', credits: 0, jwt: '', lastErrorMessage: '',
-    investments: [], promotions: [], connectedUsers: [], reachableUserCount: 0, contents: [], currentContent: null
+    investments: [], promotions: [], connectedUsers: [], reachableUserCount: 0, contents: [], allTags: [], currentContent: null
   };
 }
 

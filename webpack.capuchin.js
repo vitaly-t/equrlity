@@ -57,6 +57,10 @@ module.exports = function (env) {
           }
         },
         {
+          from: 'node_modules/react-select/dist/react-select.css',
+          to: outPath
+        },
+        {
           from: 'node_modules/react-simple-flex-grid/lib/*.css',
           to: outPath
         },

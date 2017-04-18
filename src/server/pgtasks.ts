@@ -201,13 +201,13 @@ export async function deliveriesCount(t: ITask<any>, linkId: Dbt.linkId): Promis
   return parseInt(rslt.cnt);
 }
 
-export async function promoteLink(t: ITask<any>, userId: Dbt.userId, linkurl: string, title, content: string, amount: Dbt.integer): Promise<CacheUpdate[]> {
+export async function promoteLink(t: ITask<any>, userId: Dbt.userId, linkurl: string, title, content: string, amount: Dbt.integer, tags: string[]): Promise<CacheUpdate[]> {
   let usr = await retrieveRecord<Dbt.User>(t, "users", { userId });
   if (amount > usr.credits) throw new Error("Negative balances not allowed");
   let ourl = parse(linkurl);
   let cont = OxiGen.emptyRec<Dbt.Content>(oxb.tables.get("contents"));
   let rslt: CacheUpdate[] = [];
-  cont = { ...cont, userId, title, contentType: "link", content }
+  cont = { ...cont, userId, title, contentType: "link", content, tags }
   cont = await insertRecord<Dbt.Content>(t, "contents", cont);
   rslt.push({ table: "contents" as CachedTable, record: cont });
   if (amount > 0) {
@@ -216,10 +216,10 @@ export async function promoteLink(t: ITask<any>, userId: Dbt.userId, linkurl: st
     if (Utils.isPseudoQLinkURL(ourl)) {
       let prevLink = Utils.getLinkIdFromUrl(parse(linkurl));
       let prv = await retrieveRecord<Dbt.Link>(t, "links", { linkId: prevLink });
-      link = { ...prv, userId, prevLink, contentId, amount };
+      link = { ...prv, userId, prevLink, contentId, amount, tags };
     }
     else {
-      link = { ...emptyLink(), userId, url: linkurl, contentId, amount };
+      link = { ...emptyLink(), userId, url: linkurl, contentId, amount, tags };
     }
     link = await insertRecord<Dbt.Link>(t, "links", link);
     console.log("inserted link: " + link.linkId);
@@ -391,6 +391,10 @@ export async function countRecordsInTable(t: ITask<any>, tblnm: string): Promise
   if (!tbl) throw new Error("Table not known: " + tblnm);
   let rslt = await t.one("select count(*) as count from " + tblnm);
   return parseInt(rslt.count);
+}
+
+export async function saveTags(t: ITask<any>, tags: string[]): Promise<void> {
+  await t.any("insert into tags (tag) values ('" + tags.join("'),('") + "')");
 }
 
 

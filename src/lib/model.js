@@ -133,6 +133,7 @@ export default {
     "Promotion": ["linkId", "userId", "created", "updated",
       { "name": "delivered", "type": "timestamp" }
     ],
+    "Tag": ["tag", "created"],
     "User": ["userId", "publicKey", "userName", "email", "created", "updated",
       { "name": "credits", "type": "integer" },
       { "name": "groups", "type": "userGroup", "multiValued": true }
@@ -147,6 +148,10 @@ export default {
     "View": ["userId", "linkId", "created", "updated"]
   },
   "tables": {   // the order of entries here is significant.  foreign keys can only reference preceding entries
+    "tags": {
+      "rowType": "Tag",
+      "primaryKey": ["tag"]
+    },
     "users": {
       "rowType": "User",
       "primaryKey": ["userId"],

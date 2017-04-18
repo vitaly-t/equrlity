@@ -31,6 +31,11 @@ export type published = Date;
 export type userId = string;
 export type varchar_8 = string;
 
+export interface Tag {
+  readonly tag: tag | null,
+  readonly created: created | null
+};
+
 export interface User {
   readonly userId: userId | null,
   readonly publicKey: publicKey | null,

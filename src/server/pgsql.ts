@@ -113,7 +113,8 @@ export async function initCache() {
   let authRows: Array<Dbt.Auth> = await db.any("select * from auths");
   let contentRows: Array<Dbt.Content> = await db.any("select * from contents");
   let linkRows: Dbt.Link[] = await db.any('select * from links order by "linkId" ');
-  cache.init(userRows, authRows, contentRows, linkRows);
+  let tagRows: Dbt.Tag[] = await db.any('select * from tags order by tag');
+  cache.init(userRows, authRows, contentRows, linkRows, tagRows);
 }
 
 export async function createDataTables() {
@@ -359,7 +360,8 @@ export async function createUser(email?: string): Promise<Dbt.User> {
   return user;
 };
 
-async function _handlePromoteContent(t: ITask<any>, userId, { publicKey, contentId, signature, amount }): Promise<[cache.CacheUpdate[], Rpc.PromoteContentResponse]> {
+async function _handlePromoteContent(t: ITask<any>, userId, req: Rpc.PromoteContentRequest): Promise<[cache.CacheUpdate[], Rpc.PromoteContentResponse]> {
+  let { publicKey, contentId, signature, amount, tags } = req;
   let usr = await tasks.retrieveRecord<Dbt.User>(t, "users", { userId });
   if (amount > usr.credits) throw new Error("Negative balances not allowed");
   let cont = await tasks.retrieveRecord<Dbt.Content>(t, "contents", { contentId });
@@ -367,15 +369,15 @@ async function _handlePromoteContent(t: ITask<any>, userId, { publicKey, content
   let links = await tasks.getRootLinksForContentId(t, contentId);
   if (links.length > 0) throw new Error("Content already promoted");
   let url = Utils.contentToUrl(contentId);
-  let updts = await tasks.promoteLink(t, userId, url, cont.title, cont.content, amount);
+  let updts = await tasks.promoteLink(t, userId, url, cont.title, cont.content, amount, tags);
   let link = updts.find(e => e.table === "links" as cache.CachedTable).record;
   await _promoteLink(t, link, amount);
   let rsp: Rpc.PromoteContentResponse = { url };
   return [updts, rsp];
 }
 
-export async function handlePromoteContent(userId, { publicKey, contentId, signature, amount }): Promise<Rpc.PromoteContentResponse> {
-  let pr = await db.tx(t => _handlePromoteContent(t, userId, { publicKey, contentId, signature, amount }));
+export async function handlePromoteContent(userId, req: Rpc.PromoteContentRequest): Promise<Rpc.PromoteContentResponse> {
+  let pr = await db.tx(t => _handlePromoteContent(t, userId, req));
   let updts: cache.CacheUpdate[] = pr[0];
   let rsp: Rpc.PromoteContentResponse = pr[1];
   cache.update(updts);
@@ -383,12 +385,13 @@ export async function handlePromoteContent(userId, { publicKey, contentId, signa
 }
 
 async function _handlePromoteLink(t: ITask<any>, userId, req: Rpc.PromoteLinkRequest): Promise<[cache.CacheUpdate[], Rpc.PromoteLinkResponse]> {
-  let { publicKey, url, signature, title, comment, amount } = req;
+  let { publicKey, url, signature, title, comment, amount, tags } = req;
   let ourl = parse(url);
   let linkId = 0;
   let link = null;
   let linkDepth = 0;
   let rslt: cache.CacheUpdate[] = [];
+  saveTags(tags);
   if (Utils.isPseudoQLinkURL(ourl)) {
     linkId = Utils.getLinkIdFromUrl(ourl);
     link = cache.links.get(linkId);
@@ -402,12 +405,12 @@ async function _handlePromoteLink(t: ITask<any>, userId, req: Rpc.PromoteLinkReq
       cache.connectUsers(userId, link.userId);
       let prevId = await tasks.getLinkAlreadyInvestedIn(t, userId, url);
       if (prevId) throw new Error("user has previously invested in this content");
-      rslt = await tasks.promoteLink(t, userId, url, title, comment, amount);
+      rslt = await tasks.promoteLink(t, userId, url, title, comment, amount, tags);
       linkDepth += 1;
     }
   }
   else {
-    rslt = await tasks.promoteLink(t, userId, url, title, comment, amount);
+    rslt = await tasks.promoteLink(t, userId, url, title, comment, amount, tags);
   }
   if (amount == 0) return [rslt, { linkDepth: -1 }];
 
@@ -455,10 +458,12 @@ export async function getUserContents(id: Dbt.userId): Promise<Rpc.ContentInfoIt
 }
 
 export async function saveContent(req: Rpc.SaveContentRequest): Promise<Dbt.Content> {
+  saveTags(req.tags)
   return await db.task(t => tasks.saveContent(t, req));
 }
 
 export async function addContent(req: Rpc.SaveContentRequest, userId: Dbt.userId): Promise<Dbt.Content> {
+  saveTags(req.tags)
   return await db.task(t => tasks.addContent(t, req, userId));
 }
 
@@ -495,3 +500,10 @@ export async function retrieveBlobContent(contentId: Dbt.contentId): Promise<Buf
     return await tasks.retrieveLargeObject(t, blobId);
   });
 }
+
+export async function saveTags(tags: Dbt.tag[]): Promise<Dbt.tag[]> {  // return list of tags added
+  let newtags = tags.filter(t => !cache.tags.has(t));
+  if (newtags.length > 0) await db.task(t => tasks.saveTags(t, newtags));
+  return newtags;
+}
+

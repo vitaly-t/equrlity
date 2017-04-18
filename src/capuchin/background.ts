@@ -2,6 +2,7 @@ import * as localForage from "localforage";
 
 import * as Crypto from '../lib/Crypto'
 import * as Utils from '../lib/utils';
+import { mergeTags } from '../lib/tags';
 
 import { AppState, initState, expandedUrl, isSeen, setLoading, setWaiting, getRedirectUrl, prepareUrl, preSerialize } from './AppState';
 
@@ -40,10 +41,11 @@ function getChromeAccessToken(): Promise<string> {
 
 let settingsTabId = -1;
 function createSettingsTab(): Promise<chrome.tabs.Tab> {
-  return new Promise(resolve => {
+  return new Promise((resolve, reject) => {
     chrome.tabs.create({ 'url': chrome.extension.getURL('settings.html'), 'selected': true }, t => {
       if (t.id) settingsTabId = t.id;
-      return t;
+      if (chrome.runtime.lastError) reject(chrome.runtime.lastError.message)
+      else resolve(t);
     });
   });
 }
@@ -81,7 +83,7 @@ chrome.runtime.onMessage.addListener((message, sender, cb) => {
 });
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  console.log("status: " + changeInfo.status + ", url: " + changeInfo.url);
+  //console.log("status: " + changeInfo.status + ", url: " + changeInfo.url);
   if (changeInfo.status == "loading" && changeInfo.url) {
     handleAsyncMessage({ eventType: "Load", url: changeInfo.url });
   }
@@ -160,11 +162,12 @@ export async function handleAsyncMessage(event: Message) {
             chrome.tabs.highlight({ windowId: tab.windowId, tabs: tab.index }, w => {
               chrome.windows.update(tab.windowId, { focused: true });
             });
-            return;
           }
-          catch (e) { }
+          catch (e) {
+            settingsTabId = -1;
+          }
         }
-        await createSettingsTab();
+        if (settingsTabId < 0) await createSettingsTab();
         fn = await AsyncHandlers.getUserLinks(st);
         break;
       case "GetUserLinks": {
@@ -225,6 +228,10 @@ export function handleMessage(event: Message, async: boolean = false): AppState 
       case "LaunchContentEditPage":
         chrome.tabs.create({ 'url': chrome.extension.getURL('content.html'), 'selected': true });
         st = { ...st, currentContent: event.info };
+        break;
+      case "SaveTags":
+        let allTags = mergeTags(event.tags, st.allTags);
+        if (allTags != st.allTags) st = { ...st, allTags };
         break;
       default:
         throw new Error("Unknown eventType: " + event.eventType);

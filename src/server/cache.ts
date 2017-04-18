@@ -12,14 +12,15 @@ export const auths = new Map<Dbt.authId, Dbt.Auth>();
 export const contents = new Map<Dbt.contentId, Dbt.Content>();
 export const links = new Map<Dbt.linkId, Dbt.Link>();
 export const userlinks = new Map<Dbt.userId, Dbt.userId[]>();
+export const tags = new Set<Dbt.tag>();
 
-export type CachedTable = "users" | "auths" | "contents" | "links";
+export type CachedTable = "users" | "auths" | "contents" | "links" | "tags";
 
 export type CacheUpdate = { table: CachedTable; record: any; remove?: boolean };
 
 let domain = ''
 
-export function init(userRows, authRows, contentRows, linkRows, ) {
+export function init(userRows, authRows, contentRows, linkRows, tagRows) {
   console.log("cache init called");
   let url = parse(Utils.serverUrl);
   domain = url.host;
@@ -34,9 +35,10 @@ export function init(userRows, authRows, contentRows, linkRows, ) {
   contentRows.forEach(r => contents.set(r.contentId, r));
 
   links.clear();
-  linkRows.forEach(r => {
-    links.set(r.linkId, r);
-  });
+  linkRows.forEach(r => links.set(r.linkId, r));
+
+  tags.clear();
+  tagRows.forEach(r => tags.add(r.tag));
 
   if (Utils.isDev()) {  // connect all users
     let ids = Array.from(users.keys());

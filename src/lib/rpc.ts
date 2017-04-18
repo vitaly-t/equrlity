@@ -76,6 +76,7 @@ export type InitializeRequest = {
 
 export type InitializeResponse = {
   ok: boolean;
+  allTags: string[];
   redirectUrl?: UrlString;
 }
 
@@ -85,6 +86,7 @@ export type PromoteContentRequest = {
   amount: Integer;
   publicKey: JsonWebKey;
   signature: string;
+  tags?: string[];
 }
 
 export type PromoteContentResponse = {

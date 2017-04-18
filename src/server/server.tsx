@@ -432,7 +432,8 @@ router.post('/rpc', async function (ctx: any) {
         let usr = getUser(userId);
         if (!usr) throw new Error("Internal error getting user details");
         let redirectUrl = ctx['redirectUrl'];
-        let result: Rpc.InitializeResponse = { ok: true, redirectUrl };
+        let allTags = Array.from(cache.tags);
+        let result: Rpc.InitializeResponse = { ok: true, allTags, redirectUrl };
         ctx.body = { id, result };
         break;
       }

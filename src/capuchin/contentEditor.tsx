@@ -88,7 +88,7 @@ export class ContentEditor extends React.Component<ContentProps, ContentState> {
           </div>
           <div style={rowStyle} >
             <span style={lhcolStyle}>Tags: </span>
-            <TagGroupEditor tags={this.state.tags} removeTag={lbl => this.removeTag(lbl)} />
+            <TagGroupEditor tags={this.state.tags} allTags={this.props.appState.allTags} onChange={tags => this.setState({ tags })} />
           </div>
           <div style={rowStyle} >
             <Button key='review' className="pt-intent-primary" style={btnStyle} onClick={() => this.stopEdit()} text="Save" />

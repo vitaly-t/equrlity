@@ -7,6 +7,7 @@ import { AxiosResponse } from 'axios';
 import * as Rpc from '../lib/rpc';
 import * as Dbt from '../lib/datatypes';
 import * as Utils from '../lib/utils';
+import { TagSelectOption } from '../lib/tags';
 
 export interface PromoteContent {
   eventType: "PromoteContent";
@@ -87,17 +88,24 @@ export interface DismissPromotion {
   url: Dbt.urlString;
 }
 
+export interface SaveTags {
+  eventType: "SaveTags";
+  tags: string[];
+}
 export interface Thunk {
   eventType: "Thunk";
   fn: (st: AppState) => AppState;
 }
 
 export type Message = PromoteContent | PromoteLink | Initialize | Load | ActivateTab | Render | ChangeSettings | LaunchSettingsPage
-  | LaunchContentEditPage | SaveContent | RemoveContent | CreatePost | RedeemLink | GetUserLinks | DismissPromotion | TransferCredits | Thunk;
+  | LaunchContentEditPage | SaveContent | RemoveContent | CreatePost | RedeemLink | GetUserLinks | DismissPromotion | TransferCredits | SaveTags | Thunk;
 
 export function getTab(tabId: number): Promise<chrome.tabs.Tab> {
-  return new Promise(resolve => {
-    chrome.tabs.get(tabId, t => resolve(t));
+  return new Promise((resolve, reject) => {
+    chrome.tabs.get(tabId, t => {
+      if (chrome.runtime.lastError) reject(chrome.runtime.lastError.message);
+      else resolve(t)
+    });
   });
 }
 
@@ -155,9 +163,9 @@ export namespace AsyncHandlers {
     let thunk = (st: AppState) => {
       st = extractHeadersToState(st, rsp);
       let rslt: Rpc.InitializeResponse = extractResult(rsp);
-
+      let allTags: TagSelectOption[] = rslt.allTags.map(t => { return { value: t, label: t }; });
       if (rslt.redirectUrl) chrome.tabs.update(activeTab.id, { url: rslt.redirectUrl });
-      return { ...st, activeTab }
+      return { ...st, allTags, activeTab }
     }
     return thunk;
   }
@@ -264,9 +272,8 @@ export namespace AsyncHandlers {
       console.log("redirecting to: " + tgt);
       chrome.tabs.update(tab.id, { url: tgt });
     }
-    if (isSeen(state, curl)) return (st => { return { ...st, activeUrl: curl }; });
-    if (Utils.isPseudoQLinkURL(parse(curl))) return await getRedirect(state, curl)
-    return (st: AppState) => st;
+    if (!isSeen(state, curl) && Utils.isPseudoQLinkURL(parse(curl))) return await getRedirect(state, curl)
+    return (st => { return { ...st, activeUrl: curl }; });
     /*
     let response = await Comms.sendLoadLink(state, curl);
     let thunk = (st: AppState) => {
