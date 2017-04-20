@@ -10,7 +10,6 @@ import { TagGroupEditor } from '../lib/tags';
 import * as Chrome from './chrome';
 import { AppState, expandedUrl, isWaiting, getLinked } from "./AppState";
 
-
 export interface PopupPanelProps { appState?: AppState; serverMessage?: string };
 export interface PopupPanelState { promoteAmount: number, title: string, comment: string, tags: string[] };
 
@@ -134,3 +133,4 @@ export class PopupPanel extends React.Component<PopupPanelProps, PopupPanelState
     </div >
   }
 }
+

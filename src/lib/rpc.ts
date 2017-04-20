@@ -62,7 +62,7 @@ import * as Dbt from './datatypes';
 
 //TODO: rename "getUserLinks" to "loadSettingsPage"
 export type Method = "initialize" | "authenticate" | "promoteContent" | "promoteLink" | "loadLink" | "getRedirect" | "changeSettings"
-  | "getUserLinks" | "redeemLink" | "getPostBody" | "saveContent" | "removeContent" | "transferCredits";
+  | "getUserLinks" | "redeemLink" | "getPostBody" | "saveContent" | "saveLink" | "removeContent" | "transferCredits";
 
 /**
  * Informational type tags used to indicate intended usage.
@@ -82,15 +82,14 @@ export type InitializeResponse = {
 
 export type PromoteContentRequest = {
   contentId: Dbt.contentId;
-  linkDescription: string;
+  title: string;
+  comment: string;
   amount: Integer;
-  publicKey: JsonWebKey;
-  signature: string;
   tags?: string[];
 }
 
 export type PromoteContentResponse = {
-  url: Dbt.urlString | null;
+  link: Dbt.Link;
 }
 
 export type PromoteLinkRequest = {
@@ -104,11 +103,8 @@ export type PromoteLinkRequest = {
 }
 
 export type PromoteLinkResponse = {
-  link?: UrlString;
+  link: Dbt.Link;
   linkDepth: Integer;
-  prevLink?: UrlString;
-  linkPromoter?: string;
-  contents?: ContentInfoItem[];
 }
 
 export type LoadLinkRequest = {
@@ -146,46 +142,25 @@ export type GetUserLinksResponse = {
   promotions: Dbt.urlString[];
   connectedUsers: Dbt.userName[];
   reachableUserCount: Dbt.integer;
-  contents: ContentInfoItem[];
+  contents: Dbt.Content[];
+  allTags: string[];
 }
 
 export type UserLinkItem = {
-  linkId: Dbt.linkId;
-  contentUrl: Dbt.urlString;
-  info: ContentInfoItem;
+  link: Dbt.Link;
   linkDepth: Dbt.integer;
   viewCount: Dbt.integer;
   promotionsCount: Dbt.integer;
   deliveriesCount: Dbt.integer;
-  amount: Dbt.integer;
 }
 
-export type ContentInfoItem = {
-  contentId: Dbt.contentId;
-  contentType: Dbt.contentType;
-  content: string;
-  mime_ext: string;
-  title: string;
-  tags: string[];
-  published: Dbt.timestamp;
-  created: Dbt.created;
-  updated: Dbt.updated;
-};
+export type SaveContentRequest = { content: Dbt.Content; }
 
-export type SaveContentRequest = {
-  contentId: Dbt.contentId;
-  contentType: Dbt.contentType;
-  mime_ext: string;
-  title: string;
-  content?: string;
-  tags: string[];
-  publish: boolean;
-  investment?: Dbt.integer;
-}
+export type SaveContentResponse = { content: Dbt.Content; }
 
-export type SaveContentResponse = {
-  contents: ContentInfoItem[];
-};
+export type SaveLinkRequest = { link: Dbt.Link; }
+
+export type SaveLinkResponse = { link: Dbt.Link; }
 
 export type RedeemLinkRequest = { linkId: Dbt.linkId; }
 
@@ -204,17 +179,17 @@ export type AuthenticateRequest = { provider: string }
 export type AuthenticateResponse = { ok: boolean; }
 
 export type RequestBody = PromoteContentRequest | PromoteLinkRequest | InitializeRequest | LoadLinkRequest | GetRedirectRequest | ChangeSettingsRequest
-  | GetUserLinksRequest | RedeemLinkRequest | RemoveContentRequest | TransferCreditsRequest | AuthenticateRequest;
+  | GetUserLinksRequest | RedeemLinkRequest | SaveLinkRequest | SaveContentRequest | RemoveContentRequest | TransferCreditsRequest | AuthenticateRequest;
 
 export type ResponseBody = PromoteContentResponse & PromoteLinkResponse & InitializeResponse & LoadLinkResponse & GetRedirectResponse & ChangeSettingsResponse
-  & GetUserLinksResponse & RedeemLinkResponse & RemoveContentResponse & TransferCreditsResponse & AuthenticateResponse;
+  & GetUserLinksResponse & RedeemLinkResponse & SaveLinkResponse & SaveContentResponse & RemoveContentResponse & TransferCreditsResponse & AuthenticateResponse;
 
 // internal to server.
 export type RecvRequestBody = PromoteContentRequest & PromoteLinkRequest & InitializeRequest & LoadLinkRequest & GetRedirectRequest & ChangeSettingsRequest
-  & GetUserLinksRequest & RedeemLinkRequest & RemoveContentRequest & TransferCreditsRequest & AuthenticateRequest;
+  & GetUserLinksRequest & RedeemLinkRequest & SaveLinkRequest & SaveContentRequest & RemoveContentRequest & TransferCreditsRequest & AuthenticateRequest;
 
 export type SendResponseBody = PromoteContentResponse | PromoteLinkResponse | InitializeResponse | LoadLinkResponse | GetRedirectResponse | ChangeSettingsResponse
-  | GetUserLinksResponse | RedeemLinkResponse | RemoveContentResponse | TransferCreditsResponse | AuthenticateResponse;
+  | GetUserLinksResponse | RedeemLinkResponse | SaveLinkResponse | SaveContentResponse | RemoveContentResponse | TransferCreditsResponse | AuthenticateResponse;
 
 export type Handler<Request, Response> = (req: Request) => Promise<Response>;
 

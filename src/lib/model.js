@@ -113,21 +113,24 @@ export default {
     "blobId": "integer",
     "contentId": "integer",
     "contentCryptId": "binary",
+    "isPublic": "boolean",
     "publicKey": "binary",
     "published": "timestamp",
     "userId": "uuid",
+    "viewId": "integer",
   },
   "tupleTypes": {
     "Auth": ["authProvider", "authId", "userId", "created", "updated"],
-    "Content": ["contentId", "contentType", "title", "userId", "blobId", "content", "created", "updated", "published",
+    "Content": ["contentId", "contentType", "title", "userId", "blobId", "content", "created", "updated", "published", "isPublic",
       { "name": "mime_ext", "type": "varchar(8)" },
       { "name": "tags", "type": "tag", "multiValued": true },
       { "name": "cryptHash", "type": "binary" },
     ],
     "Invitation": ["ipAddress", "linkId", "created", "updated"],
-    "Link": ["linkId", "userId", "contentId",
-      { "name": "url", "type": "urlString" },
+    "Link": ["linkId", "userId", "contentId", "title", "created", "updated",
+      { "name": "comment", "type": "text" },
       { "name": "prevLink", "type": "linkId" },
+      { "name": "tags", "type": "tag", "multiValued": true },
       { "name": "amount", "type": "integer" },
     ],
     "Promotion": ["linkId", "userId", "created", "updated",
@@ -145,7 +148,8 @@ export default {
       "created",
       "updated",
     ],
-    "View": ["userId", "linkId", "created", "updated"]
+    "View": ["viewId", "userId", "linkId", "created"],
+    "ContentView": ["viewId", "userId", "contentId", "linkId", "ipAddress", "created"],
   },
   "tables": {   // the order of entries here is significant.  foreign keys can only reference preceding entries
     "tags": {
@@ -194,7 +198,6 @@ export default {
         { "ref": "contents", "columns": ["contentId"] },
         { "ref": "links", "columns": ["prevLink"] },
       ],
-      "uniques": [["url", "userId"]],
     },
     "invitations": {
       "rowType": "Invitation",
@@ -215,11 +218,20 @@ export default {
     },
     "views": {
       "rowType": "View",
-      "primaryKey": ["userId", "linkId"],
-      "updated": "updated",
+      "primaryKey": ["viewId"],
+      "autoIncrement": "viewId",
       "foreignKeys": [
         { "ref": "users", "columns": ["userId"] },
         { "ref": "links", "columns": ["linkId"], "onDelete": "CASCADE" },
+      ],
+    },
+    "contentviews": {
+      "rowType": "ContentView",
+      "primaryKey": ["viewId"],
+      "autoIncrement": "viewId",
+      "foreignKeys": [
+        { "ref": "users", "columns": ["userId"] },
+        { "ref": "contents", "columns": ["contentId"], "onDelete": "CASCADE" },
       ],
     }
   }

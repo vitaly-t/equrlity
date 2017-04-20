@@ -23,7 +23,7 @@ export const rowStyle = { width: '100%', marginTop: 2, marginLeft: 5, padding: 6
 export const btnStyle = { height: '24', marginTop: 2, marginLeft: 5, marginRight: 5, display: 'inline-block' };
 export const lhcolStyle = { width: '20%' };
 
-interface ContentViewProps { info: Rpc.ContentInfoItem, creator: string };
+interface ContentViewProps { info: Dbt.Content, creator: string };
 interface ContentViewState { };
 
 export class ContentView extends React.Component<ContentViewProps, ContentViewState> {

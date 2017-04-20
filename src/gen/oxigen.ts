@@ -1,5 +1,6 @@
-import * as fs from "fs";
 import json from '../lib/model.js';
+
+export const dbSchema = loadModel(json)
 
 export type FK_Action = "NO ACTION" | "RESTRICT" | "CASCADE" | "SET NULL" | "SET_DEFAULT";
 
@@ -211,7 +212,7 @@ export function genUpsertStatement(tbl: ITable, data: Object = null): string {
 
 export function genTypescriptType(tbl: ITable): string {
   let lns = tbl.rowType.heading.map(c => {
-    return "\n  readonly " + c.name + ": " + c.type.name + (c.multiValued ? '[]' : '') + (c.notNull ? '' : ' | null')
+    return "\n  readonly " + c.name + ": " + c.type.name + (c.multiValued ? '[]' : '') + (c.notNull ? '' : ' | null');
   });
   return "export interface " + tbl.rowType.name + " {" + lns.join() + "\n};";
 }
@@ -237,34 +238,6 @@ export function genCreateTableStatement(tbl: ITable): string {
   return stmt;
 }
 
-export function writeTypescriptTypesToFile(db: IDbSchema, fname: string): void {
-  let strm = fs.createWriteStream(fname, { flags: 'w', encoding: 'utf8' });
-  strm.write("// This file is generated - it should not be edited\n\n");
-  strm.on('finish', () => strm.close());
-  db.dataTypes.forEach(t => {
-    let typ = t.enum ? t.enum.map(s => '"' + s + '"').join(" | ")
-      : (t.tsType || "string")
-    if (t.name !== typ) strm.write("\nexport type " + t.name + " = " + typ + ";");
-  })
-  strm.write("\n\n");
-
-  db.tables.forEach(t => {
-    let ts = genTypescriptType(t);
-    strm.write(ts + "\n\n");
-  })
-  strm.end("// end of generated types");
-}
-
-export function writeTableCreateStatementsToFile(db: IDbSchema, fname: string): void {
-  let strm = fs.createWriteStream(fname, { flags: 'w', encoding: 'utf8' });
-  strm.write("-- This file is generated - it (probably) should not be edited\n\n");
-  strm.on('finish', () => strm.close());
-  db.tables.forEach(t => {
-    strm.write(genCreateTableStatement(t) + "\n");
-  })
-  strm.end("-- end of generated text");
-}
-
 export function defaultValue(typ: IScalarType): any {
   if (typ.enum) return [];
   switch (typ.name) {
@@ -275,11 +248,11 @@ export function defaultValue(typ: IScalarType): any {
   }
 }
 
-export function emptyRec<T>(tbl: ITable): T {
+export function emptyRec<T>(tblnm: string): T {
+  let tbl = dbSchema.tables.get(tblnm);
   let rslt = Object.create(null);
   tbl.rowType.heading.forEach(c => rslt[c.name] = undefined);
   return rslt;
 }
 
-export const dbSchema = loadModel(json)
 

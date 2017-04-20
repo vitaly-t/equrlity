@@ -36,6 +36,7 @@ export function mergeTags(tags: string[], _allTags: TagSelectOption[]): TagSelec
 interface TagGroupProps { tags: string[] }
 export class TagGroup extends React.Component<TagGroupProps, {}> {
   render() {
+    if (!this.props.tags) return null;
     let tags = this.props.tags.map(label => <Tag className="pt-minimal pt-round" key={'tag:' + label} > {label}</Tag>);
     return <div>{tags}</div>
   }

@@ -1,8 +1,9 @@
+import * as OxiGen from '../gen/oxigen';
+
 import * as Utils from "../lib/utils";
 import { Url, parse } from 'url';
 import * as Rpc from '../lib/rpc';
 import * as Dbt from '../lib/datatypes'
-import * as OxiGen from '../lib/oxigen';
 import * as uuid from '../lib/uuid';
 
 // ahem ... cache (almost) the whole db in memory 
@@ -132,8 +133,9 @@ export function getLinkDepth(link: Dbt.Link): Dbt.integer {
 
 export function getContentFromLinkId(linkId: Dbt.linkId): Dbt.urlString | null {
   let link = links.get(linkId);
-  if (!link) return null;
-  return link.url;
+  let cont = contents.get(link.contentId);
+  if (cont.contentType === "link") return cont.title;
+  return Utils.contentToUrl(cont.contentId);
 }
 
 export function linkToUrl(linkId: Dbt.linkId): Dbt.urlString {

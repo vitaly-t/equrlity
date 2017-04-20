@@ -14,6 +14,7 @@ module.exports = function (env) {
       background: './src/capuchin/background.ts',
       settings: './src/capuchin/settings.tsx',
       content: './src/capuchin/contentEditor.tsx',
+      link: './src/capuchin/linkEditor.tsx',
     },
     output: {
       path: outPath,

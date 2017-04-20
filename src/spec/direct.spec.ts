@@ -1,13 +1,15 @@
 "use strict";
 
 import * as fs from "fs"
-import { Url, parse } from 'url';
+import { Url, parse, format } from 'url';
 import { it } from 'jasmine-promise-wrapper';
 import { TextEncoder, TextDecoder } from 'text-encoding';
 
 import * as Dbt from '../lib/datatypes'
 import * as Rpc from '../lib/rpc';
 import * as Utils from '../lib/utils';
+import * as Crypto from '../lib/crypto';
+
 Utils.setTest(true);  // Not sure this is kosher ...
 
 import * as pg from '../server/pgsql';
@@ -33,26 +35,26 @@ it("should work using direct calls", async () => {
   let u4 = await pg.createUser();
   expect(u4.userName).toEqual("anonymous_3", "not the fourth user");
 
-  let rsp1 = await pg.handlePromoteLink(u1.userId, { publicKey: "", url: "https://www.example.com/anydamnthing", signature: "", linkDescription: "wow awesome link", amount: 10 });
+  let pr = await Crypto.generateKeyPair();
+  let publicKey = await Crypto.getPublicKeyJWK(pr);
+
+  let preq1: Rpc.PromoteLinkRequest = { publicKey, comment: "great comment", tags: [], url: "https://www.example.com/anydamnthing", signature: "", title: "wow awesome link", amount: 10 };
+  let rsp1 = await pg.handlePromoteLink(u1.userId, preq1);
   let ok = rsp1 as Rpc.PromoteLinkResponse;
   expect(ok.link).toBeDefined("promote link call failed");
   expect(cache.users.get(u1.userId).credits).toEqual(990);
   expect(await countLinks()).toEqual(1);
 
-  let url = parse(ok.link);
-  let linkId1 = Utils.getLinkIdFromUrl(url);
-  let link1 = cache.links.get(linkId1);
+  let link1 = cache.links.get(ok.link.linkId);
   expect(link1).toBeDefined("cache error on link1");
 
-  let rsp2 = await pg.handlePromoteLink(u2.userId, { publicKey: "", url: ok.link, signature: "", linkDescription: "promote me baby", amount: 20 });
+  let preq2: Rpc.PromoteLinkRequest = { publicKey, comment: "another great comment", tags: [], url: Utils.linkToUrl(ok.link.linkId, ''), signature: "", title: "promote me baby", amount: 10 };
+  let rsp2 = await pg.handlePromoteLink(u2.userId, preq2);
   expect(await countLinks()).toEqual(2);
   let rspt = rsp2 as Rpc.PromoteLinkResponse
   expect(rspt.link).toBeDefined("promote call failed");
   expect(cache.users.get(u2.userId).credits).toEqual(980);
-  let url2 = parse(rspt.link);
-  expect(Utils.isPseudoQLinkURL(url2)).toEqual(true);
-  let linkId2 = Utils.getLinkIdFromUrl(url2);
-  expect(cache.getChainFromLinkId(linkId2).length).toEqual(2, "link not chained");
+  expect(cache.getChainFromLinkId(rspt.link.linkId).length).toEqual(2, "link not chained");
 
   // test social graph updated
   expect(cache.userlinks.get(u1.userId).length).toEqual(1);
@@ -62,13 +64,13 @@ it("should work using direct calls", async () => {
   expect(cache.userlinks.has(u3.userId)).toEqual(false);
 
   {  // new let namespace
-    let content = "https://www.example.com/somethingelse";
-    let rsp = await pg.handlePromoteLink(u1.userId, { publicKey: "", url: content, signature: "", linkDescription: "yaal", amount: 10 });
+    let preq3: Rpc.PromoteLinkRequest = { publicKey, comment: "groovy", tags: [], url: "https://www.example.com/somethingelse", signature: "", title: "yaa!!", amount: 10 };
+    let rsp = await pg.handlePromoteLink(u1.userId, preq3);
     expect(await countLinks()).toEqual(3);
 
     let ok = rsp as Rpc.PromoteLinkResponse;
     expect(ok.link).toBeDefined("add handlePomoteLink call failed");
-    let url = parse(ok.link);
+    let url = parse(Utils.linkToUrl(ok.link.linkId, ok.link.title));
     expect(Utils.isPseudoQURL(url)).toEqual(true);
     expect(Utils.isPseudoQLinkURL(url)).toEqual(true);
     let linkId = Utils.getLinkIdFromUrl(url);
@@ -86,26 +88,27 @@ it("should work using direct calls", async () => {
     expect(cache.links.get(linkId).amount).toEqual(linkbal - 1, "link amount not adjusted for view");
 
     expect(cache.userlinks.get(u1.userId).length).toEqual(1, "social graph not correct");
-    let rsp2 = await pg.handlePromoteLink(u3.userId, { publicKey: "", url: ok.link, signature: "", linkDescription: "yaal2", amount: 10 });
+    let preq4: Rpc.PromoteLinkRequest = { publicKey, comment: "groovy baby", tags: [], url: format(url), signature: "", title: "yaa2  !!", amount: 10 };
+    let rsp2 = await pg.handlePromoteLink(u3.userId, preq4);
     let ok2 = rsp2 as Rpc.PromoteLinkResponse;
     expect(ok2.link).toBeDefined("Promote call failed");
     expect(cache.userlinks.get(u1.userId).length).toEqual(2, "social graph not extended");
     {
-      let url = parse(ok2.link);
-      let linkId2 = Utils.getLinkIdFromUrl(url);
       let bal = cache.links.get(linkId).amount;
-      expect(cache.getChainFromLinkId(linkId2).length).toEqual(2, "link not chained");
+      expect(cache.getChainFromLinkId(ok2.link.linkId).length).toEqual(2, "link not chained");
 
       // user4 views promoted link
-      await pg.payForView(u4.userId, linkId2);
+      await pg.payForView(u4.userId, ok2.link.linkId);
       let newbal = cache.links.get(linkId).amount;
       expect(newbal).toEqual(bal + 1, "incorrect payment for chained view");
     }
 
     // redeem link  testing - particularly re-grafting..
-    let rsp3 = await pg.handlePromoteLink(u4.userId, { publicKey: "", url: ok.link, signature: "", linkDescription: "yaal3", amount: 10 });
+    let preq5: Rpc.PromoteLinkRequest = { publicKey, comment: "groovy baby", tags: [], url: Utils.linkToUrl(ok.link.linkId, ''), signature: "", title: "yaal3!!", amount: 10 };
+    let rsp3 = await pg.handlePromoteLink(u4.userId, preq5);
     let ok3 = rsp3 as Rpc.PromoteLinkResponse;
     expect(ok3.link).toBeDefined("promote call failed");
+
     {
       let bal = cache.users.get(u1.userId).credits;
       let link = cache.links.get(linkId);
@@ -113,7 +116,7 @@ it("should work using direct calls", async () => {
       await pg.redeemLink(link);
       let newbal = cache.users.get(u1.userId).credits;
       expect(bal + linkbal).toEqual(newbal, "link balance not redeemed");
-      let rootLinks = await pg.getRootLinksForUrl(content);
+      let rootLinks = await pg.getRootLinksForContentId(link.contentId);
       expect(rootLinks.length).toEqual(2);
     }
 

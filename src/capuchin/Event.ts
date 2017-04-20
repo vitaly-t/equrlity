@@ -52,7 +52,12 @@ export interface LaunchSettingsPage {
 
 export interface LaunchContentEditPage {
   eventType: "LaunchContentEditPage";
-  info: Rpc.ContentInfoItem;
+  info: Dbt.Content;
+}
+
+export interface LaunchLinkEditPage {
+  eventType: "LaunchLinkEditPage";
+  link: Dbt.Link;
 }
 
 export interface SaveContent {
@@ -63,6 +68,11 @@ export interface SaveContent {
 export interface RemoveContent {
   eventType: "RemoveContent";
   req: Rpc.RemoveContentRequest;
+}
+
+export interface SaveLink {
+  eventType: "SaveLink";
+  req: Rpc.SaveLinkRequest;
 }
 
 export interface TransferCredits {
@@ -98,7 +108,8 @@ export interface Thunk {
 }
 
 export type Message = PromoteContent | PromoteLink | Initialize | Load | ActivateTab | Render | ChangeSettings | LaunchSettingsPage
-  | LaunchContentEditPage | SaveContent | RemoveContent | CreatePost | RedeemLink | GetUserLinks | DismissPromotion | TransferCredits | SaveTags | Thunk;
+  | LaunchContentEditPage | LaunchLinkEditPage | SaveContent | RemoveContent | CreatePost | RedeemLink | GetUserLinks | DismissPromotion | TransferCredits
+  | SaveTags | SaveLink | Thunk;
 
 export function getTab(tabId: number): Promise<chrome.tabs.Tab> {
   return new Promise((resolve, reject) => {
@@ -107,6 +118,11 @@ export function getTab(tabId: number): Promise<chrome.tabs.Tab> {
       else resolve(t)
     });
   });
+}
+
+export function loadTags(tags: string[]): TagSelectOption[] {
+  let rslt: TagSelectOption[] = tags.map(t => { return { value: t, label: t }; });
+  return rslt;
 }
 
 function updateTab(tabId: number, props: chrome.tabs.UpdateProperties): Promise<chrome.tabs.Tab> {
@@ -163,29 +179,53 @@ export namespace AsyncHandlers {
     let thunk = (st: AppState) => {
       st = extractHeadersToState(st, rsp);
       let rslt: Rpc.InitializeResponse = extractResult(rsp);
-      let allTags: TagSelectOption[] = rslt.allTags.map(t => { return { value: t, label: t }; });
+      let allTags = loadTags(rslt.allTags);
       if (rslt.redirectUrl) chrome.tabs.update(activeTab.id, { url: rslt.redirectUrl });
       return { ...st, allTags, activeTab }
     }
     return thunk;
   }
 
-  export async function promoteContent(state: AppState, contentId: Dbt.contentId, linkDescription: string, amount: number): Promise<(st: AppState) => AppState> {
-    let response = await Comms.sendPromoteContent(state, contentId, linkDescription, amount)
+  export async function promoteContent(state: AppState, req: Rpc.PromoteContentRequest): Promise<(st: AppState) => AppState> {
+    let response = await Comms.sendPromoteContent(state, req)
     let thunk = (st: AppState) => {
       st = extractHeadersToState(st, response);
       let rslt: Rpc.PromoteContentResponse = extractResult(response);
-      if (!rslt.url) {
-        chrome.runtime.sendMessage({ eventType: 'RenderMessage', msg: "Content already registered." });
+      if (!rslt.link) {
+        //chrome.runtime.sendMessage({ eventType: 'RenderMessage', msg: "Content already registered." });
         // need to prevent an immediate render from instantaneously wiping out the above message.
-        //let pseudoqUrl = parse(rslt.prevLink);
-        //let linkPromoter = rslt.linkPromoter
-        //st.links.set(url, { pseudoqUrl, linkDepth: 0, linkPromoter });
-        return st;
       }
-      console.log("received link: " + rslt.url)
-      let src = Utils.contentToUrl(contentId);
-      return setLink(st, src, rslt.url, 0, st.moniker);
+      else {
+        let { investments } = st
+        let inv: Rpc.UserLinkItem = { link: rslt.link, linkDepth: 0, viewCount: 0, promotionsCount: 0, deliveriesCount: 0 };
+        investments = [inv, ...investments];
+        st = { ...st, investments };
+        let curl = Utils.linkToUrl(rslt.link.linkId, rslt.link.title);
+        let src = Utils.contentToUrl(rslt.link.contentId);
+        st = setLink(st, src, curl, 0, st.moniker);
+      }
+      return st;
+    };
+    return thunk;
+  }
+
+  export async function removeContent(state: AppState, req: Rpc.RemoveContentRequest): Promise<(st: AppState) => AppState> {
+    let response = await Comms.sendRemoveContent(state, req)
+    let thunk = (st: AppState) => {
+      st = extractHeadersToState(st, response);
+      let rslt: Rpc.RemoveContentResponse = extractResult(response);
+      if (!rslt.ok) {
+      }
+      else {
+        let { contents } = st;
+        let i = contents.findIndex(c => c.contentId === req.contentId);
+        if (i >= 0) {
+          contents = contents.slice();
+          contents.splice(i, 1);
+          st = { ...st, contents };
+        }
+      }
+      return st;
     };
     return thunk;
   }
@@ -205,19 +245,14 @@ export namespace AsyncHandlers {
     let thunk = (st: AppState) => {
       st = extractHeadersToState(st, response);
       let rslt: Rpc.PromoteLinkResponse = extractResult(response);
-      if (rslt.prevLink) {
-        chrome.runtime.sendMessage({ eventType: 'RenderMessage', msg: "Content already registered." });
-        // very naughty state mutation here ... so sue me!!
-        // this is to prevent an immediate render from instantaneously wiping out the above message.
-        let pseudoqUrl = parse(rslt.prevLink);
-        let linkPromoter = rslt.linkPromoter
-        st.links.set(url, { pseudoqUrl, linkDepth: 0, linkPromoter });
-        return st;
-      }
-      else {  //  a new link has been generated 
-        console.log("received link: " + rslt.link)
-        return setLink(st, src, rslt.link, rslt.linkDepth, st.moniker);
-      }
+      let { investments } = st
+      let { link, linkDepth } = rslt;
+      let inv: Rpc.UserLinkItem = { link, linkDepth, viewCount: 0, promotionsCount: 0, deliveriesCount: 0 };
+      investments = [inv, ...investments];
+      st = { ...st, investments };
+
+      let curl = Utils.linkToUrl(rslt.link.linkId, rslt.link.title);
+      return setLink(st, src, curl, linkDepth, st.moniker);
     };
     return thunk;
   }
@@ -231,7 +266,7 @@ export namespace AsyncHandlers {
       if (rslt.found) {
         st = setLink(st, rslt.contentUrl, curl, rslt.linkDepth, rslt.linkPromoter);
         st = { ...st, activeUrl: rslt.contentUrl };
-        console.log("redirecting to: " + rslt.contentUrl);
+        //console.log("redirecting to: " + rslt.contentUrl);
         chrome.tabs.update(tab.id, { url: rslt.contentUrl });
       }
       return st;
@@ -258,7 +293,8 @@ export namespace AsyncHandlers {
       let investments = rslt.links;
       let { connectedUsers, reachableUserCount, contents } = rslt;
       if (rslt.promotions.length > 0) promotions = [...promotions, ...rslt.promotions];
-      st = { ...st, investments, promotions, connectedUsers, reachableUserCount, contents };
+      let allTags = loadTags(rslt.allTags);
+      st = { ...st, investments, promotions, connectedUsers, reachableUserCount, contents, allTags };
       return st;
     };
   }
@@ -299,12 +335,36 @@ export namespace AsyncHandlers {
 
   export async function saveContent(state: AppState, req: Rpc.SaveContentRequest): Promise<(st: AppState) => AppState> {
     const response = await Comms.sendSaveContent(state, req);
-    if (req.publish) return await getUserLinks(state);
     let thunk = (st: AppState) => {
       st = extractHeadersToState(state, response);
       let rslt: Rpc.SaveContentResponse = extractResult(response);
-      let contents = rslt.contents;
-      st = { ...st, contents };
+      if (rslt.content) {
+        let { contents } = st;
+        let { content } = rslt;
+        let i = contents.findIndex(c => c.contentId === content.contentId);
+        contents = contents.slice();
+        contents[i] = content;
+        st = { ...st, contents };
+      }
+      return st;
+    }
+    return thunk;
+  }
+
+  export async function saveLink(state: AppState, req: Rpc.SaveLinkRequest): Promise<(st: AppState) => AppState> {
+    const response = await Comms.sendSaveLink(state, req);
+    let thunk = (st: AppState) => {
+      st = extractHeadersToState(state, response);
+      let rslt: Rpc.SaveLinkResponse = extractResult(response);
+      if (rslt.link) {
+        let { investments } = st;
+        let { link } = rslt;
+        let i = investments.findIndex(i => i.link.linkId === link.linkId);
+        let inv = { ...investments[i], link };
+        investments = investments.slice();
+        investments[i] = inv;
+        st = { ...st, investments };
+      }
       return st;
     }
     return thunk;

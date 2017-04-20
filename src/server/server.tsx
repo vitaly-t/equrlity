@@ -44,6 +44,7 @@ import * as pg from './pgsql';
 import * as cache from './cache';
 
 const jwt_secret = process.env.JWT_PSEUDOQURL_KEY;
+const jwtOptions = { secret: jwt_secret, ignoreExpiration: true, key: 'userId' };
 
 pg.init();
 
@@ -61,11 +62,7 @@ function readFileAsync(src: string): Promise<string> {
 }
 
 function isValidClient(ctx: Koa.Context) {
-  let client_ver = ctx.headers['x-psq-client-version'];
-  if (!client_ver) return false;
-  let [client, version] = client_ver.split("-");
-  if (client !== 'capuchin') return false;
-  return true;
+  return ctx['userId'] && !ctx['invalidClientMsg'];
 }
 
 function htmlPage(body) {
@@ -154,6 +151,26 @@ app.use(serve("dist", "./dist"));
 //app.use(favicon(__dirname + '/assets/favicon.ico'));
 //
 
+app.use(async (ctx, next) => {
+  let client_ver = ctx.headers['x-psq-client-version'];
+  if (!client_ver) {
+    ctx['invalidClientMsg'] = 'Invalid Client - missing header';
+    return;
+  }
+  let [client, version] = client_ver.split("-");
+  if (client !== 'capuchin') {
+    ctx['invalidClientMsg'] = 'Unknown Client';
+    return;
+  }
+  if (client === 'capuchin' && version !== Utils.capuchinVersion()) {
+    ctx['invalidClientMsg'] = 'Client is out-of-date and requires upgrade';
+    return;
+  }
+  await next();
+});
+
+app.use(jwt.jwt(jwtOptions));
+
 publicRouter.get('/download/pseudoqurl.crx', async function (ctx, next) {
   ctx.headers['Content-Type'] = "application/x-chrome-extension";
   await send(ctx, './assets/pseudoqurl.crx');
@@ -168,12 +185,21 @@ publicRouter.get('/download/pseudoqurl.tar.gz', async function (ctx, next) {
 });
 
 publicRouter.get('/link/:id', async (ctx, next) => {
-  if (isValidClient(ctx)) {
+  let linkId: Dbt.linkId = parseInt(ctx.params.id);
+  let link = cache.links.get(linkId);
+  let cont = cache.contents.get(link.contentId);
+  let isClient = isValidClient(ctx);
+  if (isClient && cont.contentType === 'link') {
     // tab should be redirected by client
     ctx.body = "tab should redirect";
     return;
   }
-  let linkId: Dbt.linkId = parseInt(ctx.params.id);
+  if (cont.isPublic || isClient) {
+    let ipAddress = clientIP(ctx);
+    pg.registerContentView(ctx['userId'].id, cont.contentId, ipAddress, linkId);
+    ctx.body = await mediaPage(cont);
+    return;
+  }
   let url = cache.getContentFromLinkId(linkId);
   let ip = clientIP(ctx);
   pg.registerInvitation(ip, linkId);
@@ -252,30 +278,17 @@ app.use(async (ctx, next) => {
   }
 });
 
-app.use(async (ctx, next) => {
-  let client_ver = ctx.headers['x-psq-client-version'];
-  if (!client_ver) {
-    ctx.status = 400;
-    ctx.body = { error: { message: 'Invalid Client - missing header' } };
-    return;
-  }
-  let [client, version] = client_ver.split("-");
-  if (client !== 'capuchin') {
-    ctx.status = 400;
-    ctx.body = { error: { message: 'Unknown Client' } };
-    return;
-  }
-  if (client === 'capuchin' && version !== Utils.capuchinVersion()) {
-    ctx.status = 400;
-    ctx.body = { error: { message: 'Client is out-of-date and requires upgrade' } };
-    return;
-  }
-  await next();
-});
-
-app.use(jwt.jwt({ secret: jwt_secret, ignoreExpiration: true, key: 'userId' }));
-
 app.use(async function (ctx, next) {
+  if (ctx['invalidClientMsg']) {
+    ctx.status = 400;
+    ctx.body = { error: { message: ctx['invalidClientMsg'] } };
+    return;
+  }
+  if (!ctx['userId']) {
+    ctx.status = 400;
+    ctx.body = { error: { message: 'Unauthorized access' } };
+    return;
+  }
   let _userId = { ...ctx['userId'] };
   await next();
 
@@ -366,7 +379,7 @@ router.get('/stream/content/:id', async (ctx, next) => {
 
 router.get('/content/:id', async (ctx, next) => {
   let contentId = parseInt(ctx.params.id);
-  let cont = await pg.retrieveRecord<Dbt.Content>("contents", { contentId });
+  let cont = cache.contents.get(contentId);
   if (!cont) ctx.throw(404);
   ctx.body = await mediaPage(cont);
 });
@@ -439,9 +452,9 @@ router.post('/rpc', async function (ctx: any) {
       }
       case "promoteContent": {
         let req: Rpc.PromoteContentRequest = params;
-        let { publicKey, contentId, signature } = req;
-        checkPK(publicKey)
-        if (!validateContentSignature(publicKey, contentId.toString(), signature)) throw new Error("request failed verification");
+        //let { publicKey, contentId, signature } = req;
+        //checkPK(publicKey)
+        //if (!validateContentSignature(publicKey, contentId.toString(), signature)) throw new Error("request failed verification");
         let usr = getUser(userId);
         let result: Rpc.PromoteContentResponse = await pg.handlePromoteContent(userId, req)
         ctx.body = { id, result };
@@ -481,15 +494,17 @@ router.post('/rpc', async function (ctx: any) {
         if (Utils.isPseudoQLinkURL(url)) {
           let linkId = Utils.getLinkIdFromUrl(url);
           if (!linkId) throw new Error("invalid link");
-          if (!(await pg.hasViewed(userId, linkId))) {
-            console.log("attention gots to get paid for!!!");
-            await pg.payForView(userId, linkId)
-          }
-          contentUrl = cache.getContentFromLinkId(linkId);
           let link = cache.links.get(linkId);
-          let linkDepth = cache.getLinkDepth(link);
-          let linkPromoter = cache.users.get(link.userId).userName;
-          result = { found: true, contentUrl, linkDepth, linkPromoter };
+          let cont = cache.contents.get(link.contentId)
+          console.log("attention gots to get paid for!!!");
+          await pg.payForView(userId, linkId)
+          if (cont.contentType != "link") result = { found: false };
+          else {
+            let contentUrl = cont.title;
+            let linkDepth = cache.getLinkDepth(link);
+            let linkPromoter = cache.users.get(link.userId).userName;
+            result = { found: true, contentUrl, linkDepth, linkPromoter };
+          }
         }
         ctx.body = { id, result };
         break;
@@ -519,7 +534,8 @@ router.post('/rpc', async function (ctx: any) {
         let connectedUsers = cache.getConnectedUserNames(userId);
         let reachableUserCount = cache.getReachableUserIds(userId).length;
         let contents = await pg.getUserContents(userId);
-        let result: Rpc.GetUserLinksResponse = { links, promotions, connectedUsers, reachableUserCount, contents };
+        let allTags = await pg.loadTags();
+        let result: Rpc.GetUserLinksResponse = { links, promotions, connectedUsers, reachableUserCount, contents, allTags };
         ctx.body = { id, result };
         break;
       }
@@ -534,23 +550,36 @@ router.post('/rpc', async function (ctx: any) {
       }
       case "saveContent": {
         let req: Rpc.SaveContentRequest = params;
-        let contentId = req.contentId;
-        let cont = null;
-        if (contentId) {
-          cont = await pg.retrieveRecord<Dbt.Content>("contents", { contentId });
-          if (!cont) throw new Error("Invalid content id");
-          if (cont.userId !== userId) throw new Error("Invalid user for content");
-          await pg.saveContent(req);
+        let content = req.content;
+        if (content.userId !== userId) {
+          if (content.userId) throw new Error("incorrect user for content");
+          content = { ...content, userId };
         }
-        else await pg.addContent(req, userId);
-        if (req.publish) {
-
-        }
-        let contents = await pg.getUserContents(userId);
-        let result: Rpc.SaveContentResponse = { contents };
+        if (content.contentId) content = await pg.updateRecord<Dbt.Content>("contents", content);
+        else content = await pg.insertRecord<Dbt.Content>("contents", content);
+        await pg.saveTags(req.content.tags)
+        let result: Rpc.SaveContentResponse = { content };
         ctx.body = { id, result };
         break;
-
+      }
+      case "removeContent": {
+        let req: Rpc.RemoveContentRequest = params;
+        let content = cache.contents.get(req.contentId);
+        if (content.userId !== userId) {
+          if (content.userId) throw new Error("incorrect user for content");
+        }
+        let ok = await pg.deleteRecord<Dbt.Content>("contents", content);
+        let result: Rpc.RemoveContentResponse = { ok };
+        ctx.body = { id, result };
+        break;
+      }
+      case "saveLink": {
+        let req: Rpc.SaveLinkRequest = params;
+        if (req.link.userId !== userId) throw new Error("incorrect user for content");
+        let link = await pg.updateRecord<Dbt.Link>("links", req.link);
+        let result: Rpc.SaveLinkResponse = { link };
+        ctx.body = { id, result };
+        break;
       }
       default:
         let error: Rpc.Error = { id, error: { code: -32601, message: "Invalid method: " + method } };

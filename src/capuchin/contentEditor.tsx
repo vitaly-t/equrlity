@@ -3,6 +3,7 @@
 import * as React from 'react';
 import * as ReactDOM from 'react-dom';
 import { Button } from "@blueprintjs/core";
+import { Row, Col } from 'react-simple-flex-grid';
 
 import * as oxiDate from '../lib/oxidate';
 import * as utils from '../lib/utils';
@@ -18,8 +19,8 @@ import { sendGetContentBody, sendSaveContent } from './Comms';
 import * as Chrome from './chrome';
 
 
-interface ContentProps { appState: AppState };
-interface ContentState { title: string, content: string, tags: string[], editing: boolean, isError: boolean, prevContent: string, investment: number };
+interface ContentProps { appState: AppState, onClose?: () => void };
+interface ContentState { title: string, content: string, tags: string[], editing: boolean, isError: boolean, prevContent: string };
 
 
 export class ContentEditor extends React.Component<ContentProps, ContentState> {
@@ -28,7 +29,8 @@ export class ContentEditor extends React.Component<ContentProps, ContentState> {
     super(props);
     let p = props.appState.currentContent;
     let { title, tags, content } = p
-    this.state = { title, content, tags, editing: true, isError: false, prevContent: content, investment: 20 };
+    if (!tags) tags = [];
+    this.state = { title, content, tags, editing: true, isError: false, prevContent: content };
   }
 
   ctrls: {
@@ -37,34 +39,34 @@ export class ContentEditor extends React.Component<ContentProps, ContentState> {
     investment: HTMLInputElement,
   } = { title: null, body: null, investment: null };
 
-  save(publish: boolean = false) {
+  save() {
     if (this.state.isError) return;
     let title = this.state.title;
     let tags = this.state.tags;
     let cont = this.props.appState.currentContent;
-    let content = this.state.content;
-    let investment = this.state.investment;
-    let req: Rpc.SaveContentRequest = { contentId: cont.contentId, contentType: cont.contentType, mime_ext: cont.mime_ext, title, tags, content, publish, investment };
+    let content: Dbt.Content = { ...cont, content: this.state.content, title, tags };
+    let req: Rpc.SaveContentRequest = { content };
     Chrome.sendMessage({ eventType: "SaveContent", req });
+    this.close()
   }
 
-  publish() { this.save(true); }
+  close() {
+    if (this.props.onClose) this.props.onClose();
+    else window.close();
+  }
 
   startEdit() { this.setState({ editing: true, prevContent: this.state.content }) }
   stopEdit() { this.setState({ editing: false }) }
-  abandonEdit() { this.setState({ editing: false, content: this.state.prevContent }); }
+  abandonEdit() {
+    this.setState({ editing: false, content: this.state.prevContent });
+    this.close();
+  }
 
   changeTitle(e) { this.setState({ title: e.target.value }); }
   changeBody(e) { this.setState({ content: e.target.value }); }
-  changeInvestment(e) { this.setState({ investment: parseInt(e.target.value) }); }
-
-  removeTag(lbl) {
-    let tags = this.state.tags;
-    let i = tags.indexOf(lbl);
-    if (i >= 0) {
-      tags = tags.splice(i, 1);
-      this.setState({ tags });
-    }
+  changeTags(tags: string[]) {
+    this.setState({ tags });
+    Chrome.sendSyncMessage({ eventType: "SaveTags", tags })
   }
 
   render() {
@@ -75,46 +77,53 @@ export class ContentEditor extends React.Component<ContentProps, ContentState> {
     //let btnStyle = { height: '24', marginTop: 2, marginLeft: 5, marginRight: 5, display: 'inline-block' };
     let lhcolStyle = { width: '20%' };
     if (this.state.editing) {
+      let btns = [
+        <Button style={btnStyle} key='save' className="pt-intent-primary" onClick={() => this.save()} text="Save" />,
+        <Button style={btnStyle} key='stop' onClick={() => this.abandonEdit()} text="Abandon" />
+      ];
+      if (currInfo.contentType === 'post') {
+        btns = [
+          <Button style={btnStyle} key='review' className="pt-intent-primary" onClick={() => this.stopEdit()} text="Review" />,
+          <Button style={btnStyle} key='stop' onClick={() => this.abandonEdit()} text="Abandon" />
+        ];
+      }
 
       return (
         <div>
-          <div style={rowStyle} >
-            <div style={lhcolStyle}>Title:</div>
-            <input type="text" style={{ marginTop: 6, height: 30, width: '100%' }} ref={(e) => this.ctrls.title = e} value={this.state.title} onChange={e => this.changeTitle(e)} />
-          </div>
-          <div style={rowStyle} >
-            <div style={lhcolStyle}>Body:</div>
-            <textarea style={{ width: '100%', minHeight: 400 }} ref={(e) => this.ctrls.body = e} value={this.state.content} onChange={e => this.changeBody(e)} />
-          </div>
-          <div style={rowStyle} >
-            <span style={lhcolStyle}>Tags: </span>
-            <TagGroupEditor tags={this.state.tags} allTags={this.props.appState.allTags} onChange={tags => this.setState({ tags })} />
-          </div>
-          <div style={rowStyle} >
-            <Button key='review' className="pt-intent-primary" style={btnStyle} onClick={() => this.stopEdit()} text="Save" />
-            <Button key='stop' style={btnStyle} onClick={() => this.abandonEdit()} text="Abandon" />
-          </div>
+          <Row style={rowStyle} >
+            <Col style={lhcolStyle}>Title:</Col>
+            <Col>
+              <input type="text" style={{ marginTop: 6, height: 30, width: '100%' }} ref={(e) => this.ctrls.title = e} value={this.state.title} onChange={e => this.changeTitle(e)} />
+            </Col>
+          </Row>
+          <Row style={rowStyle} >
+            <Col style={lhcolStyle}>Body:</Col>
+            <Col>
+              <textarea style={{ width: '100%', minHeight: 400 }} ref={(e) => this.ctrls.body = e} value={this.state.content} onChange={e => this.changeBody(e)} />
+            </Col>
+          </Row>
+          <Row style={rowStyle} >
+            <Col>
+              <span style={lhcolStyle}>Tags: </span>
+              <TagGroupEditor tags={this.state.tags} allTags={this.props.appState.allTags} onChange={tags => this.changeTags(tags)} />
+            </Col>
+          </Row>
+          <Row style={rowStyle} >
+            {btns}
+          </Row>
         </div>
       );
     } else {
       let { content, title, tags } = this.state;
-      let info: Rpc.ContentInfoItem = { ...currInfo, content, title, tags, userId: '', contentId: 0 };
-      let pubdiv = null;
-      if (!currInfo.published) {
-        pubdiv = <div style={rowStyle} >
-          <div style={{ display: 'inline' }}>Investment: </div>
-          <input type="text" style={{ display: 'inline', height: 24, marginTop: 6, width: '100' }} ref={(e) => this.ctrls.investment = e} value={this.state.investment} onChange={e => this.changeInvestment(e)} />
-          <Button key='publish' className="pt-intent-success" style={btnStyle} onClick={() => this.publish()} text="Publish" />
-        </div>;
-      }
+      let info: Dbt.Content = { ...currInfo, content, title, tags, userId: '', contentId: 0 };
       return (
         <div>
           <ContentView info={info} creator={creator} />
           <div style={rowStyle} >
-            <Button key='edit' className="pt-intent-primary" style={btnStyle} onClick={() => this.startEdit()} >Edit</Button>
-            <Button key='save' className="pt-intent-primary" style={btnStyle} onClick={() => this.save()} >Save</Button>
+            <Button key='save' className="pt-intent-primary" style={btnStyle} onClick={() => this.save()} text="Save" />
+            <Button key='edit' style={btnStyle} onClick={() => this.startEdit()} text="Edit" />
+            <Button key='abandon' style={btnStyle} onClick={() => this.abandonEdit()} text="Abandon" />
           </div>
-          {pubdiv}
         </div>
       );
     }

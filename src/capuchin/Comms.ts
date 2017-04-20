@@ -65,14 +65,12 @@ export async function sendApiRequest(st: AppState, method: Rpc.Method, params: a
   }
 }
 
-export async function sendPromoteContent(st: AppState, contentId: Dbt.contentId, linkDescription: string, amount: number): Promise<AxiosResponse> {
-  const privateCryptoKey: CryptoKey = await Crypto.importPrivateKeyfromJWK(st.privateKey);
-  const signature: ArrayBuffer = await Crypto.signData(privateCryptoKey, UTF8.stringToUtf8ByteArray(contentId.toString()).buffer);
-  const uint8ArraySignature = new Uint8Array(signature);
-  const sig = Utils.printBase64Binary(new Uint8Array(signature));
-  const mime_ext = "txt";
-  let req: Rpc.PromoteContentRequest = { publicKey: st.publicKey, contentId, signature: sig, linkDescription, amount };
+export async function sendPromoteContent(st: AppState, req: Rpc.PromoteContentRequest): Promise<AxiosResponse> {
   return await sendApiRequest(st, "promoteContent", req);
+}
+
+export async function sendRemoveContent(st: AppState, req: Rpc.RemoveContentRequest): Promise<AxiosResponse> {
+  return await sendApiRequest(st, "removeContent", req);
 }
 
 export async function sendPromoteLink(st: AppState, url: string, title: string, comment: string, amount: number, tags: string[]): Promise<AxiosResponse> {
@@ -115,6 +113,10 @@ export async function sendGetContentBody(st: AppState): Promise<AxiosResponse> {
 
 export async function sendSaveContent(st: AppState, req: Rpc.SaveContentRequest): Promise<AxiosResponse> {
   return await sendApiRequest(st, "saveContent", req);
+}
+
+export async function sendSaveLink(st: AppState, req: Rpc.SaveLinkRequest): Promise<AxiosResponse> {
+  return await sendApiRequest(st, "saveLink", req);
 }
 
 export async function sendTransferCredits(st: AppState, req: Rpc.TransferCreditsRequest): Promise<AxiosResponse> {

@@ -1,106 +1,32 @@
 import * as React from 'react';
 import * as ReactDOM from "react-dom";
-import { Button, Dialog, Intent } from "@blueprintjs/core";
+import { Button, Dialog, Intent, ProgressBar, Checkbox } from "@blueprintjs/core";
 import * as Dropzone from 'react-dropzone';
 import { Url, format } from 'url';
 import axios, { AxiosResponse, AxiosError } from 'axios';
 
-import * as Rpc from '../lib/rpc'
+import * as Dbt from '../lib/datatypes';
+import * as Rpc from '../lib/rpc';
 import * as Utils from '../lib/utils';
 import * as Constants from '../lib/constants';
 import * as OxiDate from '../lib/oxidate';
 import { rowStyle, btnStyle, lhcolStyle } from "../lib/contentView";
+import * as Tags from '../lib/tags';
 
 import { YesNoBox } from './dialogs';
 import { AppState, postDeserialize } from "./AppState";
 import { uploadRequest } from "./Comms";
 import * as Chrome from './chrome';
 
-interface EditContentProps { info: Rpc.ContentInfoItem, onClose: () => void }
-interface EditContentState { title: string, tags: string, isOpen: boolean, investment: number }
-export class EditContent extends React.Component<EditContentProps, EditContentState> {
-  constructor(props: EditContentProps) {
-    super(props);
-    let tags = props.info.tags && props.info.tags.length > 0 ? props.info.tags.join(", ") : '';
-    this.state = { isOpen: true, investment: 0, title: props.info.title, tags };
-  }
-
-  ctrls: {
-    title: HTMLInputElement,
-    tags: HTMLInputElement,
-    investment: HTMLInputElement,
-  } = { title: null, tags: null, investment: null };
-
-  changeTitle(e) { this.setState({ title: e.target.value }); }
-  changeTags(e) { this.setState({ tags: e.target.value }); }
-  changeInvestment(e) { this.setState({ investment: parseInt(e.target.value) }); }
-
-  close() {
-    this.props.onClose();
-    this.setState({ isOpen: false });
-  }
-
-  save() {
-    let title = this.state.title;
-    let tags = this.state.tags.split(',').map(t => t.trim());
-    let investment = this.state.investment;
-    let publish = investment > 0;
-    let info = this.props.info;
-    let req: Rpc.SaveContentRequest = { contentId: info.contentId, contentType: info.contentType, mime_ext: info.mime_ext, title, tags, publish, investment };
-    Chrome.sendMessage({ eventType: "SaveContent", req });
-    this.close();
-  }
-
-  public render() {
-    if (!this.state.isOpen) return null;
-    let pubdiv = null;
-    let ttl = "Edit Content"
-    if (!this.props.info.published) {
-      ttl = "Edit / Publish Content"
-      pubdiv = (
-        <div style={rowStyle} >
-          <div style={{ display: 'inline' }}>Publish with Investment amount:</div>
-          <input type="number" style={{ display: 'inline', height: 24, marginTop: 6, width: '100px' }} ref={(e) => this.ctrls.investment = e} value={this.state.investment} onChange={e => this.changeInvestment(e)} />
-        </div>
-      );
-    }
-    return (
-      <Dialog iconName="inbox" isOpen={this.state.isOpen} title={ttl} onClose={() => this.close()} >
-        <div className="pt-dialog-body">
-          <div style={rowStyle} >
-            <div style={lhcolStyle}>Title:</div>
-            <input type="text" style={{ marginTop: 6, height: 30, width: '100%' }} ref={(e) => this.ctrls.title = e} value={this.state.title} onChange={e => this.changeTitle(e)} />
-          </div>
-          <div style={rowStyle} >
-            <div style={lhcolStyle}>Tags:</div>
-            <input type="text" style={{ height: 30, marginTop: 6, width: '100%' }} ref={(e) => this.ctrls.tags = e} value={this.state.tags} onChange={e => this.changeTags(e)} />
-          </div>
-          {pubdiv}
-        </div>
-        <div className="pt-dialog-footer">
-          <div className="pt-dialog-footer-actions">
-            <Button text="Cancel" onClick={() => this.close()} />
-            <Button
-              intent={Intent.PRIMARY}
-              onClick={() => this.save()}
-              text={this.state.investment ? "Publish" : "Save"}
-            />
-          </div>
-        </div>
-      </Dialog >
-    );
-  }
-}
-
 interface SettingsPageProps { appState: AppState };
-interface SettingsPageState { nickName: string, email: string, editingContent?: Rpc.ContentInfoItem, confirmDeleteContent?: Rpc.ContentInfoItem, transferAmount: number, transferTo: string };
+interface SettingsPageState { nickName: string, email: string, uploadProgress: number, publishingContent?: Dbt.Content, confirmDeleteContent?: Dbt.Content, transferAmount: number, transferTo: string };
 
 export class SettingsPage extends React.Component<SettingsPageProps, SettingsPageState> {
 
   constructor(props) {
     super(props);
     console.log("email received: " + props.appState.email);
-    this.state = { nickName: props.appState.moniker, email: props.appState.email, transferAmount: 0, transferTo: '' };
+    this.state = { nickName: props.appState.moniker, email: props.appState.email, transferAmount: 0, transferTo: '', uploadProgress: 1 };
   }
 
   ctrls: {
@@ -130,9 +56,7 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
       //data.append(f.name,fs.createReadStream(__dirname + `${file}`));
     }
     var config = {
-      onUploadProgress: function (progressEvent) {
-        var percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-      }
+      onUploadProgress: (progressEvent) => { this.setState({ uploadProgress: progressEvent.loaded / progressEvent.total }); }
     };
     //axios.defaults.headers.common = form.getHeaders();
     let req = uploadRequest(this.props.appState);
@@ -151,30 +75,30 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
     let userNames = st.connectedUsers;
     let invdiv = <p>You have no current investments</p>
     if (invs.length > 0) {
-      let invrows = invs.map(l => {
+      let invrows = invs.map(item => {
+        let l = item.link
         let linkId = l.linkId;
-        let url = l.contentUrl;
-        let i = l.info;
-        let tags = i.tags && i.tags.length > 0 ? i.tags.join(", ") : '';
+        let url = Utils.linkToUrl(linkId, l.title);
+        let tags = l.tags && l.tags.length > 0 ? l.tags.join(", ") : '';
         let redeem = () => { Chrome.sendMessage({ eventType: "RedeemLink", linkId }); };
         let redeemText = l.amount > 0 ? "Redeem" : "Delete";
         let btns = [<Button onClick={redeem} text={redeemText} />];
         let onUrlClick = () => { chrome.tabs.create({ active: true, url }); };
-        let edit = () => { Chrome.sendSyncMessage({ eventType: "LaunchContentEditPage", info: i }); };
+        let edit = () => { Chrome.sendSyncMessage({ eventType: "LaunchLinkEditPage", link: l }); };
         btns.push(<Button onClick={edit} text="Edit" />);
 
         return (
           <tr key={l.linkId} >
             <td><a href="" onClick={onUrlClick} >{url}</a></td>
-            <td>{i.content}</td>
-            <td>{l.linkDepth}</td>
-            <td>{l.promotionsCount}</td>
-            <td>{l.deliveriesCount}</td>
-            <td>{l.viewCount}</td>
+            <td>{l.contentId}</td>
+            <td>{l.comment}</td>
+            <td>{item.linkDepth}</td>
+            <td>{item.promotionsCount}</td>
+            <td>{item.deliveriesCount}</td>
+            <td>{item.viewCount}</td>
             <td>{l.amount}</td>
-            <td>{i.created}</td>
-            <td>{i.updated}</td>
-            <td>{i.published}</td>
+            <td>{l.created}</td>
+            <td>{l.updated}</td>
             <td>{tags}</td>
             <td>{btns}</td>
           </tr>
@@ -185,6 +109,7 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
           <thead>
             <tr>
               <th>URL</th>
+              <th>Content ID</th>
               <th>Comment</th>
               <th>Depth</th>
               <th>Promotions</th>
@@ -193,7 +118,6 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
               <th>Balance</th>
               <th>Created</th>
               <th>Updated</th>
-              <th>Published</th>
               <th>Tags</th>
               <th></th>
             </tr>
@@ -213,9 +137,9 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
       let onYes = () => Chrome.sendMessage({ eventType: "RemoveContent", req: { contentId } });
       contsdiv = <YesNoBox message={msg} onYes={onYes} onClose={onClose} />
     }
-    else if (this.state.editingContent) {
-      let onClose = () => this.setState({ editingContent: null });
-      contsdiv = <EditContent info={this.state.editingContent} onClose={onClose} />
+    else if (this.state.publishingContent) {
+      let onClose = () => this.setState({ publishingContent: null });
+      contsdiv = <PublishContent info={this.state.publishingContent} allTags={this.props.appState.allTags} onClose={onClose} />
     }
     else if (st.contents.length > 0) {
       let postrows = st.contents.map(p => {
@@ -228,19 +152,18 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
         let remove = () => { this.setState({ confirmDeleteContent: p }) };
         let btns = [<Button onClick={remove} text="Delete" />];
         let tags = p.tags && p.tags.length > 0 ? p.tags.join(", ") : '';
-        //if (p.contentType === "post") {
         let edit = () => { Chrome.sendSyncMessage({ eventType: "LaunchContentEditPage", info: p }); };
         btns.push(<Button onClick={edit} text="Edit" />);
-        //}
-        //else {
-        //  let edit = () => { this.setState({ editingContent: p }) };
-        //  btns.push(<Button onClick={edit} text="Edit" />);
-        //}
+
+        let publish = () => { this.setState({ publishingContent: p }) };
+        btns.push(<Button onClick={publish} text="Publish" />);
+
         return (
           <tr key={p.contentId} >
             <td>{p.contentType}</td>
             <td><a href="" onClick={onclick} >{url}</a></td>
             <td>{p.title}</td>
+            <td><Checkbox disabled defaultChecked={p.isPublic} /></td>
             <td>{created}</td>
             <td>{updated}</td>
             <td>{published}</td>
@@ -256,6 +179,7 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
               <th>Type</th>
               <th>Content</th>
               <th>Title</th>
+              <th>Public?</th>
               <th>Created</th>
               <th>Updated</th>
               <th>Published</th>
@@ -356,6 +280,22 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
         </div>
       </div>);
 
+    let uploadDiv = this.state.uploadProgress < 1 ?
+      <div>
+        <h4>Uploading : </h4>
+        <ProgressBar value={this.state.uploadProgress} />
+      </div>
+      : <div>
+        <h4>Upload new Content(s) : </h4>
+        {vsp}
+        <Dropzone onDrop={this.onDropMedia}>
+          <div>Drop some audio/video/image files here, or click to select files to upload.</div>
+        </Dropzone>
+        {vsp}
+      </div>
+
+
+
     return (
       <div>
         <h3>Status and Settings.</h3>
@@ -416,14 +356,7 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
           </div>
         </div>
         {vsp}
-        <div>
-          <h4>Upload new Content(s) : </h4>
-          {vsp}
-          <Dropzone onDrop={this.onDropMedia}>
-            <div>Drop some audio/video/image files here, or click to select files to upload.</div>
-          </Dropzone>
-          {vsp}
-        </div>
+        {uploadDiv}
       </div>);
   }
 }
@@ -447,3 +380,72 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
     render(state);
   }
 });
+
+interface PublishContentProps { info: Dbt.Content, allTags: Tags.TagSelectOption[], onClose: () => void }
+interface PublishContentState { title: string, comment: string, tags: string[], isOpen: boolean, amount: number }
+export class PublishContent extends React.Component<PublishContentProps, PublishContentState> {
+  constructor(props: PublishContentProps) {
+    super(props);
+    let tags = props.info.tags;
+    this.state = { isOpen: true, amount: 10, title: props.info.title, tags, comment: '' };
+  }
+
+  ctrls: {
+    title: HTMLInputElement,
+    tags: HTMLInputElement,
+    comment: HTMLInputElement,
+    investment: HTMLInputElement,
+  } = { title: null, tags: null, comment: null, investment: null };
+
+  changeTitle(e) { this.setState({ title: e.target.value }); }
+  changeTags(e) { this.setState({ tags: e.target.value }); }
+  changeComment(e) { this.setState({ comment: e.target.value }); }
+  changeInvestment(e) { this.setState({ amount: parseInt(e.target.value) }); }
+
+  close() {
+    this.props.onClose();
+    this.setState({ isOpen: false });
+  }
+
+  save() {
+    let { title, tags, amount, comment } = this.state;
+    let info = this.props.info;
+    let req: Rpc.PromoteContentRequest = { contentId: info.contentId, title, comment, tags, amount };
+    Chrome.sendMessage({ eventType: "PromoteContent", req });
+    this.close();
+  }
+
+  public render() {
+    if (!this.state.isOpen) return null;
+    let pubdiv = null;
+    let ttl = "Promote Content"
+    return (
+      <Dialog iconName="inbox" isOpen={this.state.isOpen} title={ttl} onClose={() => this.close()} >
+        <div className="pt-dialog-body">
+          <div style={rowStyle} >
+            <div style={lhcolStyle}>Title:</div>
+            <input type="text" style={{ marginTop: 6, height: 30, width: '100%' }} ref={(e) => this.ctrls.title = e} value={this.state.title} onChange={e => this.changeTitle(e)} />
+          </div>
+          <div style={rowStyle} >
+            <div style={lhcolStyle}>Comment:</div>
+            <input type="text" style={{ marginTop: 6, height: 30, width: '100%' }} ref={(e) => this.ctrls.comment = e} value={this.state.comment} onChange={e => this.changeComment(e)} />
+          </div>
+          <div style={rowStyle} >
+            <div style={lhcolStyle}>Tags:</div>
+            <Tags.TagGroupEditor tags={this.state.tags} allTags={this.props.allTags} onChange={(tags) => this.changeTags(tags)} />
+          </div>
+          <div style={rowStyle} >
+            <div style={{ display: 'inline' }}>Investment amount:</div>
+            <input type="number" style={{ display: 'inline', height: 24, marginTop: 6, width: '100px' }} ref={(e) => this.ctrls.investment = e} value={this.state.amount} onChange={e => this.changeInvestment(e)} />
+          </div>
+        </div>
+        <div className="pt-dialog-footer">
+          <div className="pt-dialog-footer-actions">
+            <Button text="Cancel" onClick={() => this.close()} />
+            <Button intent={Intent.PRIMARY} onClick={() => this.save()} text="Publish" />
+          </div>
+        </div>
+      </Dialog >
+    );
+  }
+}

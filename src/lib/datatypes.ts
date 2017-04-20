@@ -26,9 +26,11 @@ export type content = string;
 export type blobId = number;
 export type contentId = number;
 export type contentCryptId = Buffer;
+export type isPublic = boolean;
 export type publicKey = Buffer;
 export type published = Date;
 export type userId = string;
+export type viewId = number;
 export type varchar_8 = string;
 
 export interface Tag {
@@ -73,6 +75,7 @@ export interface Content {
   readonly created: created | null,
   readonly updated: updated | null,
   readonly published: published | null,
+  readonly isPublic: isPublic | null,
   readonly mime_ext: varchar_8 | null,
   readonly tags: tag[] | null,
   readonly cryptHash: binary | null
@@ -82,8 +85,12 @@ export interface Link {
   readonly linkId: linkId | null,
   readonly userId: userId | null,
   readonly contentId: contentId | null,
-  readonly url: urlString | null,
+  readonly title: title | null,
+  readonly created: created | null,
+  readonly updated: updated | null,
+  readonly comment: text | null,
   readonly prevLink: linkId | null,
+  readonly tags: tag[] | null,
   readonly amount: integer | null
 };
 
@@ -103,10 +110,19 @@ export interface Promotion {
 };
 
 export interface View {
+  readonly viewId: viewId | null,
   readonly userId: userId | null,
   readonly linkId: linkId | null,
-  readonly created: created | null,
-  readonly updated: updated | null
+  readonly created: created | null
+};
+
+export interface ContentView {
+  readonly viewId: viewId | null,
+  readonly userId: userId | null,
+  readonly contentId: contentId | null,
+  readonly linkId: linkId | null,
+  readonly ipAddress: ipAddress | null,
+  readonly created: created | null
 };
 
 // end of generated types

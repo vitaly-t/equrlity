@@ -1,6 +1,9 @@
 import * as localForage from "localforage";
 
-import * as Crypto from '../lib/Crypto'
+import * as OxiGen from '../gen/oxigen';
+
+import * as Dbt from '../lib/datatypes';
+import * as Crypto from '../lib/Crypto';
 import * as Utils from '../lib/utils';
 import { mergeTags } from '../lib/tags';
 
@@ -147,6 +150,14 @@ export async function handleAsyncMessage(event: Message) {
         fn = await AsyncHandlers.promoteLink(st, event.title, event.comment, event.amount, event.tags);
         break;
       }
+      case "PromoteContent": {
+        fn = await AsyncHandlers.promoteContent(st, event.req);
+        break;
+      }
+      case "RemoveContent": {
+        fn = await AsyncHandlers.removeContent(st, event.req);
+        break;
+      }
       case "Load": {
         fn = await AsyncHandlers.load(st, event.url);
         break;
@@ -181,6 +192,10 @@ export async function handleAsyncMessage(event: Message) {
       }
       case "SaveContent": {
         fn = await AsyncHandlers.saveContent(st, event.req);
+        break;
+      }
+      case "SaveLink": {
+        fn = await AsyncHandlers.saveLink(st, event.req);
         break;
       }
       case "TransferCredits": {
@@ -223,11 +238,16 @@ export function handleMessage(event: Message, async: boolean = false): AppState 
         break;
       case "CreatePost":
         chrome.tabs.create({ 'url': chrome.extension.getURL('content.html'), 'selected': true });
-        st = { ...st, currentContent: { contentId: 0, content: '', contentType: "post", mime_ext: "markdown", title: '', tags: [], published: null, created: null, updated: null } };
+        let cont = OxiGen.emptyRec<Dbt.Content>("contents");
+        st = { ...st, currentContent: { ...cont, contentType: "post", mime_ext: "markdown" } };
         break;
       case "LaunchContentEditPage":
         chrome.tabs.create({ 'url': chrome.extension.getURL('content.html'), 'selected': true });
         st = { ...st, currentContent: event.info };
+        break;
+      case "LaunchLinkEditPage":
+        chrome.tabs.create({ 'url': chrome.extension.getURL('link.html'), 'selected': true });
+        st = { ...st, currentLink: event.link };
         break;
       case "SaveTags":
         let allTags = mergeTags(event.tags, st.allTags);

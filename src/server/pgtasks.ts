@@ -9,7 +9,7 @@ import * as Rpc from '../lib/rpc';
 import * as Utils from '../lib/utils';
 import * as OxiDate from '../lib/oxidate';
 import * as Dbt from '../lib/datatypes'
-import * as OxiGen from '../lib/oxigen';
+import * as OxiGen from '../gen/oxigen';
 import * as uuid from '../lib/uuid.js';
 
 import { CachedTable, CacheUpdate } from './cache';
@@ -83,7 +83,7 @@ export async function findUserByName(t: ITask<any>, name: string): Promise<Dbt.U
 };
 
 export function emptyUser(): Dbt.User {
-  let rec = OxiGen.emptyRec<Dbt.User>(oxb.tables.get("users"));
+  let rec = OxiGen.emptyRec<Dbt.User>("users");
   return { ...rec, credits: 1000 };
 }
 
@@ -96,7 +96,7 @@ export async function adjustUserBalance(t: ITask<any>, usr: Dbt.User, adj: Dbt.i
 }
 
 export function emptyAuth(): Dbt.Auth {
-  return OxiGen.emptyRec<Dbt.Auth>(oxb.tables.get("auths"));
+  return OxiGen.emptyRec<Dbt.Auth>("auths");
 }
 
 export async function createAuth(t: ITask<any>, authId: Dbt.authId, userId: Dbt.userId, provider: Dbt.authProvider): Promise<CacheUpdate[]> {
@@ -128,34 +128,11 @@ export async function touchAuth(t: ITask<any>, authProvider: Dbt.authProvider, a
 }
 
 export function emptyContent(): Dbt.Content {
-  return OxiGen.emptyRec<Dbt.Content>(oxb.tables.get("contents"));
+  return OxiGen.emptyRec<Dbt.Content>("contents");
 }
 
 export function emptyLink(): Dbt.Link {
-  return OxiGen.emptyRec<Dbt.Link>(oxb.tables.get("links"));
-}
-
-export async function getRootLinksForUrl(t: ITask<any>, url: Dbt.urlString): Promise<Dbt.Link[]> {
-  return await t.any(`select * from links where url = '${url}' and "prevLink" is null`);
-}
-
-export async function getRootLinksForContentId(t: ITask<any>, id: Dbt.contentId): Promise<Dbt.Link[]> {
-  let url = Utils.contentToUrl(id);
-  return await getRootLinksForUrl(t, url);
-}
-
-export async function findRootLinkForUrl(t: ITask<any>, url: Dbt.urlString): Promise<Dbt.Link> {
-  let recs = await getRootLinksForUrl(t, url);
-  let l = recs.length;
-  if (l == 0) return null;
-  if (l == 1) return recs[0];
-  let i = Math.floor(Math.random() * l)
-  return recs[i];
-}
-
-export async function findRootLinkForContentId(t: ITask<any>, id: Dbt.contentId): Promise<Dbt.Link> {
-  let url = Utils.contentToUrl(id);
-  return await findRootLinkForUrl(t, url);
+  return OxiGen.emptyRec<Dbt.Link>("links");
 }
 
 export async function getLinksForContentId(t: ITask<any>, id: Dbt.contentId): Promise<Dbt.Link[]> {
@@ -201,11 +178,27 @@ export async function deliveriesCount(t: ITask<any>, linkId: Dbt.linkId): Promis
   return parseInt(rslt.cnt);
 }
 
+export async function promoteContent(t: ITask<any>, userId, req: Rpc.PromoteContentRequest): Promise<CacheUpdate[]> {
+  let { contentId, amount, tags, comment, title } = req;
+  let usr = await retrieveRecord<Dbt.User>(t, "users", { userId });
+  if (amount > usr.credits) throw new Error("Negative balances not allowed");
+  let cont = await retrieveRecord<Dbt.Content>(t, "contents", { contentId });
+  if (userId !== cont.userId) throw new Error("Content owned by different user");
+  let rslt: CacheUpdate[] = [];
+  let link = OxiGen.emptyRec<Dbt.Link>("links");
+  link = { ...link, userId, contentId, tags, amount, comment, title }
+  link = await insertRecord<Dbt.Link>(t, "links", link);
+  console.log("inserted link: " + link.linkId);
+  rslt.push({ table: "links" as CachedTable, record: link });
+  Array.prototype.push.apply(rslt, await adjustUserBalance(t, usr, -amount));
+  return rslt;
+}
+
 export async function promoteLink(t: ITask<any>, userId: Dbt.userId, linkurl: string, title, content: string, amount: Dbt.integer, tags: string[]): Promise<CacheUpdate[]> {
   let usr = await retrieveRecord<Dbt.User>(t, "users", { userId });
   if (amount > usr.credits) throw new Error("Negative balances not allowed");
   let ourl = parse(linkurl);
-  let cont = OxiGen.emptyRec<Dbt.Content>(oxb.tables.get("contents"));
+  let cont = OxiGen.emptyRec<Dbt.Content>("contents");
   let rslt: CacheUpdate[] = [];
   cont = { ...cont, userId, title, contentType: "link", content, tags }
   cont = await insertRecord<Dbt.Content>(t, "contents", cont);
@@ -340,23 +333,8 @@ export async function createUser(t: ITask<any>, email?: string): Promise<Dbt.Use
   return await insertRecord<Dbt.User>(t, "users", usr);
 };
 
-export async function getUserContents(t: ITask<any>, id: Dbt.userId): Promise<Rpc.ContentInfoItem[]> {
-  return await t.any(`select "contentId","contentType",content,mime_ext,created,updated,published,title,tags from contents where "userId" = '${id}' order by updated desc`);
-}
-
-export async function saveContent(t: ITask<any>, req: Rpc.SaveContentRequest): Promise<Dbt.Content> {
-  let contentId = req.contentId;
-  req.title = req.title.replace(/_/g, " ");
-  let cont = await retrieveRecord<Dbt.Content>(t, "contents", { contentId });
-  cont = { ...cont, ...req };
-  return await updateRecord<Dbt.Content>(t, "contents", cont);
-}
-
-export async function addContent(t: ITask<any>, req: Rpc.SaveContentRequest, userId: Dbt.userId): Promise<Dbt.Content> {
-  let cont = OxiGen.emptyRec<Dbt.Content>(oxb.tables.get("contents"));
-  req.title = req.title.replace(/_/g, " ");
-  cont = { ...cont, ...req, userId };
-  return await insertRecord<Dbt.Content>(t, "contents", cont);
+export async function getUserContents(t: ITask<any>, id: Dbt.userId): Promise<Dbt.Content[]> {
+  return await t.any(`select * from contents where "userId" = '${id}' order by updated desc`);
 }
 
 export async function insertLargeObject(t: ITask<any>, strm: any): Promise<number> {
@@ -394,7 +372,10 @@ export async function countRecordsInTable(t: ITask<any>, tblnm: string): Promise
 }
 
 export async function saveTags(t: ITask<any>, tags: string[]): Promise<void> {
-  await t.any("insert into tags (tag) values ('" + tags.join("'),('") + "')");
+  await t.any(`INSERT INTO tags(tag) VALUES ('${tags.join("'),('")}') on conflict(tag) do nothing`);
 }
 
-
+export async function registerContentView(t: ITask<any>, userId: Dbt.userId, contentId: Dbt.contentId, ipAddress: Dbt.ipAddress, linkId: Dbt.linkId) {
+  let rec = { userId, contentId, ipAddress, linkId };
+  return await insertRecord<Dbt.ContentView>(t, "contentviews", rec);
+}

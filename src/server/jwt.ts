@@ -7,29 +7,19 @@ export { sign, verify, decode } from 'jsonwebtoken';
 export function jwt(opts): (cxt: any, next: () => Promise<any>) => any {
 
   return async function (ctx: any, next: () => Promise<any>) {
-    var token, user;
+    ctx[opts.key] = null;
+    ctx['token'] = null;
     let auth: string = ctx.header.authorization;
-    if (auth) {
-      if (auth.startsWith('Bearer ')) token = auth.substring(7);
-      else {
-        ctx[opts.key] = null
-        ctx.throw(400, 'Bad Authorization header format. Format is "Authorization: Bearer <token>"');
-        return;
-      }
-
+    if (auth && auth.startsWith('Bearer ')) {
       try {
-        user = verify(token, opts.secret, opts);
+        let token = auth.substring(7);
+        let user = verify(token, opts.secret, opts);
+        ctx[opts.key] = user;
+        ctx['token'] = token;
       } catch (e) {
-        console.log('Invalid token : ' + e.message);
-        ctx[opts.key] = null
-        ctx.throw(400, 'Invalid token supplied');
-        return;
+        //console.log('Invalid token : ' + e.message);
       }
-
-      ctx[opts.key] = user;
-      ctx['token'] = token;
     }
-
     await next();
   };
 };

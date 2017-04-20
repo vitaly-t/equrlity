@@ -5,13 +5,14 @@ import { IMain, IDatabase, ITask } from 'pg-promise';
 import * as pgPromise from 'pg-promise';
 import { createWriteStream, createReadStream } from 'fs';
 
+import * as OxiGen from '../gen/oxigen';
+import { genInsertStatement } from "../gen/oxigen";
+
 import * as Utils from "../lib/utils";
 import * as Rpc from '../lib/rpc';
 import * as OxiDate from '../lib/oxidate';
 import * as Dbt from '../lib/datatypes'
-import * as OxiGen from '../lib/oxigen';
 import * as uuid from '../lib/uuid.js';
-import { genInsertStatement } from "../lib/oxigen";
 
 import * as cache from './cache';
 import * as tasks from './pgtasks';
@@ -106,6 +107,12 @@ export async function init() {
     });
   }
   await initCache();
+}
+
+export async function loadTags(): Promise<string[]> {
+  let tagRows: Dbt.Tag[] = await db.any('select * from tags order by tag');
+  let tags = tagRows.map(r => r.tag);
+  return tags;
 }
 
 export async function initCache() {
@@ -228,28 +235,12 @@ export async function touchAuth(prov, authId) {
   cache.auths.set(auth.authProvider + ":" + auth.authId, auth);
 }
 
-export async function getRootLinksForContentId(id: Dbt.contentId): Promise<Dbt.Link[]> {
-  return await db.task(t => tasks.getRootLinksForContentId(t, id));
-}
-
 export async function getLinksForContentId(id: Dbt.contentId): Promise<Dbt.Link | null> {
   return await db.task(t => tasks.getLinksForContentId(t, id));
 }
 
-export async function findRootLinkForContentId(id: Dbt.contentId): Promise<Dbt.Link | null> {
-  return await db.task(t => tasks.getLinksForContentId(t, id));
-}
-
-export async function getRootLinksForUrl(url: Dbt.urlString): Promise<Dbt.Link[]> {
-  return await db.task(t => tasks.getRootLinksForUrl(t, url));
-}
-
 export async function getLinksForUrl(url: Dbt.urlString): Promise<Dbt.Link | null> {
   return await db.task(t => tasks.getLinksForUrl(t, url));
-}
-
-export async function findRootLinkForUrl(url: Dbt.urlString): Promise<Dbt.Link | null> {
-  return await db.task(t => tasks.findRootLinkForUrl(t, url));
 }
 
 export async function isPromoted(userId: Dbt.userId, linkId: Dbt.linkId): Promise<boolean> {
@@ -361,18 +352,10 @@ export async function createUser(email?: string): Promise<Dbt.User> {
 };
 
 async function _handlePromoteContent(t: ITask<any>, userId, req: Rpc.PromoteContentRequest): Promise<[cache.CacheUpdate[], Rpc.PromoteContentResponse]> {
-  let { publicKey, contentId, signature, amount, tags } = req;
-  let usr = await tasks.retrieveRecord<Dbt.User>(t, "users", { userId });
-  if (amount > usr.credits) throw new Error("Negative balances not allowed");
-  let cont = await tasks.retrieveRecord<Dbt.Content>(t, "contents", { contentId });
-  if (userId !== cont.userId) throw new Error("Content owned by different user");
-  let links = await tasks.getRootLinksForContentId(t, contentId);
-  if (links.length > 0) throw new Error("Content already promoted");
-  let url = Utils.contentToUrl(contentId);
-  let updts = await tasks.promoteLink(t, userId, url, cont.title, cont.content, amount, tags);
+  let updts = await tasks.promoteContent(t, userId, req);
   let link = updts.find(e => e.table === "links" as cache.CachedTable).record;
-  await _promoteLink(t, link, amount);
-  let rsp: Rpc.PromoteContentResponse = { url };
+  await _promoteLink(t, link, req.amount);
+  let rsp: Rpc.PromoteContentResponse = { link };
   return [updts, rsp];
 }
 
@@ -412,13 +395,13 @@ async function _handlePromoteLink(t: ITask<any>, userId, req: Rpc.PromoteLinkReq
   else {
     rslt = await tasks.promoteLink(t, userId, url, title, comment, amount, tags);
   }
-  if (amount == 0) return [rslt, { linkDepth: -1 }];
+  if (amount == 0) return [rslt, { link: null, linkDepth: -1 }];
 
   link = rslt.find(e => e.table === "links" as cache.CachedTable).record;
   if (!link) throw new Error("no link generated");
   await _promoteLink(t, link, amount);
   let linkPromoter = cache.users.get(userId).userName;
-  return [rslt, { link: Utils.linkToUrl(link.linkId, title), linkDepth, linkPromoter }];
+  return [rslt, { link, linkDepth }];
 }
 
 export async function handlePromoteLink(userId, req: Rpc.PromoteLinkRequest): Promise<Rpc.PromoteLinkResponse> {
@@ -432,18 +415,13 @@ export async function handlePromoteLink(userId, req: Rpc.PromoteLinkRequest): Pr
 async function _getUserLinks(t: ITask<any>, id: Dbt.userId): Promise<Rpc.UserLinkItem[]> {
   let a = await tasks.getLinksForUser(t, id);
   let rslt: Rpc.UserLinkItem[] = []
-  for (const l of a) {
-    let { linkId, contentId } = l;
-    let cont = await tasks.retrieveRecord<Dbt.Content>(t, "contents", { contentId });
-    let { title, content, contentType, mime_ext, tags, published, created, updated } = cont;
-    let contentUrl = l.url
-    let linkDepth = cache.getLinkDepth(l);
+  for (const link of a) {
+    let { linkId } = link;
+    let linkDepth = cache.getLinkDepth(link);
     let viewCount = await tasks.viewCount(t, linkId);
     let promotionsCount = await tasks.promotionsCount(t, linkId);
     let deliveriesCount = await tasks.deliveriesCount(t, linkId);
-    let amount = l.amount;
-    let info: Rpc.ContentInfoItem = { contentId, contentType, mime_ext, title, content, tags, published, created, updated };
-    let rl: Rpc.UserLinkItem = { linkId, contentUrl, info, linkDepth, viewCount, promotionsCount, deliveriesCount, amount };
+    let rl: Rpc.UserLinkItem = { link, linkDepth, viewCount, promotionsCount, deliveriesCount };
     rslt.push(rl);
   };
   return rslt;
@@ -453,18 +431,8 @@ export async function getUserLinks(id: Dbt.userId): Promise<Rpc.UserLinkItem[]> 
   return await db.task(t => _getUserLinks(t, id));
 }
 
-export async function getUserContents(id: Dbt.userId): Promise<Rpc.ContentInfoItem[]> {
+export async function getUserContents(id: Dbt.userId): Promise<Dbt.Content[]> {
   return await db.task(t => tasks.getUserContents(t, id));
-}
-
-export async function saveContent(req: Rpc.SaveContentRequest): Promise<Dbt.Content> {
-  saveTags(req.tags)
-  return await db.task(t => tasks.saveContent(t, req));
-}
-
-export async function addContent(req: Rpc.SaveContentRequest, userId: Dbt.userId): Promise<Dbt.Content> {
-  saveTags(req.tags)
-  return await db.task(t => tasks.addContent(t, req, userId));
 }
 
 export async function registerInvitation(ipAddress: string, linkId: Dbt.linkId): Promise<Dbt.Invitation> {
@@ -472,7 +440,7 @@ export async function registerInvitation(ipAddress: string, linkId: Dbt.linkId):
 }
 
 export async function insertContent(content: string, mime_ext: string, contentType: Dbt.contentType, title: string, userId: Dbt.userId): Promise<Dbt.Content> {
-  let cont = OxiGen.emptyRec<Dbt.Content>(oxb.tables.get("contents"));
+  let cont = OxiGen.emptyRec<Dbt.Content>("contents");
   title = title.replace(/_/g, " ");
   cont = { ...cont, mime_ext, content, contentType, title, userId };
   let rslt = await insertRecord<Dbt.Content>("contents", cont);
@@ -482,10 +450,10 @@ export async function insertContent(content: string, mime_ext: string, contentTy
 export async function insertBlobContent(strm: any, content: string, mime_ext: string, contentType: Dbt.contentType, title: string, userId: Dbt.userId): Promise<Dbt.Content> {
   return await db.tx(async t => {
     let blobId = await tasks.insertLargeObject(t, strm);
-    let cont = OxiGen.emptyRec<Dbt.Content>(oxb.tables.get("contents"));
-    title = title.replace(/_/g, " ");
+    let cont = OxiGen.emptyRec<Dbt.Content>("contents");
     cont = { ...cont, mime_ext, content, contentType, title, userId, blobId };
     let rslt = await tasks.insertRecord<Dbt.Content>(t, "contents", cont);
+    cache.contents.set(rslt.contentId, rslt);
     return rslt;
   });
 }
@@ -503,7 +471,15 @@ export async function retrieveBlobContent(contentId: Dbt.contentId): Promise<Buf
 
 export async function saveTags(tags: Dbt.tag[]): Promise<Dbt.tag[]> {  // return list of tags added
   let newtags = tags.filter(t => !cache.tags.has(t));
-  if (newtags.length > 0) await db.task(t => tasks.saveTags(t, newtags));
+  if (newtags.length > 0) {
+    await db.task(t => tasks.saveTags(t, newtags));
+    newtags.forEach(t => cache.tags.add(t));
+  }
   return newtags;
 }
+
+export async function registerContentView(userId: Dbt.userId, contentId: Dbt.contentId, ipAddress: Dbt.ipAddress, linkId: Dbt.linkId) {
+  return await db.task(t => tasks.registerContentView(t, userId, contentId, ipAddress, linkId));
+}
+
 

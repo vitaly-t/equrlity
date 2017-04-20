@@ -1,5 +1,5 @@
 import { Url, format, parse } from 'url';
-import { UserLinkItem, ContentInfoItem } from '../lib/rpc';
+import { UserLinkItem } from '../lib/rpc';
 import * as Dbt from '../lib/datatypes';
 import *as Utils from '../lib/utils';
 import { TagSelectOption } from '../lib/tags';
@@ -23,9 +23,10 @@ export interface AppState {
   promotions: Dbt.urlString[];
   connectedUsers: Dbt.userName[];
   reachableUserCount: Dbt.integer;
-  contents: ContentInfoItem[];
+  contents: Dbt.Content[];
   allTags: TagSelectOption[];
-  currentContent: ContentInfoItem;  // used to pass the target content to edit from settings page to postedit page. It is ephemeral!!
+  currentContent: Dbt.Content;  // used to pass the target content to edit from settings page to contentedit page. It is ephemeral!!
+  currentLink: Dbt.Link;  // used to pass the target link to edit from settings page to linkedit page. It is ephemeral!!
 }
 
 export function initState(): AppState {
@@ -33,7 +34,7 @@ export function initState(): AppState {
   return {
     publicKey: null, privateKey: null, links: new Map<string, LinkInfo>(), redirects: new Map<string, string>(),
     activeUrl: null, moniker: 'unknown', authprov: '', email: '', credits: 0, jwt: '', lastErrorMessage: '',
-    investments: [], promotions: [], connectedUsers: [], reachableUserCount: 0, contents: [], allTags: [], currentContent: null
+    investments: [], promotions: [], connectedUsers: [], reachableUserCount: 0, contents: [], allTags: [], currentContent: null, currentLink: null
   };
 }
 
