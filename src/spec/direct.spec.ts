@@ -1,6 +1,7 @@
 "use strict";
 
 import * as fs from "fs"
+import * as stream from 'stream';
 import { Url, parse, format } from 'url';
 import { it } from 'jasmine-promise-wrapper';
 import { TextEncoder, TextDecoder } from 'text-encoding';
@@ -8,12 +9,13 @@ import { TextEncoder, TextDecoder } from 'text-encoding';
 import * as Dbt from '../lib/datatypes'
 import * as Rpc from '../lib/rpc';
 import * as Utils from '../lib/utils';
-import * as Crypto from '../lib/crypto';
 
 Utils.setTest(true);  // Not sure this is kosher ...
 
 import * as pg from '../server/pgsql';
 import * as cache from '../server/cache';
+
+let publicKey: JsonWebKey = { kty: '' };
 
 async function countLinks(): Promise<number> {
   return await pg.countRecordsInTable("links");
@@ -23,20 +25,30 @@ it("should work using direct calls", async () => {
   expect(Utils.isDev()).toEqual(true, "not a dev environment");
   await pg.recreateDataTables();
   await pg.init();
+
+  let u0 = await pg.createUser();
+  console.log("created user 0");
+  expect(u0.userName).toEqual("anonymous_0", "not the first user");
+  expect(u0.credits).toEqual(1000);
+
   let u1 = await pg.createUser();
-  expect(u1.userName).toEqual("anonymous_0", "not the first user");
-  expect(u1.credits).toEqual(1000);
+  console.log("created user 1");
+  expect(u1.userName).toEqual("anonymous_1", "not the second user");
 
   let u2 = await pg.createUser();
-  expect(u2.userName).toEqual("anonymous_1", "not the second user");
+  console.log("created user 2");
+  expect(u2.userName).toEqual("anonymous_2", "not the third user");
+
   let u3 = await pg.createUser();
-  expect(u3.userName).toEqual("anonymous_2", "not the third user");
+  console.log("created user 3");
+  expect(u3.userName).toEqual("anonymous_3", "not the fourth user");
 
   let u4 = await pg.createUser();
-  expect(u4.userName).toEqual("anonymous_3", "not the fourth user");
+  console.log("created user 4");
+  expect(u4.userName).toEqual("anonymous_4", "not the fifth user");
 
-  let pr = await Crypto.generateKeyPair();
-  let publicKey = await Crypto.getPublicKeyJWK(pr);
+  //let pr = await Crypto.generateKeyPair();
+  //let publicKey = await Crypto.getPublicKeyJWK(pr);
 
   let preq1: Rpc.PromoteLinkRequest = { publicKey, comment: "great comment", tags: [], url: "https://www.example.com/anydamnthing", signature: "", title: "wow awesome link", amount: 10 };
   let rsp1 = await pg.handlePromoteLink(u1.userId, preq1);
@@ -51,10 +63,9 @@ it("should work using direct calls", async () => {
   let preq2: Rpc.PromoteLinkRequest = { publicKey, comment: "another great comment", tags: [], url: Utils.linkToUrl(ok.link.linkId, ''), signature: "", title: "promote me baby", amount: 10 };
   let rsp2 = await pg.handlePromoteLink(u2.userId, preq2);
   expect(await countLinks()).toEqual(2);
-  let rspt = rsp2 as Rpc.PromoteLinkResponse
-  expect(rspt.link).toBeDefined("promote call failed");
-  expect(cache.users.get(u2.userId).credits).toEqual(980);
-  expect(cache.getChainFromLinkId(rspt.link.linkId).length).toEqual(2, "link not chained");
+  expect(rsp2.link).toBeDefined("promote call failed");
+  expect(cache.users.get(u2.userId).credits).toEqual(990);
+  expect(cache.getChainFromLinkId(rsp2.link.linkId).length).toEqual(2, "link not chained");
 
   // test social graph updated
   expect(cache.userlinks.get(u1.userId).length).toEqual(1);
@@ -116,33 +127,22 @@ it("should work using direct calls", async () => {
       await pg.redeemLink(link);
       let newbal = cache.users.get(u1.userId).credits;
       expect(bal + linkbal).toEqual(newbal, "link balance not redeemed");
-      let rootLinks = await pg.getRootLinksForContentId(link.contentId);
+      let links = await pg.getLinksForUrl(link.url);
+      let rootLinks = links.filter(l => !l.prevLink);
       expect(rootLinks.length).toEqual(2);
     }
 
   }
 });
 
-it("should work for bytea types", async () => {
-  // test bytea content stuff
+it("should work for blobs", async () => {
   let u = await pg.createUser();
-  let s = "test string"
-  let b = Utils.textToBuffer(s);
-  var s0 = Utils.bufferToText(b);
-  expect(s).toEqual(s0, "encode/decode fails");
-  let rsp0 = await pg.insertBlobContent(b, "", "txt", "post", "A post", u.userId);
-  let cont = await pg.retrieveBlobContent(rsp0.contentId)
-  s0 = Utils.bufferToText(cont);
-  expect(s).toEqual(s0, "insert/retrieve fails(2)");
-
-  //  too slow to run all the time
-  /*
-  let content: Buffer = fs.readFileSync("/dev/pseudoqurl/spec/EarlyThisMorning.wav");
-  let rsp = await pg.insertContent(content, "wav", "audio", "Early This Morning", u.userId);
+  let strm = fs.createReadStream("/dev/pseudoqurl/spec/EarlyThisMorning.wav");
+  let rsp = await pg.insertBlobContent(strm, "testing", "wav", "audio", "Early This Morning", u.userId);
   console.log(rsp.contentId);
-  let cont2 = await pg.retrieveContent(rsp.contentId)
+  let cont2 = await pg.retrieveBlobContent(rsp.contentId)
+  let content = fs.readFileSync("/dev/pseudoqurl/spec/EarlyThisMorning.wav");
   let s1 = pg.pgp.as.buffer(content);
   let s2 = pg.pgp.as.buffer(cont2);
-  expect(s1).toEqual(s2, "bytea cactus");
-  */
-}, 60000);
+  expect(s1).toEqual(s2, "blob cactus");
+}, 20000);

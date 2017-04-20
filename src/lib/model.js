@@ -122,6 +122,7 @@ export default {
   "tupleTypes": {
     "Auth": ["authProvider", "authId", "userId", "created", "updated"],
     "Content": ["contentId", "contentType", "title", "userId", "blobId", "content", "created", "updated", "published", "isPublic",
+      { "name": "url", "type": "urlString" },
       { "name": "mime_ext", "type": "varchar(8)" },
       { "name": "tags", "type": "tag", "multiValued": true },
       { "name": "cryptHash", "type": "binary" },
@@ -129,6 +130,7 @@ export default {
     "Invitation": ["ipAddress", "linkId", "created", "updated"],
     "Link": ["linkId", "userId", "contentId", "title", "created", "updated",
       { "name": "comment", "type": "text" },
+      { "name": "url", "type": "urlString" },
       { "name": "prevLink", "type": "linkId" },
       { "name": "tags", "type": "tag", "multiValued": true },
       { "name": "amount", "type": "integer" },

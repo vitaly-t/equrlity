@@ -6,7 +6,6 @@ console.log("dotenv loaded");
 import * as fs from "fs"
 import * as path from "path"
 import { Url, parse } from 'url';
-import * as concat from 'concat-stream';
 
 // node_modules
 import * as React from 'react';
@@ -400,19 +399,6 @@ router.route({
         let mime_ext = pth.ext.replace(".", "");
         let contentType: Dbt.contentType = part.mime.substring(0, part.mime.indexOf("/"));
         await pg.insertBlobContent(part, '', mime_ext, contentType, part.filename, userId);
-        /*
-        var concatStream = concat(gotFile)
-        part.pipe(concatStream);
-
-        async function gotFile(blob: Buffer) {
-          console.log("got file: " + part.filename);
-          let pth = path.parse(part.filename);
-          let mime_ext = pth.ext.replace(".", "");
-          let contentType: Dbt.contentType = part.mime.substring(0, part.mime.indexOf("/"));
-          await pg.insertBlobContent(blob, '', mime_ext, contentType, part.filename, userId);
-        }
-        */
-
       }
     } catch (err) {
       console.log(err);

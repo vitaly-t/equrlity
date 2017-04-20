@@ -185,37 +185,34 @@ export async function promoteContent(t: ITask<any>, userId, req: Rpc.PromoteCont
   let cont = await retrieveRecord<Dbt.Content>(t, "contents", { contentId });
   if (userId !== cont.userId) throw new Error("Content owned by different user");
   let rslt: CacheUpdate[] = [];
+  //let url = Utils.contentToUrl(contentId);
   let link = OxiGen.emptyRec<Dbt.Link>("links");
-  link = { ...link, userId, contentId, tags, amount, comment, title }
+  link = { ...link, userId, contentId, tags, url: '', amount, comment, title }
   link = await insertRecord<Dbt.Link>(t, "links", link);
-  console.log("inserted link: " + link.linkId);
   rslt.push({ table: "links" as CachedTable, record: link });
   Array.prototype.push.apply(rslt, await adjustUserBalance(t, usr, -amount));
   return rslt;
 }
 
-export async function promoteLink(t: ITask<any>, userId: Dbt.userId, linkurl: string, title, content: string, amount: Dbt.integer, tags: string[]): Promise<CacheUpdate[]> {
+export async function promoteLink(t: ITask<any>, userId: Dbt.userId, url: string, title, comment: string, amount: Dbt.integer, tags: string[]): Promise<CacheUpdate[]> {
   let usr = await retrieveRecord<Dbt.User>(t, "users", { userId });
   if (amount > usr.credits) throw new Error("Negative balances not allowed");
-  let ourl = parse(linkurl);
+  let ourl = parse(url);
   let cont = OxiGen.emptyRec<Dbt.Content>("contents");
   let rslt: CacheUpdate[] = [];
-  cont = { ...cont, userId, title, contentType: "link", content, tags }
+  cont = { ...cont, userId, title, contentType: "link", url, content: comment, tags }
   cont = await insertRecord<Dbt.Content>(t, "contents", cont);
   rslt.push({ table: "contents" as CachedTable, record: cont });
   if (amount > 0) {
     let { contentId } = cont;
-    let link: Dbt.Link = null;
+    let prevLink = null
     if (Utils.isPseudoQLinkURL(ourl)) {
-      let prevLink = Utils.getLinkIdFromUrl(parse(linkurl));
-      let prv = await retrieveRecord<Dbt.Link>(t, "links", { linkId: prevLink });
-      link = { ...prv, userId, prevLink, contentId, amount, tags };
+      prevLink = Utils.getLinkIdFromUrl(parse(url));
+      let link = await retrieveRecord<Dbt.Link>(t, "links", { linkId: prevLink });
+      url = link.url;
     }
-    else {
-      link = { ...emptyLink(), userId, url: linkurl, contentId, amount, tags };
-    }
+    let link: Dbt.Link = { ...emptyLink(), prevLink, userId, url, comment, contentId, amount, tags };
     link = await insertRecord<Dbt.Link>(t, "links", link);
-    console.log("inserted link: " + link.linkId);
     rslt.push({ table: "links" as CachedTable, record: link });
     Array.prototype.push.apply(rslt, await adjustUserBalance(t, usr, -amount));
   }
@@ -372,6 +369,7 @@ export async function countRecordsInTable(t: ITask<any>, tblnm: string): Promise
 }
 
 export async function saveTags(t: ITask<any>, tags: string[]): Promise<void> {
+  if (tags.length === 0) return;
   await t.any(`INSERT INTO tags(tag) VALUES ('${tags.join("'),('")}') on conflict(tag) do nothing`);
 }
 

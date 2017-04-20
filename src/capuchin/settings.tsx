@@ -51,23 +51,12 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
     if (rejectedFiles.length > 0) return;
     if (acceptedFiles.length === 0) return;
     var data = new FormData();
-    for (var f of acceptedFiles) {
-      data.append(f.name, f);
-      //data.append(f.name,fs.createReadStream(__dirname + `${file}`));
-    }
-    var config = {
-      onUploadProgress: (progressEvent) => { this.setState({ uploadProgress: progressEvent.loaded / progressEvent.total }); }
-    };
-    //axios.defaults.headers.common = form.getHeaders();
+    for (var f of acceptedFiles) data.append(f.name, f);
+    let config = { onUploadProgress: (progressEvent) => { this.setState({ uploadProgress: progressEvent.loaded / progressEvent.total }); } };
     let req = uploadRequest(this.props.appState);
-    req.post(Utils.serverUrl + '/upload/media', data, config)
-      .then((response) => {
-        console.log(response.data)
-      })
-      .catch(e => { console.log(e) })
+    let response = await req.post(Utils.serverUrl + '/upload/media', data, config)
+    console.log(response.data)
   }
-
-
 
   render() {
     let st = this.props.appState;
@@ -143,7 +132,7 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
     }
     else if (st.contents.length > 0) {
       let postrows = st.contents.map(p => {
-        let url = Utils.contentToUrl(p.contentId)
+        let url = p.contentType === 'link' ? p.url : Utils.contentToUrl(p.contentId)
         let onclick = () => { chrome.tabs.create({ active: true, url }); };
         let created = p.created ? OxiDate.toFormat(new Date(p.created), "DDDD, MMMM D @ HH:MIP") : '';
         let updated = p.updated ? OxiDate.toFormat(new Date(p.updated), "DDDD, MMMM D @ HH:MIP") : '';
@@ -177,7 +166,7 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
           <thead>
             <tr>
               <th>Type</th>
-              <th>Content</th>
+              <th>Link</th>
               <th>Title</th>
               <th>Public?</th>
               <th>Created</th>

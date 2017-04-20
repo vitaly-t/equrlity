@@ -76,6 +76,7 @@ export interface Content {
   readonly updated: updated | null,
   readonly published: published | null,
   readonly isPublic: isPublic | null,
+  readonly url: urlString | null,
   readonly mime_ext: varchar_8 | null,
   readonly tags: tag[] | null,
   readonly cryptHash: binary | null
@@ -89,6 +90,7 @@ export interface Link {
   readonly created: created | null,
   readonly updated: updated | null,
   readonly comment: text | null,
+  readonly url: urlString | null,
   readonly prevLink: linkId | null,
   readonly tags: tag[] | null,
   readonly amount: integer | null

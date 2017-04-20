@@ -149,7 +149,6 @@ export async function recreateDataTables() {
   }
   console.log("should all be dropped now");
   await createDataTables();
-  await initCache();
 }
 
 export async function resetDataTables() {
@@ -235,11 +234,7 @@ export async function touchAuth(prov, authId) {
   cache.auths.set(auth.authProvider + ":" + auth.authId, auth);
 }
 
-export async function getLinksForContentId(id: Dbt.contentId): Promise<Dbt.Link | null> {
-  return await db.task(t => tasks.getLinksForContentId(t, id));
-}
-
-export async function getLinksForUrl(url: Dbt.urlString): Promise<Dbt.Link | null> {
+export async function getLinksForUrl(url: Dbt.urlString): Promise<Dbt.Link[]> {
   return await db.task(t => tasks.getLinksForUrl(t, url));
 }
 

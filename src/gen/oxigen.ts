@@ -136,6 +136,17 @@ function filterCols(tbl: ITable, data: Object = null): IColumn[] {
   return cols;
 }
 
+function extColRef(c: IColumn): string {
+  let ext = '';
+  if (c.multiValued) {
+    let typ = c.type.sqlType;
+    if (typ.startsWith('varchar')) typ = 'text';
+    ext = '::' + typ + '[]';
+  }
+  return '${' + c.name + '}' + ext;
+}
+
+
 export function columnNames(tbl: ITable, data: Object = null): string[] {
   return filterCols(tbl, data).map(colnm);
 }
@@ -145,7 +156,7 @@ export function columnRefs(tbl: ITable, data: Object = null): string[] {
 }
 
 export function columnSets(tbl: ITable, data: Object = null): string[] {
-  return filterCols(tbl, data).filter(c => tbl.primaryKey.indexOf(c.name) < 0).map(c => colnm(c) + ' = ${' + c.name + '}');
+  return filterCols(tbl, data).filter(c => tbl.primaryKey.indexOf(c.name) < 0).map(c => colnm(c) + ' = ' + extColRef(c));
 }
 
 export function genInsertColumns(tbl: ITable, data: Object = null): string {
@@ -165,7 +176,7 @@ export function genInsertValues(tbl: ITable, data: Object = null): string {
     let i = cols.findIndex(c => c.name === tbl.autoIncrement);
     if (i >= 0) cols.splice(i, 1);
   }
-  let refs = cols.map(c => '${' + c.name + '}');
+  let refs = cols.map(c => extColRef(c));
   return '(' + refs.join() + ')';
 }
 
@@ -199,7 +210,8 @@ export function genUpdateStatement(tbl: ITable, data: Object = null): string {
     }
   }
   let where = tbl.primaryKey.map(c => cnm(c) + ' = ${' + c + '}').join(' AND ');
-  return "UPDATE " + tbl.name + " SET " + columnSets(tbl, data).join() + updtd + " WHERE " + where + ' RETURNING ' + columnNames(tbl).join();
+  let stmt = "UPDATE " + tbl.name + " SET " + columnSets(tbl, data).join() + updtd + " WHERE " + where + ' RETURNING ' + columnNames(tbl).join();
+  return stmt;
 }
 
 export function genUpsertStatement(tbl: ITable, data: Object = null): string {
