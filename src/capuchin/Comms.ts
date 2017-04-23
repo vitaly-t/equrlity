@@ -1,40 +1,32 @@
 import * as UTF8 from '../lib/UTF8';
 import * as Crypto from '../lib/Crypto';
 import { Url, parse } from 'url';
-import axios, { AxiosResponse, AxiosError } from 'axios';
+import axios, { AxiosResponse, AxiosError, AxiosInstance, AxiosRequestConfig } from 'axios';
 import * as Rpc from '../lib/rpc';
 import { AppState } from './AppState';
 import * as Utils from '../lib/utils';
 import * as Dbt from '../lib/datatypes';
 
-function apiRequest(st: AppState) {
-  let headers = { 'content-type': 'application/json', 'Accept': 'application/json' };
-  if (st.jwt) headers['Authorization'] = 'Bearer ' + st.jwt;
-  headers['x-psq-client-version'] = 'capuchin-' + Utils.capuchinVersion();
-  //if (Utils.isDev()) headers['x-psq-moniker'] = st.moniker;
-  return axios.create({
-    timeout: 10000,
-    headers,
-    responseType: 'json',
-    //transformRequest: (data) => {
-    // Do whatever you want to transform the data
-    //    return data;
-    //},
-  });
+export type Header = { name: string, value: string };
+
+export function clientHeaders(st): Header[] {
+  let hdrs: Header[] = [{ name: 'x-psq-client-version', value: 'capuchin-' + Utils.capuchinVersion() }];
+  if (st && st.jwt) hdrs.push({ name: 'Authorization', value: 'Bearer ' + st.jwt });
+  return hdrs;
 }
 
-export function uploadRequest(st: AppState) {
-  let headers = { 'x-psq-client-version': 'capuchin-' + Utils.capuchinVersion() };
-  if (st.jwt) headers['Authorization'] = 'Bearer ' + st.jwt;
-  return axios.create({
-    timeout: 500000,
-    headers,
-    //responseType: 'json',
-    //transformRequest: (data) => {
-    // Do whatever you want to transform the data
-    //    return data;
-    //},
-  });
+export function clientRequest(st: AppState, config: AxiosRequestConfig): AxiosInstance {
+  for (const hdr of clientHeaders(st)) config.headers[hdr.name] = hdr.value;
+  return axios.create(config);
+}
+
+export function uploadRequest(st: AppState): AxiosInstance {
+  return clientRequest(st, { timeout: 600000, headers: {} });
+}
+
+function apiRequest(st: AppState): AxiosInstance {
+  let headers = { 'content-type': 'application/json', 'Accept': 'application/json' };
+  return clientRequest(st, { headers, timeout: 10000, responseType: 'json' });
 }
 
 export async function sendAuthRequest(data: Object, authHeader: string): Promise<AxiosResponse> {

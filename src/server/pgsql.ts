@@ -446,6 +446,7 @@ export async function insertBlobContent(strm: any, content: string, mime_ext: st
   return await db.tx(async t => {
     let blobId = await tasks.insertLargeObject(t, strm);
     let cont = OxiGen.emptyRec<Dbt.Content>("contents");
+    title = await tasks.getUniqueContentTitle(t, userId, title);
     cont = { ...cont, mime_ext, content, contentType, title, userId, blobId };
     let rslt = await tasks.insertRecord<Dbt.Content>(t, "contents", cont);
     cache.contents.set(rslt.contentId, rslt);
@@ -458,8 +459,6 @@ export async function retrieveBlobContent(contentId: Dbt.contentId): Promise<Buf
     let cont = await tasks.retrieveRecord<Dbt.Content>(t, "contents", { contentId });
     let blobId = cont.blobId;
     if (!blobId) return null;
-    //let blob = await retrieveRecord<Dbt.Blob>("blobs", { blobId });
-    //return blob.blobContent;
     return await tasks.retrieveLargeObject(t, blobId);
   });
 }

@@ -18,15 +18,17 @@ import { AppState, postDeserialize } from "./AppState";
 import { uploadRequest } from "./Comms";
 import * as Chrome from './chrome';
 
+type UploadProgress = { fileName: string, progress: number }
+
 interface SettingsPageProps { appState: AppState };
-interface SettingsPageState { nickName: string, email: string, uploadProgress: number, publishingContent?: Dbt.Content, confirmDeleteContent?: Dbt.Content, transferAmount: number, transferTo: string };
+interface SettingsPageState { nickName: string, email: string, uploadProgress: UploadProgress[], publishingContent?: Dbt.Content, confirmDeleteContent?: Dbt.Content, transferAmount: number, transferTo: string };
 
 export class SettingsPage extends React.Component<SettingsPageProps, SettingsPageState> {
 
   constructor(props) {
     super(props);
     console.log("email received: " + props.appState.email);
-    this.state = { nickName: props.appState.moniker, email: props.appState.email, transferAmount: 0, transferTo: '', uploadProgress: 1 };
+    this.state = { nickName: props.appState.moniker, email: props.appState.email, transferAmount: 0, transferTo: '', uploadProgress: [] };
   }
 
   ctrls: {
@@ -45,17 +47,36 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
     Chrome.sendMessage({ eventType: "ChangeSettings", settings });
   }
 
+  setUploadProgress(nm: string, progress: number) {
+    let uploadProgress = [...this.state.uploadProgress]
+    let i = uploadProgress.findIndex(u => u.fileName === nm);
+    if (i < 0) {
+      console.log("file gone?");
+    }
+    else {
+      if (progress === 1) uploadProgress.splice(i, 1);
+      else uploadProgress[i].progress = progress;
+      this.setState({ uploadProgress });
+    }
+  }
+
   onDropMedia = async (acceptedFiles, rejectedFiles) => {
     console.log('Accepted files: ', acceptedFiles);
     console.log('Rejected files: ', rejectedFiles);
     if (rejectedFiles.length > 0) return;
     if (acceptedFiles.length === 0) return;
-    var data = new FormData();
-    for (var f of acceptedFiles) data.append(f.name, f);
-    let config = { onUploadProgress: (progressEvent) => { this.setState({ uploadProgress: progressEvent.loaded / progressEvent.total }); } };
-    let req = uploadRequest(this.props.appState);
-    let response = await req.post(Utils.serverUrl + '/upload/media', data, config)
-    console.log(response.data)
+    let uploadProgress = acceptedFiles.map(f => { return { fileName: f.name, progress: 0 }; });
+    this.setState({ uploadProgress });
+    let uploadFile = async (f: any) => {
+      var data = new FormData();
+      data.append(f.name, f);
+      let config = { onUploadProgress: (progressEvent) => { this.setUploadProgress(f.name, progressEvent.loaded / progressEvent.total) } };
+      let req = uploadRequest(this.props.appState);
+      let response = await req.post(Utils.serverUrl + '/upload/media', data, config);
+      let contents: Dbt.Content[] = response.data;
+      Chrome.sendSyncMessage({ eventType: "AddContents", contents })
+    }
+    for (var f of acceptedFiles) await uploadFile(f);
   }
 
   render() {
@@ -133,7 +154,7 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
     else if (st.contents.length > 0) {
       let postrows = st.contents.map(p => {
         let url = p.contentType === 'link' ? p.url : Utils.contentToUrl(p.contentId)
-        let onclick = () => { chrome.tabs.create({ active: true, url }); };
+        //let onclick = () => { chrome.tabs.create({ active: true, url }); };
         let created = p.created ? OxiDate.toFormat(new Date(p.created), "DDDD, MMMM D @ HH:MIP") : '';
         let updated = p.updated ? OxiDate.toFormat(new Date(p.updated), "DDDD, MMMM D @ HH:MIP") : '';
         let published = p.published ? OxiDate.toFormat(new Date(p.updated), "DDDD, MMMM D @ HH:MIP") : '';
@@ -150,7 +171,7 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
         return (
           <tr key={p.contentId} >
             <td>{p.contentType}</td>
-            <td><a href="" onClick={onclick} >{url}</a></td>
+            <td><a href={url} target='blank' >{url}</a></td>
             <td>{p.title}</td>
             <td><Checkbox disabled defaultChecked={p.isPublic} /></td>
             <td>{created}</td>
@@ -269,22 +290,26 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
         </div>
       </div>);
 
-    let uploadDiv = this.state.uploadProgress < 1 ?
-      <div>
-        <h4>Uploading : </h4>
-        <ProgressBar value={this.state.uploadProgress} />
-      </div>
-      : <div>
-        <h4>Upload new Content(s) : </h4>
-        {vsp}
-        <Dropzone onDrop={this.onDropMedia}>
-          <div>Drop some audio/video/image files here, or click to select files to upload.</div>
-        </Dropzone>
-        {vsp}
-      </div>
-
-
-
+    let uploadDiv;
+    if (this.state.uploadProgress.length > 0) {
+      let uplds = this.state.uploadProgress.map(u => <div><p>{u.fileName}:</p><ProgressBar value={u.progress} /></div>);
+      uploadDiv =
+        <div>
+          <h4>Uploading : </h4>
+          {uplds}
+        </div>
+    }
+    else {
+      uploadDiv =
+        <div>
+          <h4>Upload new Content(s) : </h4>
+          {vsp}
+          <Dropzone style={{ height: '60px', width: '300px', borderStyle: 'dashed', borderWidth: 3 }} onDrop={this.onDropMedia}>
+            <div>Drop some audio/video/image files here, or click to select files to upload.</div>
+          </Dropzone>
+          {vsp}
+        </div>
+    }
     return (
       <div>
         <h3>Status and Settings.</h3>
@@ -351,7 +376,7 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
 }
 
 function render(state: AppState) {
-  console.log("render called");
+  console.log("render called for settings");
   let elem = document.getElementById('app')
   if (!elem) console.log("cannot get app element");
   else {

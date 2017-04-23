@@ -24,6 +24,7 @@ export type userName = string;
 export type uuid = string;
 export type content = string;
 export type blobId = number;
+export type blobContent = Buffer;
 export type contentId = number;
 export type contentCryptId = Buffer;
 export type isPublic = boolean;
@@ -63,6 +64,11 @@ export interface Auth {
   readonly userId: userId | null,
   readonly created: created | null,
   readonly updated: updated | null
+};
+
+export interface Blob {
+  readonly blobId: blobId | null,
+  readonly blobContent: blobContent | null
 };
 
 export interface Content {

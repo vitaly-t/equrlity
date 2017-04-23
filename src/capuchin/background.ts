@@ -253,6 +253,10 @@ export function handleMessage(event: Message, async: boolean = false): AppState 
         let allTags = mergeTags(event.tags, st.allTags);
         if (allTags != st.allTags) st = { ...st, allTags };
         break;
+      case "AddContents":
+        let contents = [...event.contents, ...st.contents];
+        st = { ...st, contents };
+        break;
       default:
         throw new Error("Unknown eventType: " + event.eventType);
     }

@@ -17,9 +17,9 @@ export function jwt(opts): (cxt: any, next: () => Promise<any>) => any {
         ctx[opts.key] = user;
         ctx['token'] = token;
       } catch (e) {
-        //console.log('Invalid token : ' + e.message);
+        console.log('Invalid token : ' + e.message);
       }
-    }
+    } else console.log("No authorization header");
     await next();
   };
 };

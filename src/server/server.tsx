@@ -152,18 +152,16 @@ app.use(serve("dist", "./dist"));
 
 app.use(async (ctx, next) => {
   let client_ver = ctx.headers['x-psq-client-version'];
-  if (!client_ver) {
-    ctx['invalidClientMsg'] = 'Invalid Client - missing header';
-    return;
+  let msg;
+  if (!client_ver) msg = 'Invalid Client - missing header';
+  else {
+    let [client, version] = client_ver.split("-");
+    if (client !== 'capuchin') msg = 'Unknown Client';
+    else if (version !== Utils.capuchinVersion()) msg = 'Client is out-of-date and requires upgrade';
   }
-  let [client, version] = client_ver.split("-");
-  if (client !== 'capuchin') {
-    ctx['invalidClientMsg'] = 'Unknown Client';
-    return;
-  }
-  if (client === 'capuchin' && version !== Utils.capuchinVersion()) {
-    ctx['invalidClientMsg'] = 'Client is out-of-date and requires upgrade';
-    return;
+  if (msg) {
+    ctx['invalidClientMsg'] = msg
+    console.log("Invalid Client : " + msg);
   }
   await next();
 });
@@ -303,6 +301,7 @@ app.use(async function (ctx, next) {
   ctx.set('x-psq-credits', user.credits.toString());
   ctx.set('x-psq-moniker', user.userName);
   ctx.set('x-psq-email', email);
+
   await pg.touchUser(user.userId);
 });
 
@@ -392,18 +391,21 @@ router.route({
     const userId = ctx.userId.id;
 
     let part;
+    let rslt = []
 
     try {
       while (part = await parts) {
         let pth = path.parse(part.filename);
         let mime_ext = pth.ext.replace(".", "");
         let contentType: Dbt.contentType = part.mime.substring(0, part.mime.indexOf("/"));
-        await pg.insertBlobContent(part, '', mime_ext, contentType, part.filename, userId);
+        let cont = await pg.insertBlobContent(part, '', mime_ext, contentType, part.filename, userId);
+        rslt.push(cont);
       }
     } catch (err) {
       console.log(err);
       ctx.throw(err);
     }
+    ctx.body = JSON.stringify(rslt);
   }
 });
 

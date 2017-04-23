@@ -334,13 +334,47 @@ export async function getUserContents(t: ITask<any>, id: Dbt.userId): Promise<Db
   return await t.any(`select * from contents where "userId" = '${id}' order by updated desc`);
 }
 
+export async function insertBlob(t: ITask<any>, strm: any): Promise<Dbt.blobId> {
+  let rslt: Dbt.blobId;
+  let lo_strm = concat(async (blobContent: Buffer) => {
+    console.log("got Buffer");
+    let rec = await insertRecord<Dbt.Blob>(t, "blobs", { blobId: 0, blobContent });
+    rslt = rec.blobId;
+  });
+  strm.pipe(lo_strm);
+  await new Promise(resolve => { lo_strm.on('finish', resolve) });
+  while (!rslt) {
+    console.log("sleeping");
+    await Utils.sleep(1000);
+  }
+  console.log("returning :" + rslt.toString())
+  return rslt;
+}
+
+export async function retrieveBlob(t: ITask<any>, blobId: Dbt.blobId): Promise<Buffer> {
+  let rec = await retrieveRecord<Dbt.Blob>(t, "blobs", { blobId });
+  return rec.blobContent
+}
+
+export async function getUniqueContentTitle(t: ITask<any>, userId: Dbt.userId, title: Dbt.title): Promise<Dbt.title> {
+  let rslt = title;
+  let i = 0;
+  while (true) {
+    let cont = await t.any(`select "contentId" from contents where title='${rslt}' and "userId" = '${userId}'`);
+    if (cont.length === 0) break;
+    ++i;
+    rslt = title + ` (${i.toString()})`;
+  }
+  return rslt;
+}
+
 export async function insertLargeObject(t: ITask<any>, strm: any): Promise<number> {
   const man = new LargeObjectManager({ pgPromise: t });
   let [oid, lo_strm] = await man.createAndWritableStreamAsync(16384)
   strm.pipe(lo_strm);
-  await new Promise(resolve => {
-    lo_strm.on('finish', resolve);
-  });
+  console.log("inserting lo: " + oid);
+  await new Promise(resolve => { lo_strm.on('finish', resolve); });
+  console.log("lo inserted: " + oid);
   return oid;
 }
 

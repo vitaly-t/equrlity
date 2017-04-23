@@ -60,6 +60,11 @@ export interface LaunchLinkEditPage {
   link: Dbt.Link;
 }
 
+export interface AddContents {
+  eventType: "AddContents";
+  contents: Dbt.Content[];
+}
+
 export interface SaveContent {
   eventType: "SaveContent";
   req: Rpc.SaveContentRequest;
@@ -102,13 +107,15 @@ export interface SaveTags {
   eventType: "SaveTags";
   tags: string[];
 }
+
 export interface Thunk {
   eventType: "Thunk";
   fn: (st: AppState) => AppState;
 }
 
 export type Message = PromoteContent | PromoteLink | Initialize | Load | ActivateTab | Render | ChangeSettings | LaunchSettingsPage
-  | LaunchContentEditPage | LaunchLinkEditPage | SaveContent | RemoveContent | CreatePost | RedeemLink | GetUserLinks | DismissPromotion | TransferCredits
+  | LaunchContentEditPage | LaunchLinkEditPage | AddContents | SaveContent | RemoveContent | CreatePost
+  | RedeemLink | GetUserLinks | DismissPromotion | TransferCredits
   | SaveTags | SaveLink | Thunk;
 
 export function getTab(tabId: number): Promise<chrome.tabs.Tab> {

@@ -111,6 +111,7 @@ export default {
   "typeAliases": {
     "content": "text",
     "blobId": "integer",
+    "blobContent": "binary",
     "contentId": "integer",
     "contentCryptId": "binary",
     "isPublic": "boolean",
@@ -121,6 +122,7 @@ export default {
   },
   "tupleTypes": {
     "Auth": ["authProvider", "authId", "userId", "created", "updated"],
+    "Blob": ["blobId", "blobContent"],
     "Content": ["contentId", "contentType", "title", "userId", "blobId", "content", "created", "updated", "published", "isPublic",
       { "name": "url", "type": "urlString" },
       { "name": "mime_ext", "type": "varchar(8)" },
@@ -181,6 +183,11 @@ export default {
         { "ref": "users", "columns": ["userId"] }
       ],
     },
+    "blobs": {
+      "rowType": "Blob",
+      "primaryKey": ["blobId"],
+      "autoIncrement": "blobId",
+    },
     "contents": {
       "rowType": "Content",
       "primaryKey": ["contentId"],
@@ -188,6 +195,7 @@ export default {
       "updated": "updated",
       "foreignKeys": [
         { "ref": "users", "columns": ["userId"] },
+        //{ "ref": "blobs", "columns": ["blobId"] },
       ],
       "uniques": [["contentType", "title"]],
     },

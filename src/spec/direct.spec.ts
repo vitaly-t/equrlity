@@ -145,4 +145,4 @@ it("should work for blobs", async () => {
   let s1 = pg.pgp.as.buffer(content);
   let s2 = pg.pgp.as.buffer(cont2);
   expect(s1).toEqual(s2, "blob cactus");
-}, 20000);
+}, 60000);

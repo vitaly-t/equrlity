@@ -49,16 +49,14 @@ module.exports = function (env) {
               console.log("transforming: " + path);
               var str = (new TextDecoder('utf-8')).decode(content);
               str = str.replace("__CAPUCHIN_VERSION__", capuchinVersion());
-              if (!isDev) {
-                str = str.replace(/\"key\".+$/gm, "");
-              }
+              //if (!isDev) { str = str.replace(/\"key\".+$/gm, ""); }
               return (new TextEncoder()).encode(str);
             }
             return content;
           }
         },
         {
-          from: 'node_modules/react-select/dist/react-select.css',
+          from: 'node_modules/react-select/dist/*.css',
           to: outPath
         },
         {
@@ -67,6 +65,10 @@ module.exports = function (env) {
         },
         {
           from: 'node_modules/@blueprintjs/core/dist/*.css',
+          to: outPath
+        },
+        {
+          from: 'node_modules/video.js/dist/*.css',
           to: outPath
         },
         {
