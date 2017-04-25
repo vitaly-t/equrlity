@@ -2,35 +2,33 @@
 
 import * as React from 'react';
 import * as ReactDOM from 'react-dom';
-import { Button } from "@blueprintjs/core";
+import { Button, Dialog, Checkbox } from "@blueprintjs/core";
 import { Row, Col } from 'react-simple-flex-grid';
+import TextareaAutosize from 'react-autosize-textarea';
 
 import * as oxiDate from '../lib/oxidate';
 import * as utils from '../lib/utils';
 import * as uuid from '../lib/uuid.js';
-import { TagGroupEditor } from '../lib/tags';
+import * as Tags from '../lib/tags';
 import { TimeSpan } from '../lib/timeSpan';
 import { ContentView, rowStyle, btnStyle, lhcolStyle } from "../lib/contentView";
 import * as Rpc from '../lib/rpc';
 import * as Dbt from '../lib/datatypes';
 
-import { AppState, postDeserialize } from "./AppState";
-import { sendGetContentBody, sendSaveContent } from './Comms';
 import * as Chrome from './chrome';
 
 
-interface ContentProps { appState: AppState, onClose?: () => void };
-interface ContentState { title: string, content: string, tags: string[], editing: boolean, isError: boolean, prevContent: string };
+interface ContentEditorProps { info: Dbt.Content, allTags: Tags.TagSelectOption[], creator: string, onClose: () => void }
+interface ContentEditorState { title: string, content: string, tags: string[], editing: boolean, isError: boolean, isPublic: boolean, prevContent: string, isOpen: boolean };
 
+export class ContentEditor extends React.Component<ContentEditorProps, ContentEditorState> {
 
-export class ContentEditor extends React.Component<ContentProps, ContentState> {
-
-  constructor(props: ContentProps) {
+  constructor(props: ContentEditorProps) {
     super(props);
-    let p = props.appState.currentContent;
-    let { title, tags, content } = p
+    let p = props.info;
+    let { title, tags, content, isPublic } = p
     if (!tags) tags = [];
-    this.state = { title, content, tags, editing: true, isError: false, prevContent: content };
+    this.state = { title, content, tags, editing: true, isError: false, isPublic, prevContent: content, isOpen: true };
   }
 
   ctrls: {
@@ -41,18 +39,16 @@ export class ContentEditor extends React.Component<ContentProps, ContentState> {
 
   save() {
     if (this.state.isError) return;
-    let title = this.state.title;
-    let tags = this.state.tags;
-    let cont = this.props.appState.currentContent;
-    let content: Dbt.Content = { ...cont, content: this.state.content, title, tags };
-    let req: Rpc.SaveContentRequest = { content };
+    let { title, tags, isPublic, content } = this.state;
+    let cont: Dbt.Content = { ...this.props.info, content, title, tags, isPublic };
+    let req: Rpc.SaveContentRequest = { content: cont };
     Chrome.sendMessage({ eventType: "SaveContent", req });
     this.close()
   }
 
   close() {
-    if (this.props.onClose) this.props.onClose();
-    else window.close();
+    this.props.onClose();
+    this.setState({ isOpen: false });
   }
 
   startEdit() { this.setState({ editing: true, prevContent: this.state.content }) }
@@ -70,18 +66,16 @@ export class ContentEditor extends React.Component<ContentProps, ContentState> {
   }
 
   render() {
-    let currInfo = this.props.appState.currentContent;
-    let creator = this.props.appState.moniker
-    if (!currInfo) return null;
-    let rowStyle = { width: '100%', marginTop: 2, marginLeft: 5, padding: 6 };
-    //let btnStyle = { height: '24', marginTop: 2, marginLeft: 5, marginRight: 5, display: 'inline-block' };
-    let lhcolStyle = { width: '20%' };
+    let gutter = 20;
+    let btnStyle = { marginRight: gutter / 2 };
+    let rowStyle = { padding: 4 };
+
     if (this.state.editing) {
       let btns = [
         <Button style={btnStyle} key='save' className="pt-intent-primary" onClick={() => this.save()} text="Save" />,
         <Button style={btnStyle} key='stop' onClick={() => this.abandonEdit()} text="Abandon" />
       ];
-      if (currInfo.contentType === 'post') {
+      if (this.props.info.contentType === 'post') {
         btns = [
           <Button style={btnStyle} key='review' className="pt-intent-primary" onClick={() => this.stopEdit()} text="Review" />,
           <Button style={btnStyle} key='stop' onClick={() => this.abandonEdit()} text="Abandon" />
@@ -89,63 +83,45 @@ export class ContentEditor extends React.Component<ContentProps, ContentState> {
       }
 
       return (
-        <div>
-          <Row style={rowStyle} >
-            <Col style={lhcolStyle}>Title:</Col>
-            <Col>
-              <input type="text" style={{ marginTop: 6, height: 30, width: '100%' }} ref={(e) => this.ctrls.title = e} value={this.state.title} onChange={e => this.changeTitle(e)} />
-            </Col>
-          </Row>
-          <Row style={rowStyle} >
-            <Col style={lhcolStyle}>Body:</Col>
-            <Col>
-              <textarea style={{ width: '100%', minHeight: 400 }} ref={(e) => this.ctrls.body = e} value={this.state.content} onChange={e => this.changeBody(e)} />
-            </Col>
-          </Row>
-          <Row style={rowStyle} >
-            <Col>
-              <span style={lhcolStyle}>Tags: </span>
-              <TagGroupEditor tags={this.state.tags} allTags={this.props.appState.allTags} onChange={tags => this.changeTags(tags)} />
-            </Col>
-          </Row>
-          <Row style={rowStyle} >
-            {btns}
-          </Row>
-        </div>
+        <Dialog iconName="inbox" style={{ width: '80%' }} isOpen={this.state.isOpen} title={"Edit Content Info"} canOutsideClickClose={false} onClose={() => this.close()} >
+          <div style={{ padding: gutter }}>
+            <Row style={rowStyle} gutter={gutter}>
+              <Col span={1}>Title:</Col>
+              <Col span={8}>
+                <input type="text" style={{ width: '100%' }} ref={(e) => this.ctrls.title = e} value={this.state.title} onChange={e => this.changeTitle(e)} />
+              </Col>
+              <Col span={2}><Checkbox label="Public?" checked={this.state.isPublic} onChange={e => this.setState({ isPublic: !this.state.isPublic })} /></Col>
+            </Row>
+            <Row span={2}>Body:</Row>
+            <Row span={12}>
+              <TextareaAutosize style={{ width: '100%', minHeight: "100px", maxHeight: "600px" }} ref={(e) => this.ctrls.body = e} value={this.state.content} onChange={e => this.changeBody(e)} />
+            </Row>
+            <Row style={rowStyle} gutter={gutter}>
+              <Col span={1}>Tags:</Col>
+              <Col span={10}>
+                <Tags.TagGroupEditor tags={this.state.tags} allTags={this.props.allTags} onChange={tags => this.changeTags(tags)} />
+              </Col>
+            </Row>
+            <Row style={rowStyle} gutter={gutter}>
+              <Col span={12}>{btns}</Col>
+            </Row>
+          </div>
+        </Dialog >
       );
     } else {
       let { content, title, tags } = this.state;
-      let info: Dbt.Content = { ...currInfo, content, title, tags, userId: '', contentId: 0 };
+      let info: Dbt.Content = { ...this.props.info, content, title, tags, userId: '', contentId: 0 };
       return (
-        <div>
-          <ContentView info={info} creator={creator} />
+        <Dialog iconName="inbox" style={{ width: '80%' }} isOpen={this.state.isOpen} title={"Preview Content Info"} onClose={() => this.close()} >
+          <ContentView info={info} creator={this.props.creator} />
           <div style={rowStyle} >
             <Button key='save' className="pt-intent-primary" style={btnStyle} onClick={() => this.save()} text="Save" />
             <Button key='edit' style={btnStyle} onClick={() => this.startEdit()} text="Edit" />
             <Button key='abandon' style={btnStyle} onClick={() => this.abandonEdit()} text="Abandon" />
           </div>
-        </div>
+        </Dialog>
       );
     }
   }
 }
 
-function render(state: AppState) {
-  console.log("render called");
-  let elem = document.getElementById('app')
-  if (!elem) console.log("cannot get app element");
-  else {
-    ReactDOM.render(<ContentEditor appState={state} />, elem);
-  }
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-  chrome.runtime.sendMessage({ eventType: "GetState" }, st => render(postDeserialize(st)));
-});
-
-chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
-  if (message.eventType === "Render") {
-    let state: AppState = postDeserialize(message.appState);
-    render(state);
-  }
-});

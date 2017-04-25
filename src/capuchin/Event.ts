@@ -50,19 +50,16 @@ export interface LaunchSettingsPage {
   eventType: "LaunchSettingsPage";
 }
 
-export interface LaunchContentEditPage {
-  eventType: "LaunchContentEditPage";
-  info: Dbt.Content;
+export interface LaunchContentsPage {
+  eventType: "LaunchContentsPage";
 }
 
-export interface LaunchLinkEditPage {
-  eventType: "LaunchLinkEditPage";
-  link: Dbt.Link;
+export interface LaunchLinksPage {
+  eventType: "LaunchLinksPage";
 }
 
-export interface AddContents {
-  eventType: "AddContents";
-  contents: Dbt.Content[];
+export interface LaunchUsersPage {
+  eventType: "LaunchUsersPage";
 }
 
 export interface SaveContent {
@@ -75,6 +72,11 @@ export interface RemoveContent {
   req: Rpc.RemoveContentRequest;
 }
 
+export interface AddContents {
+  eventType: "AddContents";
+  contents: Dbt.Content[];
+}
+
 export interface SaveLink {
   eventType: "SaveLink";
   req: Rpc.SaveLinkRequest;
@@ -83,10 +85,6 @@ export interface SaveLink {
 export interface TransferCredits {
   eventType: "TransferCredits";
   req: Rpc.TransferCreditsRequest;
-}
-
-export interface CreatePost {
-  eventType: "CreatePost";
 }
 
 export interface RedeemLink {
@@ -113,8 +111,9 @@ export interface Thunk {
   fn: (st: AppState) => AppState;
 }
 
-export type Message = PromoteContent | PromoteLink | Initialize | Load | ActivateTab | Render | ChangeSettings | LaunchSettingsPage
-  | LaunchContentEditPage | LaunchLinkEditPage | AddContents | SaveContent | RemoveContent | CreatePost
+export type Message = PromoteContent | PromoteLink | Initialize | Load | ActivateTab | Render | ChangeSettings
+  | LaunchSettingsPage | LaunchContentsPage | LaunchLinksPage | LaunchUsersPage
+  | SaveContent | RemoveContent | AddContents
   | RedeemLink | GetUserLinks | DismissPromotion | TransferCredits
   | SaveTags | SaveLink | Thunk;
 
@@ -298,10 +297,21 @@ export namespace AsyncHandlers {
       let rslt: Rpc.GetUserLinksResponse = extractResult(response);
       let promotions = st.promotions;
       let investments = rslt.links;
-      let { connectedUsers, reachableUserCount, contents } = rslt;
+      let { connectedUsers, reachableUserCount } = rslt;
       if (rslt.promotions.length > 0) promotions = [...promotions, ...rslt.promotions];
       let allTags = loadTags(rslt.allTags);
-      st = { ...st, investments, promotions, connectedUsers, reachableUserCount, contents, allTags };
+      st = { ...st, investments, promotions, connectedUsers, reachableUserCount, allTags };
+      return st;
+    };
+  }
+
+  export async function getUserContents(state: AppState): Promise<(st: AppState) => AppState> {
+    let response = await Comms.sendGetUserContents(state);
+    return (st: AppState) => {
+      st = extractHeadersToState(st, response);
+      let rslt: Rpc.GetUserContentsResponse = extractResult(response);
+      let { contents } = rslt;
+      st = { ...st, contents };
       return st;
     };
   }
@@ -350,7 +360,8 @@ export namespace AsyncHandlers {
         let { content } = rslt;
         let i = contents.findIndex(c => c.contentId === content.contentId);
         contents = contents.slice();
-        contents[i] = content;
+        if (i < 0) contents.unshift(content);
+        else contents[i] = content;
         st = { ...st, contents };
       }
       return st;

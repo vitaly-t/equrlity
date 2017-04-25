@@ -515,15 +515,21 @@ router.post('/rpc', async function (ctx: any) {
         ctx.body = { id, result };
         break;
       }
+      case "getUserContents": {
+        //let req: Rpc.GetUserContentsRequest = params;
+        let contents = await pg.getUserContents(userId);
+        let result: Rpc.GetUserContentsResponse = { contents };
+        ctx.body = { id, result };
+        break;
+      }
       case "getUserLinks": {
         //let req: Rpc.GetUserLinksRequest = params;
         let links = await pg.getUserLinks(userId);
         let promotions = await pg.deliverNewPromotions(userId);
         let connectedUsers = cache.getConnectedUserNames(userId);
         let reachableUserCount = cache.getReachableUserIds(userId).length;
-        let contents = await pg.getUserContents(userId);
         let allTags = await pg.loadTags();
-        let result: Rpc.GetUserLinksResponse = { links, promotions, connectedUsers, reachableUserCount, contents, allTags };
+        let result: Rpc.GetUserLinksResponse = { links, promotions, connectedUsers, reachableUserCount, allTags };
         ctx.body = { id, result };
         break;
       }

@@ -52,6 +52,9 @@ export class PopupPanel extends React.Component<PopupPanelProps, PopupPanelState
       return <div>Waiting for response from Server</div>;
     }
     console.log("rendering popup...");
+    let linksAction = () => Chrome.sendMessage({ eventType: "LaunchLinksPage" });
+    let usersAction = () => Chrome.sendMessage({ eventType: "LaunchUsersPage" });
+    let contentsAction = () => Chrome.sendMessage({ eventType: "LaunchContentsPage" });
     let settingsAction = () => Chrome.sendMessage({ eventType: "LaunchSettingsPage" });
     let gutter = 20;
     let lspan = 3;
@@ -60,7 +63,10 @@ export class PopupPanel extends React.Component<PopupPanelProps, PopupPanelState
     let rowStyle = { marginBottom: 10 };
     let btns = [
       <Button key="Close" style={btnStyle} onClick={() => window.close()} text="Close" />,
-      <Button key="Settings" style={btnStyle} className="pt-intent-success" onClick={settingsAction} text="Settings" />
+      <Button key="Settings" style={btnStyle} className="pt-intent-success" onClick={settingsAction} text="Settings" />,
+      <Button key="Investments" style={btnStyle} className="pt-intent-success" onClick={linksAction} text="Investments" />,
+      <Button key="People" style={btnStyle} className="pt-intent-success" onClick={usersAction} text="People" />,
+      <Button key="Contents" style={btnStyle} className="pt-intent-success" onClick={contentsAction} text="Contents" />,
     ]
     let pnl = <div>
       <p>No active URL found</p>

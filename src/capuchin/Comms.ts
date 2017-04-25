@@ -95,12 +95,12 @@ export async function sendGetUserLinks(st: AppState): Promise<AxiosResponse> {
   return await sendApiRequest(st, "getUserLinks", {});
 }
 
-export async function sendRedeemLink(st: AppState, linkId: Dbt.linkId): Promise<AxiosResponse> {
-  return await sendApiRequest(st, "redeemLink", { linkId });
+export async function sendGetUserContents(st: AppState): Promise<AxiosResponse> {
+  return await sendApiRequest(st, "getUserContents", {});
 }
 
-export async function sendGetContentBody(st: AppState): Promise<AxiosResponse> {
-  return await sendApiRequest(st, "getPostBody", { contentId: st.currentContent.contentId });
+export async function sendRedeemLink(st: AppState, linkId: Dbt.linkId): Promise<AxiosResponse> {
+  return await sendApiRequest(st, "redeemLink", { linkId });
 }
 
 export async function sendSaveContent(st: AppState, req: Rpc.SaveContentRequest): Promise<AxiosResponse> {

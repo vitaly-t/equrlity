@@ -62,7 +62,7 @@ import * as Dbt from './datatypes';
 
 //TODO: rename "getUserLinks" to "loadSettingsPage"
 export type Method = "initialize" | "authenticate" | "promoteContent" | "promoteLink" | "loadLink" | "getRedirect" | "changeSettings"
-  | "getUserLinks" | "redeemLink" | "getPostBody" | "saveContent" | "saveLink" | "removeContent" | "transferCredits";
+  | "getUserContents" | "getUserLinks" | "redeemLink" | "saveContent" | "saveLink" | "removeContent" | "transferCredits";
 
 /**
  * Informational type tags used to indicate intended usage.
@@ -135,6 +135,12 @@ export type ChangeSettingsRequest = {
 
 export type ChangeSettingsResponse = { ok: boolean; }
 
+export type GetUserContentsRequest = {}
+
+export type GetUserContentsResponse = {
+  contents: Dbt.Content[];
+}
+
 export type GetUserLinksRequest = {}
 
 export type GetUserLinksResponse = {
@@ -142,7 +148,6 @@ export type GetUserLinksResponse = {
   promotions: Dbt.urlString[];
   connectedUsers: Dbt.userName[];
   reachableUserCount: Dbt.integer;
-  contents: Dbt.Content[];
   allTags: string[];
 }
 
@@ -179,17 +184,17 @@ export type AuthenticateRequest = { provider: string }
 export type AuthenticateResponse = { ok: boolean; }
 
 export type RequestBody = PromoteContentRequest | PromoteLinkRequest | InitializeRequest | LoadLinkRequest | GetRedirectRequest | ChangeSettingsRequest
-  | GetUserLinksRequest | RedeemLinkRequest | SaveLinkRequest | SaveContentRequest | RemoveContentRequest | TransferCreditsRequest | AuthenticateRequest;
+  | GetUserContentsRequest | GetUserLinksRequest | RedeemLinkRequest | SaveLinkRequest | SaveContentRequest | RemoveContentRequest | TransferCreditsRequest | AuthenticateRequest;
 
 export type ResponseBody = PromoteContentResponse & PromoteLinkResponse & InitializeResponse & LoadLinkResponse & GetRedirectResponse & ChangeSettingsResponse
-  & GetUserLinksResponse & RedeemLinkResponse & SaveLinkResponse & SaveContentResponse & RemoveContentResponse & TransferCreditsResponse & AuthenticateResponse;
+  & GetUserContentsResponse & GetUserLinksResponse & RedeemLinkResponse & SaveLinkResponse & SaveContentResponse & RemoveContentResponse & TransferCreditsResponse & AuthenticateResponse;
 
 // internal to server.
 export type RecvRequestBody = PromoteContentRequest & PromoteLinkRequest & InitializeRequest & LoadLinkRequest & GetRedirectRequest & ChangeSettingsRequest
-  & GetUserLinksRequest & RedeemLinkRequest & SaveLinkRequest & SaveContentRequest & RemoveContentRequest & TransferCreditsRequest & AuthenticateRequest;
+  & GetUserContentsRequest & GetUserLinksRequest & RedeemLinkRequest & SaveLinkRequest & SaveContentRequest & RemoveContentRequest & TransferCreditsRequest & AuthenticateRequest;
 
 export type SendResponseBody = PromoteContentResponse | PromoteLinkResponse | InitializeResponse | LoadLinkResponse | GetRedirectResponse | ChangeSettingsResponse
-  | GetUserLinksResponse | RedeemLinkResponse | SaveLinkResponse | SaveContentResponse | RemoveContentResponse | TransferCreditsResponse | AuthenticateResponse;
+  | GetUserContentsResponse | GetUserLinksResponse | RedeemLinkResponse | SaveLinkResponse | SaveContentResponse | RemoveContentResponse | TransferCreditsResponse | AuthenticateResponse;
 
 export type Handler<Request, Response> = (req: Request) => Promise<Response>;
 

@@ -2,32 +2,31 @@
 
 import * as React from 'react';
 import * as ReactDOM from 'react-dom';
-import { Button } from "@blueprintjs/core";
+import { Button, Dialog, Checkbox } from "@blueprintjs/core";
+import { Row, Col } from 'react-simple-flex-grid';
+import TextareaAutosize from 'react-autosize-textarea';
 
 import * as oxiDate from '../lib/oxidate';
 import * as utils from '../lib/utils';
 import * as uuid from '../lib/uuid.js';
-import { TagGroupEditor } from '../lib/tags';
+import * as Tags from '../lib/tags';
 import { TimeSpan } from '../lib/timeSpan';
 import { rowStyle, btnStyle, lhcolStyle } from "../lib/contentView";
 import * as Rpc from '../lib/rpc';
 import * as Dbt from '../lib/datatypes';
 
-import { AppState, postDeserialize } from "./AppState";
-import { sendSaveLink } from './Comms';
 import * as Chrome from './chrome';
 
+interface LinkEditorProps { info: Dbt.Link, allTags: Tags.TagSelectOption[], onClose: () => void }
+interface LinkEditorState { title: string, comment: string, tags: string[], isError: boolean, isOpen: boolean };
 
-interface LinkProps { appState: AppState };
-interface LinkState { title: string, comment: string, tags: string[], isError: boolean };
+export class LinkEditor extends React.Component<LinkEditorProps, LinkEditorState> {
 
-export class LinkEditor extends React.Component<LinkProps, LinkState> {
-
-  constructor(props: LinkProps) {
+  constructor(props: LinkEditorProps) {
     super(props);
-    let p = props.appState.currentLink;
+    let p = props.info
     let { title, tags, comment } = p
-    this.state = { title, comment, tags, isError: false };
+    this.state = { title, comment, tags, isError: false, isOpen: true };
   }
 
   ctrls: {
@@ -35,17 +34,22 @@ export class LinkEditor extends React.Component<LinkProps, LinkState> {
     comment: HTMLTextAreaElement,
   } = { title: null, comment: null };
 
+  close() {
+    this.props.onClose();
+    this.setState({ isOpen: false });
+  }
+
   save() {
     let { title, tags, comment } = this.state;
-    let link = this.props.appState.currentLink;
+    let link = this.props.info
     link = { ...link, title, tags, comment };
     let req: Rpc.SaveLinkRequest = { link };
     Chrome.sendMessage({ eventType: "SaveLink", req });
-    window.close()
+    this.close()
   }
 
   cancel() {
-    window.close()
+    this.close()
   }
 
   changeTitle(e) { this.setState({ title: e.target.value }); }
@@ -56,45 +60,39 @@ export class LinkEditor extends React.Component<LinkProps, LinkState> {
   }
 
   render() {
+    let gutter = 20;
+    let btnStyle = { marginRight: gutter / 2 };
+    let rowStyle = { padding: 4 };
+
     return (
-      <div>
-        <div style={rowStyle} >
-          <div style={lhcolStyle}>Title:</div>
-          <input type="text" style={{ marginTop: 6, height: 30, width: '100%' }} ref={(e) => this.ctrls.title = e} value={this.state.title} onChange={e => this.changeTitle(e)} />
+      <Dialog iconName="inbox" style={{ width: '80%' }} isOpen={this.state.isOpen} title={"Edit Content Info"} canOutsideClickClose={false} onClose={() => this.close()} >
+        <div style={{ padding: gutter }}>
+          <Row style={rowStyle} gutter={gutter}>
+            <Col span={1}>Title:</Col>
+            <Col span={8}>
+              <input type="text" style={{ width: '100%' }} ref={(e) => this.ctrls.title = e} value={this.state.title} onChange={e => this.changeTitle(e)} />
+            </Col>
+          </Row>
+          <Row span={2}>Comment:</Row>
+          <Row span={12}>
+            <TextareaAutosize style={{ width: '100%', minHeight: "100px", maxHeight: "600px" }} ref={(e) => this.ctrls.comment = e} value={this.state.comment} onChange={e => this.changeComment(e)} />
+          </Row>
+          <Row style={rowStyle} gutter={gutter}>
+            <Col span={1}>Tags:</Col>
+            <Col span={10}>
+              <Tags.TagGroupEditor tags={this.state.tags} allTags={this.props.allTags} onChange={tags => this.changeTags(tags)} />
+            </Col>
+          </Row>
+          <Row style={rowStyle} gutter={gutter}>
+            <Col span={12}>
+              <Button key='save' className="pt-intent-primary" style={btnStyle} onClick={() => this.save()} text="Save" />
+              <Button key='cancel' style={btnStyle} onClick={() => this.cancel()} text="Cancel" />
+            </Col>
+          </Row>
         </div>
-        <div style={rowStyle} >
-          <div style={lhcolStyle}>Body:</div>
-          <textarea style={{ width: '100%', minHeight: 400 }} ref={(e) => this.ctrls.comment = e} value={this.state.comment} onChange={e => this.changeComment(e)} />
-        </div>
-        <div style={rowStyle} >
-          <span style={lhcolStyle}>Tags: </span>
-          <TagGroupEditor tags={this.state.tags} allTags={this.props.appState.allTags} onChange={tags => this.changeTags(tags)} />
-        </div>
-        <div style={rowStyle} >
-          <Button key='save' className="pt-intent-primary" style={btnStyle} onClick={() => this.save()} text="Save" />
-          <Button key='cancel' style={btnStyle} onClick={() => this.cancel()} text="Cancel" />
-        </div>
-      </div>
+      </Dialog >
+
     );
   }
 }
 
-function render(state: AppState) {
-  console.log("render called");
-  let elem = document.getElementById('app')
-  if (!elem) console.log("cannot get app element");
-  else {
-    ReactDOM.render(<LinkEditor appState={state} />, elem);
-  }
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-  chrome.runtime.sendMessage({ eventType: "GetState" }, st => render(postDeserialize(st)));
-});
-
-chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
-  if (message.eventType === "Render") {
-    let state: AppState = postDeserialize(message.appState);
-    render(state);
-  }
-});

@@ -42,15 +42,30 @@ function getChromeAccessToken(): Promise<string> {
   });
 }
 
-let settingsTabId = -1;
-function createSettingsTab(): Promise<chrome.tabs.Tab> {
+let tabids = new Map<string, number>();
+function createSystemTab(nm: string): Promise<chrome.tabs.Tab> {
   return new Promise((resolve, reject) => {
-    chrome.tabs.create({ 'url': chrome.extension.getURL('settings.html'), 'selected': true }, t => {
-      if (t.id) settingsTabId = t.id;
+    chrome.tabs.create({ 'url': chrome.extension.getURL(nm + '.html'), 'selected': true }, t => {
+      if (t.id) tabids.set(nm, t.id);
       if (chrome.runtime.lastError) reject(chrome.runtime.lastError.message)
       else resolve(t);
     });
   });
+}
+
+async function launchSystemTab(nm: string) {
+  if (tabids.has(nm)) {
+    try {
+      let tab = await getTab(tabids.get(nm));
+      chrome.tabs.highlight({ windowId: tab.windowId, tabs: tab.index }, w => {
+        chrome.windows.update(tab.windowId, { focused: true });
+      });
+    }
+    catch (e) {
+      tabids.delete(nm);
+    }
+  }
+  if (!tabids.has(nm)) await createSystemTab(nm);
 }
 
 async function initialize() {
@@ -167,19 +182,17 @@ export async function handleAsyncMessage(event: Message) {
         break;
       }
       case "LaunchSettingsPage":
-        if (settingsTabId > 0) {
-          try {
-            let tab = await getTab(settingsTabId);
-            chrome.tabs.highlight({ windowId: tab.windowId, tabs: tab.index }, w => {
-              chrome.windows.update(tab.windowId, { focused: true });
-            });
-          }
-          catch (e) {
-            settingsTabId = -1;
-          }
-        }
-        if (settingsTabId < 0) await createSettingsTab();
-        fn = await AsyncHandlers.getUserLinks(st);
+        launchSystemTab("settings");
+        break;
+      case "LaunchContentsPage":
+        launchSystemTab("contents");
+        fn = await AsyncHandlers.getUserContents(st);
+        break;
+      case "LaunchLinksPage":
+        launchSystemTab("links");
+        break;
+      case "LaunchUsersPage":
+        launchSystemTab("users");
         break;
       case "GetUserLinks": {
         fn = await AsyncHandlers.getUserLinks(st);
@@ -235,19 +248,6 @@ export function handleMessage(event: Message, async: boolean = false): AppState 
           promotions.splice(i, 1);
           st = { ...st, promotions };
         }
-        break;
-      case "CreatePost":
-        chrome.tabs.create({ 'url': chrome.extension.getURL('content.html'), 'selected': true });
-        let cont = OxiGen.emptyRec<Dbt.Content>("contents");
-        st = { ...st, currentContent: { ...cont, contentType: "post", mime_ext: "markdown" } };
-        break;
-      case "LaunchContentEditPage":
-        chrome.tabs.create({ 'url': chrome.extension.getURL('content.html'), 'selected': true });
-        st = { ...st, currentContent: event.info };
-        break;
-      case "LaunchLinkEditPage":
-        chrome.tabs.create({ 'url': chrome.extension.getURL('link.html'), 'selected': true });
-        st = { ...st, currentLink: event.link };
         break;
       case "SaveTags":
         let allTags = mergeTags(event.tags, st.allTags);

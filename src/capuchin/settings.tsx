@@ -1,9 +1,10 @@
 import * as React from 'react';
 import * as ReactDOM from "react-dom";
-import { Button, Dialog, Intent, ProgressBar, Checkbox } from "@blueprintjs/core";
-import * as Dropzone from 'react-dropzone';
+import { Button, Dialog, Intent } from "@blueprintjs/core";
 import { Url, format } from 'url';
 import axios, { AxiosResponse, AxiosError } from 'axios';
+import { Row, Col } from 'react-simple-flex-grid';
+
 
 import * as Dbt from '../lib/datatypes';
 import * as Rpc from '../lib/rpc';
@@ -18,28 +19,24 @@ import { AppState, postDeserialize } from "./AppState";
 import { uploadRequest } from "./Comms";
 import * as Chrome from './chrome';
 
-type UploadProgress = { fileName: string, progress: number }
 
 interface SettingsPageProps { appState: AppState };
-interface SettingsPageState { nickName: string, email: string, uploadProgress: UploadProgress[], publishingContent?: Dbt.Content, confirmDeleteContent?: Dbt.Content, transferAmount: number, transferTo: string };
+interface SettingsPageState { nickName: string, email: string };
 
 export class SettingsPage extends React.Component<SettingsPageProps, SettingsPageState> {
 
   constructor(props) {
     super(props);
     console.log("email received: " + props.appState.email);
-    this.state = { nickName: props.appState.moniker, email: props.appState.email, transferAmount: 0, transferTo: '', uploadProgress: [] };
+    this.state = { nickName: props.appState.moniker, email: props.appState.email };
   }
 
   ctrls: {
-    nickNameInput?: HTMLInputElement, emailInput?: HTMLInputElement, depositInput?: HTMLInputElement,
-    transferAmount?: HTMLInputElement, transferTo?: HTMLInputElement
+    nickNameInput?: HTMLInputElement, emailInput?: HTMLInputElement
   } = {}
 
   changeNickName() { this.setState({ nickName: this.ctrls.nickNameInput.value }); }
   changeEmail() { this.setState({ email: this.ctrls.emailInput.value }); }
-  changeTransferAmount() { this.setState({ transferAmount: parseInt(this.ctrls.transferAmount.value) }); }
-  changeTransferTo() { this.setState({ transferTo: this.ctrls.transferTo.value }); }
 
   saveSettings = () => {
     console.log("saving settings");
@@ -47,206 +44,13 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
     Chrome.sendMessage({ eventType: "ChangeSettings", settings });
   }
 
-  setUploadProgress(nm: string, progress: number) {
-    let uploadProgress = [...this.state.uploadProgress]
-    let i = uploadProgress.findIndex(u => u.fileName === nm);
-    if (i < 0) {
-      console.log("file gone?");
-    }
-    else {
-      if (progress === 1) uploadProgress.splice(i, 1);
-      else uploadProgress[i].progress = progress;
-      this.setState({ uploadProgress });
-    }
-  }
-
-  onDropMedia = async (acceptedFiles, rejectedFiles) => {
-    console.log('Accepted files: ', acceptedFiles);
-    console.log('Rejected files: ', rejectedFiles);
-    if (rejectedFiles.length > 0) return;
-    if (acceptedFiles.length === 0) return;
-    let uploadProgress = acceptedFiles.map(f => { return { fileName: f.name, progress: 0 }; });
-    this.setState({ uploadProgress });
-    let uploadFile = async (f: any) => {
-      var data = new FormData();
-      data.append(f.name, f);
-      let config = { onUploadProgress: (progressEvent) => { this.setUploadProgress(f.name, progressEvent.loaded / progressEvent.total) } };
-      let req = uploadRequest(this.props.appState);
-      let response = await req.post(Utils.serverUrl + '/upload/media', data, config);
-      let contents: Dbt.Content[] = response.data;
-      Chrome.sendSyncMessage({ eventType: "AddContents", contents })
-    }
-    for (var f of acceptedFiles) await uploadFile(f);
-  }
-
   render() {
     let st = this.props.appState;
-    let invs = st.investments;
     let userNames = st.connectedUsers;
-    let invdiv = <p>You have no current investments</p>
-    if (invs.length > 0) {
-      let invrows = invs.map(item => {
-        let l = item.link
-        let linkId = l.linkId;
-        let url = Utils.linkToUrl(linkId, l.title);
-        let tags = l.tags && l.tags.length > 0 ? l.tags.join(", ") : '';
-        let redeem = () => { Chrome.sendMessage({ eventType: "RedeemLink", linkId }); };
-        let redeemText = l.amount > 0 ? "Redeem" : "Delete";
-        let btns = [<Button onClick={redeem} text={redeemText} />];
-        let onUrlClick = () => { chrome.tabs.create({ active: true, url }); };
-        let edit = () => { Chrome.sendSyncMessage({ eventType: "LaunchLinkEditPage", link: l }); };
-        btns.push(<Button onClick={edit} text="Edit" />);
-
-        return (
-          <tr key={l.linkId} >
-            <td><a href="" onClick={onUrlClick} >{url}</a></td>
-            <td>{l.contentId}</td>
-            <td>{l.comment}</td>
-            <td>{item.linkDepth}</td>
-            <td>{item.promotionsCount}</td>
-            <td>{item.deliveriesCount}</td>
-            <td>{item.viewCount}</td>
-            <td>{l.amount}</td>
-            <td>{l.created}</td>
-            <td>{l.updated}</td>
-            <td>{tags}</td>
-            <td>{btns}</td>
-          </tr>
-        );
-      });
-      invdiv = (
-        <table className="pt-table pt-striped pt-bordered" >
-          <thead>
-            <tr>
-              <th>URL</th>
-              <th>Content ID</th>
-              <th>Comment</th>
-              <th>Depth</th>
-              <th>Promotions</th>
-              <th>Deliveries</th>
-              <th>Views</th>
-              <th>Balance</th>
-              <th>Created</th>
-              <th>Updated</th>
-              <th>Tags</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {invrows}
-          </tbody>
-        </table>
-      );
-    }
-
-    let contsdiv = <p>You do not currently have any uploaded contents.</p>
-    if (this.state.confirmDeleteContent) {
-      let msg = "Warning: Deleting a Content Item is irreversible. Are you sure you wish to Proceed?";
-      let onClose = () => this.setState({ confirmDeleteContent: null });
-      let contentId = this.state.confirmDeleteContent.contentId;
-      let onYes = () => Chrome.sendMessage({ eventType: "RemoveContent", req: { contentId } });
-      contsdiv = <YesNoBox message={msg} onYes={onYes} onClose={onClose} />
-    }
-    else if (this.state.publishingContent) {
-      let onClose = () => this.setState({ publishingContent: null });
-      contsdiv = <PublishContent info={this.state.publishingContent} allTags={this.props.appState.allTags} onClose={onClose} />
-    }
-    else if (st.contents.length > 0) {
-      let postrows = st.contents.map(p => {
-        let url = p.contentType === 'link' ? p.url : Utils.contentToUrl(p.contentId)
-        //let onclick = () => { chrome.tabs.create({ active: true, url }); };
-        let created = p.created ? OxiDate.toFormat(new Date(p.created), "DDDD, MMMM D @ HH:MIP") : '';
-        let updated = p.updated ? OxiDate.toFormat(new Date(p.updated), "DDDD, MMMM D @ HH:MIP") : '';
-        let published = p.published ? OxiDate.toFormat(new Date(p.updated), "DDDD, MMMM D @ HH:MIP") : '';
-        let postEdit = null;
-        let remove = () => { this.setState({ confirmDeleteContent: p }) };
-        let btns = [<Button onClick={remove} text="Delete" />];
-        let tags = p.tags && p.tags.length > 0 ? p.tags.join(", ") : '';
-        let edit = () => { Chrome.sendSyncMessage({ eventType: "LaunchContentEditPage", info: p }); };
-        btns.push(<Button onClick={edit} text="Edit" />);
-
-        let publish = () => { this.setState({ publishingContent: p }) };
-        btns.push(<Button onClick={publish} text="Publish" />);
-
-        return (
-          <tr key={p.contentId} >
-            <td>{p.contentType}</td>
-            <td><a href={url} target='blank' >{url}</a></td>
-            <td>{p.title}</td>
-            <td><Checkbox disabled defaultChecked={p.isPublic} /></td>
-            <td>{created}</td>
-            <td>{updated}</td>
-            <td>{published}</td>
-            <td>{tags}</td>
-            <td>{btns}</td>
-          </tr>
-        );
-      });
-      contsdiv = (
-        <table className="pt-table pt-striped pt-bordered" >
-          <thead>
-            <tr>
-              <th>Type</th>
-              <th>Link</th>
-              <th>Title</th>
-              <th>Public?</th>
-              <th>Created</th>
-              <th>Updated</th>
-              <th>Published</th>
-              <th>Tags</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {postrows}
-          </tbody>
-        </table>);
-    }
-
-    let links = st.promotions;
-    let linkdiv = <p>There are no new promoted links for you.</p>
-    if (links.length > 0) {
-      let linkrows = links.map(url => {
-        let dismiss = () => { Chrome.sendMessage({ eventType: "DismissPromotion", url }); };
-        let onclick = () => { chrome.tabs.create({ active: true, url }); };
-        let [tgt, desc] = url.split('#');
-        if (desc) desc = desc.replace('_', ' ');
-        return (
-          <tr key={url} >
-            <td><Button onClick={dismiss} text="Dismiss" /></td>
-            <td><a href="" onClick={onclick} >{tgt}</a></td>
-            <td>{desc}</td>
-          </tr>
-        );
-      });
-      linkdiv = (
-        <table className="pt-table pt-striped pt-bordered">
-          <thead>
-            <tr>
-              <th></th>
-              <th>Link</th>
-              <th>Description</th>
-            </tr>
-          </thead>
-          <tbody>
-            {linkrows}
-          </tbody>
-        </table>
-      );
-    }
-
     let vsp = <div style={{ height: 20 }} />;
     let divStyle = { width: '100%', marginTop: 5, marginLeft: 5, padding: 6 };
     let lhcolStyle = { width: '20%' };
-    let transfer = () => {
-      let amount = this.state.transferAmount;
-      let transferTo = this.state.transferTo;
-      let req: Rpc.TransferCreditsRequest = { transferTo, amount };
-      if (amount > 0 && transferTo) {
-        Chrome.sendMessage({ eventType: "TransferCredits", req });
-        this.setState({ transferAmount: 0 });
-      }
-    };
+
     let userp = userNames.length > 0 ? <div><p>You are currently directly connected with another {userNames.length} user{userNames.length > 1 ? "s" : ""}.</p>
       <p>Your social graph currently extends to {st.reachableUserCount} reachable users.</p>
     </div>
@@ -275,41 +79,6 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
         };
     */
 
-    let transferDiv = (
-      <div>
-        {vsp}
-        <p>If you wish, you can transfer credits to another user.</p>
-        <div style={divStyle} >
-          <div style={{ display: 'inline' }}>Amount to Transfer: </div>
-          <input type="number" style={{ display: 'inline', height: 24, marginLeft: 20, marginTop: 6, width: '100' }} ref={(e) => this.ctrls.transferAmount = e}
-            value={this.state.transferAmount} onChange={e => this.changeTransferAmount()} />
-          <div style={{ display: 'inline', marginLeft: 20 }}>Transfer To: </div>
-          <input type="text" style={{ display: 'inline', height: 24, marginLeft: 20, marginTop: 6, width: '200' }} ref={(e) => this.ctrls.transferTo = e}
-            value={this.state.transferTo} onChange={e => this.changeTransferTo()} />
-          <Button key='transfer' className="pt-intent-primary" style={{ display: 'inline', marginLeft: 20 }} onClick={() => transfer()} text="Transfer" />
-        </div>
-      </div>);
-
-    let uploadDiv;
-    if (this.state.uploadProgress.length > 0) {
-      let uplds = this.state.uploadProgress.map(u => <div><p>{u.fileName}:</p><ProgressBar value={u.progress} /></div>);
-      uploadDiv =
-        <div>
-          <h4>Uploading : </h4>
-          {uplds}
-        </div>
-    }
-    else {
-      uploadDiv =
-        <div>
-          <h4>Upload new Content(s) : </h4>
-          {vsp}
-          <Dropzone style={{ height: '60px', width: '300px', borderStyle: 'dashed', borderWidth: 3 }} onDrop={this.onDropMedia}>
-            <div>Drop some audio/video/image files here, or click to select files to upload.</div>
-          </Dropzone>
-          {vsp}
-        </div>
-    }
     return (
       <div>
         <h3>Status and Settings.</h3>
@@ -344,39 +113,12 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
         <div style={divStyle}>
           <Button className="pt-intent-primary" onClick={this.saveSettings} text="Save Settings" />
         </div>
-        {vsp}
-        <div>
-          <h4>Investments : </h4>
-          {vsp}
-          <h6>Your Current Wallet Balance is : {st.credits}.</h6>
-          {transferDiv}
-          {vsp}
-          {invdiv}
-        </div>
-        {vsp}
-        <div>
-          <h4>Promoted Links for you : </h4>
-          {vsp}
-          {linkdiv}
-        </div>
-        {vsp}
-        <div>
-          <h4>Your Contents : </h4>
-          {vsp}
-          {contsdiv}
-          {vsp}
-          <div style={divStyle}>
-            <Button className="pt-intent-primary" onClick={() => Chrome.sendSyncMessage({ eventType: "CreatePost" })} text="Create New Post" />
-          </div>
-        </div>
-        {vsp}
-        {uploadDiv}
       </div>);
   }
 }
 
 function render(state: AppState) {
-  console.log("render called for settings");
+  //console.log("render called for settings");
   let elem = document.getElementById('app')
   if (!elem) console.log("cannot get app element");
   else {
@@ -400,7 +142,7 @@ interface PublishContentState { title: string, comment: string, tags: string[], 
 export class PublishContent extends React.Component<PublishContentProps, PublishContentState> {
   constructor(props: PublishContentProps) {
     super(props);
-    let tags = props.info.tags;
+    let tags = props.info.tags || [];
     this.state = { isOpen: true, amount: 10, title: props.info.title, tags, comment: '' };
   }
 
@@ -438,11 +180,11 @@ export class PublishContent extends React.Component<PublishContentProps, Publish
         <div className="pt-dialog-body">
           <div style={rowStyle} >
             <div style={lhcolStyle}>Title:</div>
-            <input type="text" style={{ marginTop: 6, height: 30, width: '100%' }} ref={(e) => this.ctrls.title = e} value={this.state.title} onChange={e => this.changeTitle(e)} />
+            <input type="text" style={{ marginTop: 6, height: "30px", width: '100%' }} ref={(e) => this.ctrls.title = e} value={this.state.title} onChange={e => this.changeTitle(e)} />
           </div>
           <div style={rowStyle} >
             <div style={lhcolStyle}>Comment:</div>
-            <input type="text" style={{ marginTop: 6, height: 30, width: '100%' }} ref={(e) => this.ctrls.comment = e} value={this.state.comment} onChange={e => this.changeComment(e)} />
+            <input type="text" style={{ marginTop: 6, height: "30px", width: '100%' }} ref={(e) => this.ctrls.comment = e} value={this.state.comment} onChange={e => this.changeComment(e)} />
           </div>
           <div style={rowStyle} >
             <div style={lhcolStyle}>Tags:</div>
@@ -450,7 +192,7 @@ export class PublishContent extends React.Component<PublishContentProps, Publish
           </div>
           <div style={rowStyle} >
             <div style={{ display: 'inline' }}>Investment amount:</div>
-            <input type="number" style={{ display: 'inline', height: 24, marginTop: 6, width: '100px' }} ref={(e) => this.ctrls.investment = e} value={this.state.amount} onChange={e => this.changeInvestment(e)} />
+            <input type="number" style={{ display: 'inline', height: "24px", marginTop: "6px", width: '100px' }} ref={(e) => this.ctrls.investment = e} value={this.state.amount} onChange={e => this.changeInvestment(e)} />
           </div>
         </div>
         <div className="pt-dialog-footer">

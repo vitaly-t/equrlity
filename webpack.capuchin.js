@@ -1,3 +1,4 @@
+const fs = require('fs');
 const webpack = require('webpack');
 const path = require('path');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
@@ -7,15 +8,38 @@ const { capuchinVersion } = require('./dist/lib/utils');
 const { TextEncoder, TextDecoder } = require('text-encoding');
 let outPath = path.resolve(__dirname, tgtdir);
 
+function htmlPage(pg) {
+  return `
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <link href="./node_modules/@blueprintjs/core/dist/blueprint.css" rel="stylesheet" />
+    <link href="./node_modules/react-select/dist/react-select.css" rel="stylesheet" />
+    <link href="./node_modules/react-simple-flex-grid/lib/main.css" rel="stylesheet" />
+</head>
+
+<body>
+    <script type="text/javascript" src="${pg}_bndl.js"></script>
+    <div id="app"></div>
+</body>
+
+</html>`;
+}
+
+let entry = {
+  main: './src/capuchin/main.tsx',
+  background: './src/capuchin/background.ts',
+}
+for (const pg of ['settings', 'contents', 'links']) {
+  entry[pg] = `./src/capuchin/${pg}.tsx`;
+  fs.writeFileSync(outPath + '/' + pg + '.html', htmlPage(pg));
+}
+
 module.exports = function (env) {
   return {
-    entry: {
-      main: './src/capuchin/main.tsx',
-      background: './src/capuchin/background.ts',
-      settings: './src/capuchin/settings.tsx',
-      content: './src/capuchin/contentEditor.tsx',
-      link: './src/capuchin/linkEditor.tsx',
-    },
+    entry,
     output: {
       path: outPath,
       filename: '[name]_bndl.js'
