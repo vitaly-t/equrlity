@@ -8,6 +8,10 @@ const { capuchinVersion } = require('./dist/lib/utils');
 const { TextEncoder, TextDecoder } = require('text-encoding');
 let outPath = path.resolve(__dirname, tgtdir);
 
+if (!fs.existsSync(outPath)) {
+  fs.mkdirSync(outPath);
+}
+
 function htmlPage(pg) {
   return `
 <!DOCTYPE html>
@@ -49,6 +53,10 @@ module.exports = function (env) {
     },
     module: {
       rules: [
+        {
+          test: /\.css$/,
+          use: ['style-loader', 'css-loader'],
+        },
         {
           test: /\.tsx?$/,
           loader: 'ts-loader',

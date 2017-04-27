@@ -151,18 +151,7 @@ export async function handleAsyncMessage(event: Message) {
         fn = await AsyncHandlers.changeSettings(st, event.settings);
         break;
       case "PromoteLink": {
-        let curl = prepareUrl(st.activeUrl);
-        if (!curl) return;
-
-        // we can't do storeState from here. 
-        // so instead we just lie by calling render with temporary state; (so much for source of truth!!)
-        chrome.runtime.sendMessage({ eventType: 'Render', appState: preSerialize(setWaiting(st, st.activeUrl)) });
-        // force a refresh with correct state in 5 seconds
-        setTimeout(() => {
-          //console.log("refreshing with correct state");
-          chrome.runtime.sendMessage({ eventType: 'Render', appState: preSerialize(currentState()) });
-        }, 5000);
-        fn = await AsyncHandlers.promoteLink(st, event.title, event.comment, event.amount, event.tags);
+        fn = await AsyncHandlers.promoteLink(st, event);
         break;
       }
       case "PromoteContent": {
@@ -181,18 +170,10 @@ export async function handleAsyncMessage(event: Message) {
         fn = await AsyncHandlers.redeemLink(st, event.linkId);
         break;
       }
-      case "LaunchSettingsPage":
-        launchSystemTab("settings");
-        break;
-      case "LaunchContentsPage":
-        launchSystemTab("contents");
-        fn = await AsyncHandlers.getUserContents(st);
-        break;
-      case "LaunchLinksPage":
-        launchSystemTab("links");
-        break;
-      case "LaunchUsersPage":
-        launchSystemTab("users");
+      case "LaunchPage":
+        launchSystemTab(event.page);
+        if (event.page === 'contents') fn = await AsyncHandlers.getUserContents(st);
+        else if (event.page === 'links') fn = await AsyncHandlers.getUserLinks(st);
         break;
       case "GetUserLinks": {
         fn = await AsyncHandlers.getUserLinks(st);

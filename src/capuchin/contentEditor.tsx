@@ -110,7 +110,7 @@ export class ContentEditor extends React.Component<ContentEditorProps, ContentEd
       );
     } else {
       let { content, title, tags } = this.state;
-      let info: Dbt.Content = { ...this.props.info, content, title, tags, userId: '', contentId: 0 };
+      let info: Dbt.Content = { ...this.props.info, content, title, tags, userId: '', contentId: '' };
       return (
         <Dialog iconName="inbox" style={{ width: '80%' }} isOpen={this.state.isOpen} title={"Preview Content Info"} onClose={() => this.close()} >
           <ContentView info={info} creator={this.props.creator} />

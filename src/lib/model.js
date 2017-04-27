@@ -1,11 +1,11 @@
 export default {
-  "scalarTypes": {
-    "authId": {
-      "sqlType": "varchar(128)"
+  scalarTypes: {
+    authId: {
+      sqlType: "varchar(128)"
     },
-    "authProvider": {
-      "sqlType": "varchar(36)",
-      "enum": [
+    authProvider: {
+      sqlType: "varchar(36)",
+      enum: [
         "facebook",
         "github",
         "twitter",
@@ -13,17 +13,17 @@ export default {
         "chrome",
       ]
     },
-    "binary": {
-      "tsType": "Buffer",
-      "sqlType": "bytea"
+    binary: {
+      tsType: "Buffer",
+      sqlType: "bytea"
     },
-    "boolean": {
-      "tsType": "boolean",
-      "sqlType": "boolean"
+    boolean: {
+      tsType: "boolean",
+      sqlType: "boolean"
     },
-    "contentType": {
-      "sqlType": "varchar(10)",
-      "enum": [
+    contentType: {
+      sqlType: "varchar(10)",
+      enum: [
         "video",
         "post",
         "audio",
@@ -31,217 +31,205 @@ export default {
         "link",
       ]
     },
-    "created": {
-      "tsType": "Date",
-      "sqlType": "timestamptz",
-      "sqlDefault": "CURRENT_TIMESTAMP"
+    created: {
+      tsType: "Date",
+      sqlType: "timestamptz",
+      sqlDefault: "CURRENT_TIMESTAMP"
     },
-    "date": {
-      "tsType": "Date",
-      "sqlType": "date"
+    date: {
+      tsType: "Date",
+      sqlType: "date"
     },
-    "email": {
-      "tsType": "string",
-      "sqlType": "varchar(160)"
+    email: {
+      tsType: "string",
+      sqlType: "varchar(160)"
     },
-    "integer": {
-      "tsType": "number",
-      "sqlType": "integer"
+    integer: {
+      tsType: "number",
+      sqlType: "integer"
     },
-    "ipAddress": {
-      "tsType": "string",
-      "sqlType": "varchar(30)"
+    ipAddress: {
+      tsType: "string",
+      sqlType: "varchar(30)"
     },
-    "json": {
-      "sqlType": "jsonb"
+    json: {
+      sqlType: "jsonb"
     },
-    "linkId": {
-      "tsType": "number",
-      "sqlType": "integer"
+    hashId: {
+      tsType: "string",
+      sqlType: "varchar(6)"
     },
-    "title": {
-      "tsType": "string",
-      "sqlType": "varchar(100)"
+    percentage: {
+      tsType: "number",
+      sqlType: "integer",
+      max: 100,
+      min: 0
     },
-    "percentage": {
-      "tsType": "number",
-      "sqlType": "integer",
-      "max": 100,
-      "min": 0
+    tag: {
+      tsType: "string",
+      sqlType: "varchar(20)"
     },
-    "tag": {
-      "tsType": "string",
-      "sqlType": "varchar(20)"
+    text: {
+      tsType: "string",
+      sqlType: "text"
     },
-    "text": {
-      "tsType": "string",
-      "sqlType": "text"
+    timestamp: {
+      tsType: "Date",
+      sqlType: "timestamptz"
     },
-    "timestamp": {
-      "tsType": "Date",
-      "sqlType": "timestamptz"
+    title: {
+      tsType: "string",
+      sqlType: "varchar(254)"
     },
-    "title": {
-      "tsType": "string",
-      "sqlType": "varchar(254)"
+    updated: {
+      tsType: "Date",
+      sqlType: "timestamptz",
+      sqlDefault: "CURRENT_TIMESTAMP"
     },
-    "updated": {
-      "tsType": "Date",
-      "sqlType": "timestamptz",
-      "sqlDefault": "CURRENT_TIMESTAMP"
-    },
-    "userGroup": {
-      "sqlType": "varchar(10)",
-      "enum": [
+    userGroup: {
+      sqlType: "varchar(10)",
+      enum: [
         "admin",
         "author",
         "member"
       ]
     },
-    "urlString": {
-      "sqlType": "varchar(2000)"
+    urlString: {
+      sqlType: "varchar(2000)"
     },
-    "userName": {
-      "sqlType": "varchar(72)"
+    userName: {
+      sqlType: "varchar(72)"
     },
-    "uuid": {
-      "sqlType": "varchar(36)"
+    uuid: {
+      sqlType: "varchar(36)"
     }
   },
-  "typeAliases": {
-    "content": "text",
-    "blobId": "integer",
-    "blobContent": "binary",
-    "contentId": "integer",
-    "contentCryptId": "binary",
-    "isPublic": "boolean",
-    "publicKey": "binary",
-    "published": "timestamp",
-    "userId": "uuid",
-    "viewId": "integer",
+  typeAliases: {
+    content: "text",
+    blobId: "integer",
+    blobContent: "binary",
+    contentId: "hashId",
+    contentCryptId: "binary",
+    isPublic: "boolean",
+    linkId: "hashId",
+    publicKey: "binary",
+    published: "timestamp",
+    userId: "uuid",
+    viewId: "integer",
   },
-  "tupleTypes": {
-    "Auth": ["authProvider", "authId", "userId", "created", "updated"],
-    "Blob": ["blobId", "blobContent"],
-    "Content": ["contentId", "contentType", "title", "userId", "blobId", "content", "created", "updated", "published", "isPublic",
-      { "name": "url", "type": "urlString" },
-      { "name": "mime_ext", "type": "varchar(8)" },
-      { "name": "tags", "type": "tag", "multiValued": true },
-      { "name": "cryptHash", "type": "binary" },
+  tupleTypes: {
+    Auth: ["authProvider", "authId", "userId", "created", "updated"],
+    Content: ["contentId", "contentType", "title", "userId", "blobId", "content", "created", "updated", "published", "isPublic",
+      { name: "url", type: "urlString" },
+      { name: "mime_ext", type: "varchar(8)" },
+      { name: "tags", type: "tag", multiValued: true },
+      { name: "cryptHash", type: "binary" },
     ],
-    "Invitation": ["ipAddress", "linkId", "created", "updated"],
-    "Link": ["linkId", "userId", "contentId", "title", "created", "updated",
-      { "name": "comment", "type": "text" },
-      { "name": "url", "type": "urlString" },
-      { "name": "prevLink", "type": "linkId" },
-      { "name": "tags", "type": "tag", "multiValued": true },
-      { "name": "amount", "type": "integer" },
+    Invitation: ["ipAddress", "linkId", "created", "updated"],
+    Link: ["linkId", "userId", "contentId", "title", "created", "updated",
+      { name: "comment", type: "text" },
+      { name: "url", type: "urlString" },
+      { name: "prevLink", type: "linkId" },
+      { name: "tags", type: "tag", multiValued: true },
+      { name: "amount", type: "integer" },
     ],
-    "Promotion": ["linkId", "userId", "created", "updated",
-      { "name": "delivered", "type": "timestamp" }
+    Promotion: ["linkId", "userId", "created", "updated",
+      { name: "delivered", type: "timestamp" }
     ],
-    "Tag": ["tag", "created"],
-    "User": ["userId", "publicKey", "userName", "email", "created", "updated",
-      { "name": "credits", "type": "integer" },
-      { "name": "groups", "type": "userGroup", "multiValued": true }
+    Tag: ["tag", "created"],
+    User: ["userId", "publicKey", "userName", "email", "created", "updated",
+      { name: "credits", type: "integer" },
+      { name: "groups", type: "userGroup", multiValued: true }
     ],
-    "UserLink": [
-      { "name": "user_A", "type": "userId" },
-      { "name": "user_B", "type": "userId" },
-      { "name": "tags", "type": "tag", "multiValued": true },
+    UserLink: [
+      { name: "user_A", type: "userId" },
+      { name: "user_B", type: "userId" },
+      { name: "tags", type: "tag", multiValued: true },
       "created",
       "updated",
     ],
-    "View": ["viewId", "userId", "linkId", "created"],
-    "ContentView": ["viewId", "userId", "contentId", "linkId", "ipAddress", "created"],
+    View: ["viewId", "userId", "linkId", "created"],
+    ContentView: ["viewId", "userId", "contentId", "linkId", "ipAddress", "created"],
   },
-  "tables": {   // the order of entries here is significant.  foreign keys can only reference preceding entries
-    "tags": {
-      "rowType": "Tag",
-      "primaryKey": ["tag"]
+  tables: {   // the order of entries here is significant.  foreign keys can only reference preceding entries
+    tags: {
+      rowType: "Tag",
+      primaryKey: ["tag"]
     },
-    "users": {
-      "rowType": "User",
-      "primaryKey": ["userId"],
-      "uniques": [["userName"]],
-      "updated": "updated",
+    users: {
+      rowType: "User",
+      primaryKey: ["userId"],
+      uniques: [["userName"]],
+      updated: "updated",
     },
-    "userlinks": {
-      "rowType": "UserLink",
-      "primaryKey": ["user_A", "user_B"],
-      "foreignKeys": [
-        { "ref": "users", "columns": ["user_A"] },
-        { "ref": "users", "columns": ["user_B"] },
+    userlinks: {
+      rowType: "UserLink",
+      primaryKey: ["user_A", "user_B"],
+      foreignKeys: [
+        { ref: "users", columns: ["user_A"] },
+        { ref: "users", columns: ["user_B"] },
       ],
-      "updated": "updated",
+      updated: "updated",
     },
-    "auths": {
-      "rowType": "Auth",
-      "primaryKey": ["authProvider", "authId"],
-      "updated": "updated",
-      "foreignKeys": [
-        { "ref": "users", "columns": ["userId"] }
-      ],
-    },
-    "blobs": {
-      "rowType": "Blob",
-      "primaryKey": ["blobId"],
-      "autoIncrement": "blobId",
-    },
-    "contents": {
-      "rowType": "Content",
-      "primaryKey": ["contentId"],
-      "autoIncrement": "contentId",
-      "updated": "updated",
-      "foreignKeys": [
-        { "ref": "users", "columns": ["userId"] },
-        //{ "ref": "blobs", "columns": ["blobId"] },
-      ],
-      "uniques": [["contentType", "title"]],
-    },
-    "links": {
-      "rowType": "Link",
-      "primaryKey": ["linkId"],
-      "autoIncrement": "linkId",
-      "foreignKeys": [
-        { "ref": "users", "columns": ["userId"] },
-        { "ref": "contents", "columns": ["contentId"] },
-        { "ref": "links", "columns": ["prevLink"] },
+    auths: {
+      rowType: "Auth",
+      primaryKey: ["authProvider", "authId"],
+      updated: "updated",
+      foreignKeys: [
+        { ref: "users", columns: ["userId"] }
       ],
     },
-    "invitations": {
-      "rowType": "Invitation",
-      "primaryKey": ["ipAddress"],
-      "updated": "updated",
-      "foreignKeys": [
-        { "ref": "links", "columns": ["linkId"] },
+    contents: {
+      rowType: "Content",
+      primaryKey: ["contentId"],
+      updated: "updated",
+      foreignKeys: [
+        { ref: "users", columns: ["userId"] },
+      ],
+      uniques: [["contentType", "title"]],
+    },
+    links: {
+      rowType: "Link",
+      primaryKey: ["linkId"],
+      foreignKeys: [
+        { ref: "users", columns: ["userId"] },
+        { ref: "contents", columns: ["contentId"] },
+        { ref: "links", columns: ["prevLink"] },
       ],
     },
-    "promotions": {
-      "rowType": "Promotion",
-      "primaryKey": ["linkId", "userId"],
-      "updated": "updated",
-      "foreignKeys": [
-        { "ref": "users", "columns": ["userId"] },
-        { "ref": "links", "columns": ["linkId"], "onDelete": "CASCADE" },
+    invitations: {
+      rowType: "Invitation",
+      primaryKey: ["ipAddress"],
+      updated: "updated",
+      foreignKeys: [
+        { ref: "links", columns: ["linkId"] },
       ],
     },
-    "views": {
-      "rowType": "View",
-      "primaryKey": ["viewId"],
-      "autoIncrement": "viewId",
-      "foreignKeys": [
-        { "ref": "users", "columns": ["userId"] },
-        { "ref": "links", "columns": ["linkId"], "onDelete": "CASCADE" },
+    promotions: {
+      rowType: "Promotion",
+      primaryKey: ["linkId", "userId"],
+      updated: "updated",
+      foreignKeys: [
+        { ref: "users", columns: ["userId"] },
+        { ref: "links", columns: ["linkId"], onDelete: "CASCADE" },
       ],
     },
-    "contentviews": {
-      "rowType": "ContentView",
-      "primaryKey": ["viewId"],
-      "autoIncrement": "viewId",
-      "foreignKeys": [
-        { "ref": "users", "columns": ["userId"] },
-        { "ref": "contents", "columns": ["contentId"], "onDelete": "CASCADE" },
+    views: {
+      rowType: "View",
+      primaryKey: ["viewId"],
+      autoIncrement: "viewId",
+      foreignKeys: [
+        { ref: "users", columns: ["userId"] },
+        { ref: "links", columns: ["linkId"], onDelete: "CASCADE" },
+      ],
+    },
+    contentviews: {
+      rowType: "ContentView",
+      primaryKey: ["viewId"],
+      autoIncrement: "viewId",
+      foreignKeys: [
+        { ref: "users", columns: ["userId"] },
+        { ref: "contents", columns: ["contentId"], onDelete: "CASCADE" },
       ],
     }
   }

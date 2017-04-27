@@ -365,7 +365,7 @@ export async function handlePromoteContent(userId, req: Rpc.PromoteContentReques
 async function _handlePromoteLink(t: ITask<any>, userId, req: Rpc.PromoteLinkRequest): Promise<[cache.CacheUpdate[], Rpc.PromoteLinkResponse]> {
   let { publicKey, url, signature, title, comment, amount, tags } = req;
   let ourl = parse(url);
-  let linkId = 0;
+  let linkId = '';
   let link = null;
   let linkDepth = 0;
   let rslt: cache.CacheUpdate[] = [];
@@ -438,8 +438,7 @@ export async function insertContent(content: string, mime_ext: string, contentTy
   let cont = OxiGen.emptyRec<Dbt.Content>("contents");
   title = title.replace(/_/g, " ");
   cont = { ...cont, mime_ext, content, contentType, title, userId };
-  let rslt = await insertRecord<Dbt.Content>("contents", cont);
-  return rslt;
+  return await db.task(t => tasks.insertContent(t, cont))
 }
 
 export async function insertBlobContent(strm: any, content: string, mime_ext: string, contentType: Dbt.contentType, title: string, userId: Dbt.userId): Promise<Dbt.Content> {
@@ -448,7 +447,7 @@ export async function insertBlobContent(strm: any, content: string, mime_ext: st
     let cont = OxiGen.emptyRec<Dbt.Content>("contents");
     title = await tasks.getUniqueContentTitle(t, userId, title);
     cont = { ...cont, mime_ext, content, contentType, title, userId, blobId };
-    let rslt = await tasks.insertRecord<Dbt.Content>(t, "contents", cont);
+    let rslt = await tasks.insertContent(t, cont);
     cache.contents.set(rslt.contentId, rslt);
     return rslt;
   });

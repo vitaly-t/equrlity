@@ -2,7 +2,7 @@
 
 var crypto = require('crypto');
 
-var uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/ ;
+var uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
 var _proc = function (rnd) {
     rnd[6] = (rnd[6] & 0x0f) | 0x40;
@@ -17,5 +17,6 @@ export function generate() {
 }
 
 export function validate(uuid) {
-  return uuidPattern.test(uuid);
+    return uuidPattern.test(uuid);
 }
+

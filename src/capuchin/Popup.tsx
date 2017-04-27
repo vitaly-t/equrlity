@@ -4,26 +4,31 @@ import { Row, Col } from 'react-simple-flex-grid';
 import TextareaAutosize from 'react-autosize-textarea';
 import { Button, Intent } from "@blueprintjs/core";
 
-import * as Rpc from '../lib/rpc'
+import * as Rpc from '../lib/rpc';
+import * as Dbt from '../lib/datatypes';
 import { TagGroupEditor } from '../lib/tags';
 
 import * as Chrome from './chrome';
 import { AppState, expandedUrl, isWaiting, getLinked } from "./AppState";
 
 export interface PopupPanelProps { appState?: AppState; serverMessage?: string };
-export interface PopupPanelState { promoteAmount: number, title: string, comment: string, tags: string[] };
+export interface PopupPanelState { url: Dbt.urlString, promoteAmount: number, title: string, comment: string, tags: string[] };
 
 export class PopupPanel extends React.Component<PopupPanelProps, PopupPanelState> {
 
   constructor(props) {
     super(props);
-    this.state = { promoteAmount: 0, title: props.appState.activeUrl, comment: '', tags: [] };
+    this.state = { promoteAmount: 0, url: props.appState.activeUrl, title: '', comment: '', tags: [] };
   }
 
-  ctrls: { amountInput?: HTMLInputElement, title?: HTMLTextAreaElement, comment?: HTMLTextAreaElement } = {}
+  ctrls: { amountInput?: HTMLInputElement, url?: HTMLTextAreaElement, title?: HTMLTextAreaElement, comment?: HTMLTextAreaElement } = {}
 
   changePromoteAmount() {
     this.setState({ promoteAmount: parseInt(this.ctrls.amountInput.value) });
+  }
+
+  changeUrl() {
+    this.setState({ url: this.ctrls.url.value });
   }
 
   changeTitle() {
@@ -47,15 +52,17 @@ export class PopupPanel extends React.Component<PopupPanelProps, PopupPanelState
     }
     let st = props.appState;
     let curl = st.activeUrl
+    /*
     if (curl && isWaiting(st, curl)) {
       console.log("rendering waiting for response...");
       return <div>Waiting for response from Server</div>;
     }
-    console.log("rendering popup...");
-    let linksAction = () => Chrome.sendMessage({ eventType: "LaunchLinksPage" });
-    let usersAction = () => Chrome.sendMessage({ eventType: "LaunchUsersPage" });
-    let contentsAction = () => Chrome.sendMessage({ eventType: "LaunchContentsPage" });
-    let settingsAction = () => Chrome.sendMessage({ eventType: "LaunchSettingsPage" });
+    */
+    let launch = (page) => Chrome.sendMessage({ eventType: "LaunchPage", page });
+    let linksAction = () => launch('links');
+    let usersAction = () => launch('users');
+    let contentsAction = () => launch('contents');
+    let settingsAction = () => launch('settings');
     let gutter = 20;
     let lspan = 3;
     let rspan = 9;
@@ -65,7 +72,7 @@ export class PopupPanel extends React.Component<PopupPanelProps, PopupPanelState
       <Button key="Close" style={btnStyle} onClick={() => window.close()} text="Close" />,
       <Button key="Settings" style={btnStyle} className="pt-intent-success" onClick={settingsAction} text="Settings" />,
       <Button key="Investments" style={btnStyle} className="pt-intent-success" onClick={linksAction} text="Investments" />,
-      <Button key="People" style={btnStyle} className="pt-intent-success" onClick={usersAction} text="People" />,
+      //<Button key="People" style={btnStyle} className="pt-intent-success" onClick={usersAction} text="People" />,
       <Button key="Contents" style={btnStyle} className="pt-intent-success" onClick={contentsAction} text="Contents" />,
     ]
     let pnl = <div>
@@ -78,10 +85,8 @@ export class PopupPanel extends React.Component<PopupPanelProps, PopupPanelState
       let lbl = "Save";
       let saveaction = () => {
         let amount = this.state.promoteAmount;
-        let title = this.state.title;
-        let comment = this.state.comment;
-        let tags = this.state.tags;
-        Chrome.sendMessage({ eventType: "PromoteLink", amount, title, comment, tags });
+        let { title, comment, tags, url } = this.state;
+        Chrome.sendMessage({ eventType: "PromoteLink", url, amount, title, comment, tags });
       }
       let infoDiv = null;
       let promTxt = null;
@@ -102,7 +107,8 @@ export class PopupPanel extends React.Component<PopupPanelProps, PopupPanelState
       pnl = (<div>
         <Row style={rowStyle} gutter={gutter} align="top">
           <Col span={lspan}>Source URL : </Col>
-          <Col span={rspan}><TextareaAutosize style={{ width: '100%', readonly: true }} value={tgt} /></Col>
+          <Col span={rspan}><TextareaAutosize style={{ width: '100%' }} value={this.state.url} ref={(e) => this.ctrls.title = e}
+            onChange={(e) => this.changeUrl()} /></Col>
         </Row>
         {infoDiv}
         <Row style={rowStyle} gutter={gutter} align="top">

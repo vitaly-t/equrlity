@@ -145,7 +145,7 @@ export async function getLinksForUrl(t: ITask<any>, url: Dbt.urlString): Promise
 }
 
 export async function isPromoted(t: ITask<any>, userId: Dbt.userId, linkId: Dbt.linkId): Promise<boolean> {
-  let rslt = await t.any(`select created from promotions where "userId" = '${userId}' and "linkId" = ${linkId}`);
+  let rslt = await t.any(`select created from promotions where "userId" = '${userId}' and "linkId" = '${linkId}'`);
   return rslt.length === 1;
 }
 
@@ -156,7 +156,7 @@ export async function linkToUrl(t: ITask<any>, linkId: Dbt.linkId): Promise<Dbt.
   let desc = cont.title;
   if (desc) desc = desc.replace(/ /g, '_');
   let url = parse(Utils.serverUrl);
-  url.path = "/link/" + linkId.toString() + (desc ? "#" + desc : '')
+  url.path = "/link/" + linkId + (desc ? "#" + desc : '')
   return format(url);
 }
 
@@ -169,12 +169,12 @@ export async function deliverNewPromotions(t: ITask<any>, userId: Dbt.userId): P
 }
 
 export async function promotionsCount(t: ITask<any>, linkId: Dbt.linkId): Promise<number> {
-  let rslt = await t.one(`select count(*) as cnt from promotions where "linkId" = ${linkId}`);
+  let rslt = await t.one(`select count(*) as cnt from promotions where "linkId" = '${linkId}'`);
   return parseInt(rslt.cnt);
 }
 
 export async function deliveriesCount(t: ITask<any>, linkId: Dbt.linkId): Promise<number> {
-  let rslt = await t.one(`select count(*) as cnt from promotions where "linkId" = ${linkId} and delivered is not null`);
+  let rslt = await t.one(`select count(*) as cnt from promotions where "linkId" = '${linkId}' and delivered is not null`);
   return parseInt(rslt.cnt);
 }
 
@@ -185,10 +185,9 @@ export async function promoteContent(t: ITask<any>, userId, req: Rpc.PromoteCont
   let cont = await retrieveRecord<Dbt.Content>(t, "contents", { contentId });
   if (userId !== cont.userId) throw new Error("Content owned by different user");
   let rslt: CacheUpdate[] = [];
-  //let url = Utils.contentToUrl(contentId);
   let link = OxiGen.emptyRec<Dbt.Link>("links");
   link = { ...link, userId, contentId, tags, url: '', amount, comment, title }
-  link = await insertRecord<Dbt.Link>(t, "links", link);
+  link = await insertLink(t, link);
   rslt.push({ table: "links" as CachedTable, record: link });
   Array.prototype.push.apply(rslt, await adjustUserBalance(t, usr, -amount));
   return rslt;
@@ -201,7 +200,7 @@ export async function promoteLink(t: ITask<any>, userId: Dbt.userId, url: string
   let cont = OxiGen.emptyRec<Dbt.Content>("contents");
   let rslt: CacheUpdate[] = [];
   cont = { ...cont, userId, title, contentType: "link", url, content: comment, tags }
-  cont = await insertRecord<Dbt.Content>(t, "contents", cont);
+  cont = await insertContent(t, cont);
   rslt.push({ table: "contents" as CachedTable, record: cont });
   if (amount > 0) {
     let { contentId } = cont;
@@ -212,7 +211,7 @@ export async function promoteLink(t: ITask<any>, userId: Dbt.userId, url: string
       url = link.url;
     }
     let link: Dbt.Link = { ...emptyLink(), prevLink, userId, url, comment, contentId, amount, tags };
-    link = await insertRecord<Dbt.Link>(t, "links", link);
+    link = await insertLink(t, link);
     rslt.push({ table: "links" as CachedTable, record: link });
     Array.prototype.push.apply(rslt, await adjustUserBalance(t, usr, -amount));
   }
@@ -220,11 +219,11 @@ export async function promoteLink(t: ITask<any>, userId: Dbt.userId, url: string
 }
 
 export async function redeemLink(t: ITask<any>, link: Dbt.Link): Promise<CacheUpdate[]> {
-  let linksToReParent = await t.any(`select * from links where "prevLink" = ${link.linkId}`)
-  let stmt = `update links set "prevLink" = ${link.prevLink ? link.prevLink.toString() : 'null'} 
-              where "prevLink" = ${link.linkId}`;
+  let linksToReParent = await t.any(`select * from links where "prevLink" = '${link.linkId}'`)
+  let stmt = `update links set "prevLink" = ${link.prevLink ? "'" + link.prevLink + "'" : 'null'} 
+              where "prevLink" = '${link.linkId}'`;
   await t.none(stmt);
-  await t.none(`delete from links where "linkId" = ${link.linkId}`);
+  await t.none(`delete from links where "linkId" = '${link.linkId}'`);
   let rslt: CacheUpdate[] = [];
   rslt.push({ table: "links" as CachedTable, record: link, remove: true });
   let user = await retrieveRecord<Dbt.User>(t, "users", { userId: link.userId });
@@ -256,12 +255,12 @@ export async function getLinksForUser(t: ITask<any>, userId: Dbt.userId): Promis
 }
 
 export async function hasViewed(t: ITask<any>, userId: Dbt.userId, linkId: Dbt.linkId): Promise<boolean> {
-  let rslt = await t.any(`select created from views where "userId" = '${userId}' and "linkId" = ${linkId}`);
+  let rslt = await t.any(`select created from views where "userId" = '${userId}' and "linkId" = '${linkId}'`);
   return rslt.length === 1;
 }
 
 export async function viewCount(t: ITask<any>, linkId: Dbt.linkId): Promise<number> {
-  let rslt = await t.one(`select count(*) as cnt from views where "linkId" = ${linkId}`);
+  let rslt = await t.one(`select count(*) as cnt from views where "linkId" = '${linkId}'`);
   return parseInt(rslt.cnt);
 }
 
@@ -334,26 +333,28 @@ export async function getUserContents(t: ITask<any>, id: Dbt.userId): Promise<Db
   return await t.any(`select * from contents where "userId" = '${id}' order by updated desc`);
 }
 
-export async function insertBlob(t: ITask<any>, strm: any): Promise<Dbt.blobId> {
-  let rslt: Dbt.blobId;
-  let lo_strm = concat(async (blobContent: Buffer) => {
-    console.log("got Buffer");
-    let rec = await insertRecord<Dbt.Blob>(t, "blobs", { blobId: 0, blobContent });
-    rslt = rec.blobId;
-  });
-  strm.pipe(lo_strm);
-  await new Promise(resolve => { lo_strm.on('finish', resolve) });
-  while (!rslt) {
-    console.log("sleeping");
-    await Utils.sleep(1000);
+export async function insertContent(t: ITask<any>, cont: Dbt.Content): Promise<Dbt.Content> {
+  let rslt;
+  let contentId;
+  while (true) {
+    contentId = Utils.genHashId(6);
+    let chk = await t.any(`select "contentId" from contents where "contentId" = '${contentId}'`);
+    if (chk.length === 0) break;
   }
-  console.log("returning :" + rslt.toString())
-  return rslt;
+  cont = { ...cont, contentId };
+  return await insertRecord<Dbt.Content>(t, "contents", cont);
 }
 
-export async function retrieveBlob(t: ITask<any>, blobId: Dbt.blobId): Promise<Buffer> {
-  let rec = await retrieveRecord<Dbt.Blob>(t, "blobs", { blobId });
-  return rec.blobContent
+export async function insertLink(t: ITask<any>, link: Dbt.Link): Promise<Dbt.Link> {
+  let rslt;
+  let linkId;
+  while (true) {
+    linkId = Utils.genHashId(6);
+    let chk = await t.any(`select "linkId" from links where "linkId" = '${linkId}'`);
+    if (chk.length === 0) break;
+  }
+  link = { ...link, linkId };
+  return await insertRecord<Dbt.Link>(t, "links", link);
 }
 
 export async function getUniqueContentTitle(t: ITask<any>, userId: Dbt.userId, title: Dbt.title): Promise<Dbt.title> {

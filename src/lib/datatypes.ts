@@ -11,12 +11,12 @@ export type email = string;
 export type integer = number;
 export type ipAddress = string;
 export type json = string;
-export type linkId = number;
-export type title = string;
+export type hashId = string;
 export type percentage = number;
 export type tag = string;
 export type text = string;
 export type timestamp = Date;
+export type title = string;
 export type updated = Date;
 export type userGroup = "admin" | "author" | "member";
 export type urlString = string;
@@ -25,9 +25,10 @@ export type uuid = string;
 export type content = string;
 export type blobId = number;
 export type blobContent = Buffer;
-export type contentId = number;
+export type contentId = string;
 export type contentCryptId = Buffer;
 export type isPublic = boolean;
+export type linkId = string;
 export type publicKey = Buffer;
 export type published = Date;
 export type userId = string;
@@ -64,11 +65,6 @@ export interface Auth {
   readonly userId: userId | null,
   readonly created: created | null,
   readonly updated: updated | null
-};
-
-export interface Blob {
-  readonly blobId: blobId | null,
-  readonly blobContent: blobContent | null
 };
 
 export interface Content {

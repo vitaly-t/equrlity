@@ -16,6 +16,7 @@ export interface PromoteContent {
 
 export interface PromoteLink {
   eventType: "PromoteLink";
+  url: Dbt.urlString;
   amount: number;
   title: string;
   comment: string;
@@ -46,20 +47,9 @@ export interface ChangeSettings {
   settings: Rpc.ChangeSettingsRequest;
 }
 
-export interface LaunchSettingsPage {
-  eventType: "LaunchSettingsPage";
-}
-
-export interface LaunchContentsPage {
-  eventType: "LaunchContentsPage";
-}
-
-export interface LaunchLinksPage {
-  eventType: "LaunchLinksPage";
-}
-
-export interface LaunchUsersPage {
-  eventType: "LaunchUsersPage";
+export interface LaunchPage {
+  eventType: "LaunchPage";
+  page: string;
 }
 
 export interface SaveContent {
@@ -112,8 +102,7 @@ export interface Thunk {
 }
 
 export type Message = PromoteContent | PromoteLink | Initialize | Load | ActivateTab | Render | ChangeSettings
-  | LaunchSettingsPage | LaunchContentsPage | LaunchLinksPage | LaunchUsersPage
-  | SaveContent | RemoveContent | AddContents
+  | LaunchPage | SaveContent | RemoveContent | AddContents
   | RedeemLink | GetUserLinks | DismissPromotion | TransferCredits
   | SaveTags | SaveLink | Thunk;
 
@@ -236,17 +225,8 @@ export namespace AsyncHandlers {
     return thunk;
   }
 
-  export async function promoteLink(state: AppState, title: string, comment: string, amount: number, tags: string[] = []): Promise<(st: AppState) => AppState> {
-    let curTab = await currentTab();
-    if (!curTab) console.log("No current tab");
-    if (curTab && prepareUrl(curTab.url) !== state.activeUrl) {
-      console.log("Wrong tab");
-      console.log("current : " + curTab.url)
-      console.log("active : " + state.activeUrl)
-      return () => state;
-    }
-    let src = state.activeUrl;
-    let url = expandedUrl(state, src);
+  export async function promoteLink(state: AppState, req: PromoteLink): Promise<(st: AppState) => AppState> {
+    let { url, title, comment, amount, tags } = req;
     let response = await Comms.sendPromoteLink(state, url, title, comment, amount, tags)
     let thunk = (st: AppState) => {
       st = extractHeadersToState(st, response);
@@ -258,7 +238,7 @@ export namespace AsyncHandlers {
       st = { ...st, investments };
 
       let curl = Utils.linkToUrl(rslt.link.linkId, rslt.link.title);
-      return setLink(st, src, curl, linkDepth, st.moniker);
+      return setLink(st, url, curl, linkDepth, st.moniker);
     };
     return thunk;
   }

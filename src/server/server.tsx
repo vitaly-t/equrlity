@@ -182,7 +182,7 @@ publicRouter.get('/download/pseudoqurl.tar.gz', async function (ctx, next) {
 });
 
 publicRouter.get('/link/:id', async (ctx, next) => {
-  let linkId: Dbt.linkId = parseInt(ctx.params.id);
+  let linkId: Dbt.linkId = ctx.params.id;
   let link = cache.links.get(linkId);
   let cont = cache.contents.get(link.contentId);
   let isClient = isValidClient(ctx);
@@ -354,29 +354,14 @@ router.get('/content/:contentType/:title', async (ctx, next) => {
 });
 
 router.get('/stream/content/:id', async (ctx, next) => {
-  let contentId = parseInt(ctx.params.id);
+  let contentId = ctx.params.id;
   let lob = await pg.retrieveBlobContent(contentId);
   let strm = createReadStream(lob);
-  /*
-    async function gotFile(blob: Buffer) {
-      console.log("file: " + part.filename);
-      let pth = path.parse(part.filename);
-      let mime_ext = pth.ext.replace(".", "");
-      let contentType: Dbt.contentType = part.mime.substring(0, part.mime.indexOf("/"));
-      await pg.insertBlobContent(blob, '', mime_ext, contentType, part.filename, userId);
-    }
-    //let blob = await pg.retrieveRecord<Dbt.Blob>("blobs", { blobId: cont.blobId })
-    //let strm = createReadStream(blob.blobContent);
-    var concatStream = concat(gotFile)
-  */
-
   ctx.body = strm;
-  //ctx.body = blob.blobContent;
 });
 
-
 router.get('/content/:id', async (ctx, next) => {
-  let contentId = parseInt(ctx.params.id);
+  let contentId = ctx.params.id;
   let cont = cache.contents.get(contentId);
   if (!cont) ctx.throw(404);
   ctx.body = await mediaPage(cont);

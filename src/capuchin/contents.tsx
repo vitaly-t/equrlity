@@ -24,6 +24,8 @@ import { ContentEditor } from './contentEditor';
 
 type UploadProgress = { fileName: string, progress: number }
 
+const gutter = 20;
+
 interface ContentsPageProps { appState: AppState };
 interface ContentsPageState { uploadProgress: UploadProgress[], publishingContent?: Dbt.Content, editingContent?: Dbt.Content, confirmDeleteContent?: Dbt.Content };
 
@@ -93,8 +95,7 @@ export class ContentsPage extends React.Component<ContentsPageProps, ContentsPag
     else if (st.contents.length > 0) {
       let rows = st.contents.map(p => {
         let url = p.contentType === 'link' ? p.url : Utils.contentToUrl(p.contentId)
-        //let onclick = () => { chrome.tabs.create({ active: true, url }); };
-        let created = p.created ? OxiDate.toFormat(new Date(p.created), "DDDD, MMMM D @ HH:MIP") : '';
+        //let created = p.created ? OxiDate.toFormat(new Date(p.created), "DDDD, MMMM D @ HH:MIP") : '';
         let updated = p.updated ? OxiDate.toFormat(new Date(p.updated), "DDDD, MMMM D @ HH:MIP") : '';
         let remove = () => { this.setState({ confirmDeleteContent: p }) };
         let btns = [<Button onClick={remove} text="Delete" />];
@@ -111,7 +112,6 @@ export class ContentsPage extends React.Component<ContentsPageProps, ContentsPag
             <td><a href={url} >{url}</a></td>
             <td>{p.title}</td>
             <td><Checkbox disabled defaultChecked={p.isPublic} /></td>
-            <td>{created}</td>
             <td>{updated}</td>
             <td>{tags}</td>
             <td>{btns}</td>
@@ -126,9 +126,7 @@ export class ContentsPage extends React.Component<ContentsPageProps, ContentsPag
               <th>Link</th>
               <th>Title</th>
               <th>Public?</th>
-              <th>Created</th>
               <th>Updated</th>
-              <th>Published</th>
               <th>Tags</th>
               <th>Actions</th>
             </tr>
@@ -179,9 +177,20 @@ export class ContentsPage extends React.Component<ContentsPageProps, ContentsPag
   }
 }
 
+interface DisplayPostProps { info: Dbt.Content };
+class DisplayPost extends React.Component<DisplayPostProps, {}> {
+  public render() {
+    return <div>
+      <Row style={rowStyle} gutter={gutter} align="top">
+      </Row>
+    </div>
+  }
+}
+
 interface PublishContentProps { info: Dbt.Content, allTags: Tags.TagSelectOption[], onClose: () => void }
 interface PublishContentState { title: string, comment: string, tags: string[], isOpen: boolean, amount: number }
 class PublishContent extends React.Component<PublishContentProps, PublishContentState> {
+
   constructor(props: PublishContentProps) {
     super(props);
     let tags = props.info.tags || [];

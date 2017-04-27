@@ -1,8 +1,10 @@
 "use strict";
 
-import * as Dbt from './datatypes';
 import { Url, parse, format } from 'url';
 import { TextEncoder, TextDecoder } from 'text-encoding';
+import * as crypto from 'crypto';
+
+import * as Dbt from './datatypes';
 
 export function sleep(time) {
   return new Promise((resolve) => setTimeout(resolve, time));
@@ -84,15 +86,15 @@ export function isPseudoQContentURL(url: Url): boolean {
   return url.host === srv.host && url.protocol === srv.protocol && url.path.startsWith("/content/");
 }
 
-export function getContentIdFromUrl(url: Url): Dbt.linkId {
+export function getContentIdFromUrl(url: Url): Dbt.contentId {
   if (!isPseudoQContentURL(url)) throw new Error("Not a PseudoQURL content url");
-  let linkId = parseInt(url.path.substring(9));
-  return linkId;
+  let contentId = url.path.substring(9);
+  return contentId;
 }
 
 export function getLinkIdFromUrl(url: Url): Dbt.linkId {
   if (!isPseudoQLinkURL(url)) throw new Error("Not a PseudoQURL link url");
-  let linkId = parseInt(url.path.substring(6));
+  let linkId = url.path.substring(6);
   return linkId;
 }
 
@@ -108,6 +110,19 @@ export function contentToUrl(contentId: Dbt.contentId): Dbt.urlString {
   let srv = parse(serverUrl);
   srv.pathname = "/content/" + contentId.toString()
   return format(srv);
+}
+
+export function genHashId(len: number): string {
+  let chars = "abcdefghijklmnopqrstuwxyzABCDEFGHIJKLMNOPQRSTUWXYZ0123456789";
+  let rnd = crypto.randomBytes(len)
+  let value = new Array(len)
+  let cnt = chars.length;
+
+  for (var i = 0; i < len; i++) {
+    value[i] = chars[rnd[i] % cnt]
+  };
+
+  return value.join('');
 }
 
 export function binaryIndexOf(searchElement, arr) {
