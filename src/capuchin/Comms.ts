@@ -29,6 +29,13 @@ function apiRequest(st: AppState): AxiosInstance {
   return clientRequest(st, { headers, timeout: 10000, responseType: 'json' });
 }
 
+export async function signData(st: AppState, data: string) {
+  const privateCryptoKey: CryptoKey = await Crypto.importPrivateKeyfromJWK(st.privateKey);
+  const signature: ArrayBuffer = await Crypto.signData(privateCryptoKey, UTF8.stringToUtf8ByteArray(data).buffer);
+  const sig = Utils.printBase64Binary(new Uint8Array(signature));
+  return sig;
+}
+
 export async function sendAuthRequest(data: Object, authHeader: string): Promise<AxiosResponse> {
   let headers = { 'content-type': 'application/json', 'Accept': 'application/json' };
   headers['Authorization'] = authHeader;
@@ -58,6 +65,8 @@ export async function sendApiRequest(st: AppState, method: Rpc.Method, params: a
 }
 
 export async function sendPromoteContent(st: AppState, req: Rpc.PromoteContentRequest): Promise<AxiosResponse> {
+  const signature = await signData(st, req.contentId.toString());
+  req = { ...req, signature };
   return await sendApiRequest(st, "promoteContent", req);
 }
 
@@ -66,12 +75,8 @@ export async function sendRemoveContent(st: AppState, req: Rpc.RemoveContentRequ
 }
 
 export async function sendPromoteLink(st: AppState, url: string, title: string, comment: string, amount: number, tags: string[]): Promise<AxiosResponse> {
-  const privateCryptoKey: CryptoKey = await Crypto.importPrivateKeyfromJWK(st.privateKey);
-  const signature: ArrayBuffer = await Crypto.signData(privateCryptoKey, UTF8.stringToUtf8ByteArray(url).buffer);
-  const uint8ArraySignature = new Uint8Array(signature);
-  const sig = Utils.printBase64Binary(new Uint8Array(signature));
-  const mime_ext = "txt";
-  let req: Rpc.PromoteLinkRequest = { publicKey: st.publicKey, url, signature: sig, title, comment, amount, tags };
+  const signature = await signData(st, url);
+  let req: Rpc.PromoteLinkRequest = { url, signature, title, comment, amount, tags };
   return await sendApiRequest(st, "promoteLink", req);
 }
 
@@ -80,7 +85,7 @@ export async function sendInitialize(st: AppState): Promise<AxiosResponse> {
 }
 
 export async function sendLoadLink(st: AppState, url: string): Promise<AxiosResponse> {
-  return await sendApiRequest(st, "loadLink", { publicKey: st.publicKey, url });
+  return await sendApiRequest(st, "loadLink", { url });
 }
 
 export async function sendGetRedirect(st: AppState, linkUrl: string): Promise<AxiosResponse> {

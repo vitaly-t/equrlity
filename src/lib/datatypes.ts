@@ -34,6 +34,7 @@ export type published = Date;
 export type userId = string;
 export type viewId = number;
 export type varchar_8 = string;
+export type varchar_200 = string;
 
 export interface Tag {
   readonly tag: tag | null,
@@ -81,7 +82,7 @@ export interface Content {
   readonly url: urlString | null,
   readonly mime_ext: varchar_8 | null,
   readonly tags: tag[] | null,
-  readonly cryptHash: binary | null
+  readonly cryptHash: varchar_200 | null
 };
 
 export interface Link {

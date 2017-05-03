@@ -123,7 +123,7 @@ export default {
       { name: "url", type: "urlString" },
       { name: "mime_ext", type: "varchar(8)" },
       { name: "tags", type: "tag", multiValued: true },
-      { name: "cryptHash", type: "binary" },
+      { name: "cryptHash", type: "varchar(200)" },
     ],
     Invitation: ["ipAddress", "linkId", "created", "updated"],
     Link: ["linkId", "userId", "contentId", "title", "created", "updated",

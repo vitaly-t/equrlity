@@ -340,6 +340,12 @@ async function handleRequest<I, O>(method: Rpc.Handler<I, O>, req: I): Promise<O
   return method(req);
 }
 
+function checkPK(ctx: any, publicKey: JsonWebKey) {
+  let pk = ctx.userId.publicKey;
+  if (!pk) throw new Error("missing public key from token");
+  if (JSON.stringify(publicKey) !== JSON.stringify(pk)) throw new Error("Invalid publicKey submitted");
+}
+
 
 //const router = new Router();
 const router = Router();
@@ -376,21 +382,27 @@ router.route({
     const userId = ctx.userId.id;
 
     let part;
-    let rslt = []
+    let cont: Dbt.Content;
+    let pk = ctx.userId.publicKey;
 
     try {
       while (part = await parts) {
         let pth = path.parse(part.filename);
         let mime_ext = pth.ext.replace(".", "");
         let contentType: Dbt.contentType = part.mime.substring(0, part.mime.indexOf("/"));
-        let cont = await pg.insertBlobContent(part, '', mime_ext, contentType, part.filename, userId);
-        rslt.push(cont);
+        cont = await pg.insertBlobContent(part, '', mime_ext, contentType, part.filename, userId);
+      }
+      let hash = parts.field.hash;
+      if (hash !== cont.cryptHash || !validateContentSignature(pk, hash, parts.field.sig)) {
+        let { contentId } = cont;
+        await pg.deleteRecord<Dbt.Content>("contents", { contentId });
+        throw new Error("Invalid hash for: " + part.filename);
       }
     } catch (err) {
       console.log(err);
       ctx.throw(err);
     }
-    ctx.body = JSON.stringify(rslt);
+    ctx.body = JSON.stringify(cont);
   }
 });
 
@@ -403,18 +415,12 @@ router.post('/rpc', async function (ctx: any) {
     return;
   }
 
-  let checkPK = (publicKey: JsonWebKey) => {
-    let pk = ctx.userId.publicKey;
-    if (!pk) throw new Error("missing public key from token");
-    if (JSON.stringify(publicKey) !== JSON.stringify(pk)) throw new Error("Invalid publicKey submitted");
-  }
-
   let userId = ctx.userId.id;
   try {
     switch (method as Rpc.Method) {
       case "initialize": {
         let req: Rpc.InitializeRequest = params;
-        checkPK(req.publicKey)
+        checkPK(ctx, req.publicKey)
         let usr = getUser(userId);
         if (!usr) throw new Error("Internal error getting user details");
         let redirectUrl = ctx['redirectUrl'];
@@ -425,9 +431,8 @@ router.post('/rpc', async function (ctx: any) {
       }
       case "promoteContent": {
         let req: Rpc.PromoteContentRequest = params;
-        //let { publicKey, contentId, signature } = req;
-        //checkPK(publicKey)
-        //if (!validateContentSignature(publicKey, contentId.toString(), signature)) throw new Error("request failed verification");
+        let { contentId, signature } = req;
+        if (!validateContentSignature(ctx.userId.publicKey, contentId.toString(), signature)) throw new Error("request failed verification");
         let usr = getUser(userId);
         let result: Rpc.PromoteContentResponse = await pg.handlePromoteContent(userId, req)
         ctx.body = { id, result };
@@ -435,10 +440,9 @@ router.post('/rpc', async function (ctx: any) {
       }
       case "promoteLink": {
         let req: Rpc.PromoteLinkRequest = params;
-        let { publicKey, url, signature } = req;
+        let { url, signature } = req;
         let ourl = parse(url);
-        checkPK(publicKey)
-        if (!validateContentSignature(publicKey, url, signature)) throw new Error("request failed verification");
+        if (!validateContentSignature(ctx.userId.publicKey, url, signature)) throw new Error("request failed verification");
         let usr = getUser(userId);
         let result: Rpc.PromoteLinkResponse = await pg.handlePromoteLink(userId, req)
         ctx.body = { id, result };

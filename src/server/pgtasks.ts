@@ -361,7 +361,7 @@ export async function getUniqueContentTitle(t: ITask<any>, userId: Dbt.userId, t
   let rslt = title;
   let i = 0;
   while (true) {
-    let cont = await t.any(`select "contentId" from contents where title='${rslt}' and "userId" = '${userId}'`);
+    let cont = await t.any(`select "contentId" from contents where title='${rslt.replace("'", "''")}' and "userId" = '${userId}'`);
     if (cont.length === 0) break;
     ++i;
     rslt = title + ` (${i.toString()})`;
@@ -369,14 +369,18 @@ export async function getUniqueContentTitle(t: ITask<any>, userId: Dbt.userId, t
   return rslt;
 }
 
-export async function insertLargeObject(t: ITask<any>, strm: any): Promise<number> {
+import * as Hasher from '../lib/contentHasher';
+
+export async function insertLargeObject(t: ITask<any>, strm: any): Promise<[number, string]> {
   const man = new LargeObjectManager({ pgPromise: t });
   let [oid, lo_strm] = await man.createAndWritableStreamAsync(16384)
+  const hasher = Hasher.create();
+  strm.on('data', buf => hasher.update(buf));
   strm.pipe(lo_strm);
-  console.log("inserting lo: " + oid);
   await new Promise(resolve => { lo_strm.on('finish', resolve); });
-  console.log("lo inserted: " + oid);
-  return oid;
+  const hexDigest = hasher.digest('hex');
+  //console.log("lo inserted: " + oid + ", digest: " + hexDigest);
+  return [oid, hexDigest];
 }
 
 export async function retrieveLargeObject(t: ITask<any>, oid: number): Promise<Buffer> {

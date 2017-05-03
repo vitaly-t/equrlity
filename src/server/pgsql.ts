@@ -443,10 +443,10 @@ export async function insertContent(content: string, mime_ext: string, contentTy
 
 export async function insertBlobContent(strm: any, content: string, mime_ext: string, contentType: Dbt.contentType, title: string, userId: Dbt.userId): Promise<Dbt.Content> {
   return await db.tx(async t => {
-    let blobId = await tasks.insertLargeObject(t, strm);
+    let [blobId, cryptHash] = await tasks.insertLargeObject(t, strm);
     let cont = OxiGen.emptyRec<Dbt.Content>("contents");
     title = await tasks.getUniqueContentTitle(t, userId, title);
-    cont = { ...cont, mime_ext, content, contentType, title, userId, blobId };
+    cont = { ...cont, mime_ext, content, contentType, title, userId, blobId, cryptHash };
     let rslt = await tasks.insertContent(t, cont);
     cache.contents.set(rslt.contentId, rslt);
     return rslt;

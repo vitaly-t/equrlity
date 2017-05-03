@@ -9,6 +9,7 @@ import { TextEncoder, TextDecoder } from 'text-encoding';
 import * as Dbt from '../lib/datatypes'
 import * as Rpc from '../lib/rpc';
 import * as Utils from '../lib/utils';
+import * as Hasher from '../lib/contentHasher';
 
 Utils.setTest(true);  // Not sure this is kosher ...
 
@@ -137,8 +138,11 @@ it("should work using direct calls", async () => {
 
 it("should work for blobs", async () => {
   let u = await pg.createUser();
-  let strm = fs.createReadStream("/dev/pseudoqurl/spec/EarlyThisMorning.wav");
+  let fname = "/dev/pseudoqurl/spec/EarlyThisMorning.wav";
+  let strm = fs.createReadStream(fname);
   let rsp = await pg.insertBlobContent(strm, "testing", "wav", "audio", "Early This Morning", u.userId);
+  let digest = await Hasher.calcHash(fs.createReadStream(fname));
+  expect(digest).toEqual(rsp.cryptHash, "hashing cactus");
   console.log(rsp.contentId);
   let cont2 = await pg.retrieveBlobContent(rsp.contentId)
   let content = fs.readFileSync("/dev/pseudoqurl/spec/EarlyThisMorning.wav");

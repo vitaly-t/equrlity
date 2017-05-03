@@ -62,7 +62,7 @@ import * as Dbt from './datatypes';
 
 //TODO: rename "getUserLinks" to "loadSettingsPage"
 export type Method = "initialize" | "authenticate" | "promoteContent" | "promoteLink" | "loadLink" | "getRedirect" | "changeSettings"
-  | "getUserContents" | "getUserLinks" | "redeemLink" | "saveContent" | "saveLink" | "removeContent" | "transferCredits";
+    | "getUserContents" | "getUserLinks" | "redeemLink" | "saveContent" | "saveLink" | "removeContent" | "transferCredits";
 
 /**
  * Informational type tags used to indicate intended usage.
@@ -71,66 +71,65 @@ export type UrlString = string;
 export type Integer = number;
 
 export type InitializeRequest = {
-  publicKey: JsonWebKey;
+    publicKey: JsonWebKey;
 }
 
 export type InitializeResponse = {
-  ok: boolean;
-  allTags: string[];
-  redirectUrl?: UrlString;
+    ok: boolean;
+    allTags: string[];
+    redirectUrl?: UrlString;
 }
 
 export type PromoteContentRequest = {
-  contentId: Dbt.contentId;
-  title: string;
-  comment: string;
-  amount: Integer;
-  tags?: string[];
+    contentId: Dbt.contentId;
+    title: string;
+    comment: string;
+    tags: string[];
+    amount: Integer;
+    signature: string;
 }
 
 export type PromoteContentResponse = {
-  link: Dbt.Link;
+    link: Dbt.Link;
 }
 
 export type PromoteLinkRequest = {
-  url: Dbt.urlString;
-  title: string;
-  comment: string;
-  tags: string[];
-  amount: Integer;
-  publicKey: JsonWebKey;
-  signature: string;
+    url: Dbt.urlString;
+    title: string;
+    comment: string;
+    tags: string[];
+    amount: Integer;
+    signature: string;
 }
 
 export type PromoteLinkResponse = {
-  link: Dbt.Link;
-  linkDepth: Integer;
+    link: Dbt.Link;
+    linkDepth: Integer;
 }
 
 export type LoadLinkRequest = {
-  publicKey: JsonWebKey;
-  url: UrlString;
+    url: UrlString;
 }
 
 export type LoadLinkResponse = {
-  found: boolean;
-  url?: UrlString;
-  linkDepth?: Integer;
-  linkPromoter?: string;
+    found: boolean;
+    url?: UrlString;
+    linkDepth?: Integer;
+    linkPromoter?: string;
 }
 
 export type GetRedirectRequest = { linkUrl: UrlString; }
 
 export type GetRedirectResponse = {
-  found: boolean;
-  contentUrl?: UrlString;
-  linkDepth?: Integer;
-  linkPromoter?: string;
+    found: boolean;
+    contentUrl?: UrlString;
+    linkDepth?: Integer;
+    linkPromoter?: string;
 }
 
 export type ChangeSettingsRequest = {
-  userName: string;
-  email: string;
+    userName: string;
+    email: string;
 }
 
 export type ChangeSettingsResponse = { ok: boolean; }
@@ -138,25 +137,25 @@ export type ChangeSettingsResponse = { ok: boolean; }
 export type GetUserContentsRequest = {}
 
 export type GetUserContentsResponse = {
-  contents: Dbt.Content[];
+    contents: Dbt.Content[];
 }
 
 export type GetUserLinksRequest = {}
 
 export type GetUserLinksResponse = {
-  links: UserLinkItem[];
-  promotions: Dbt.urlString[];
-  connectedUsers: Dbt.userName[];
-  reachableUserCount: Dbt.integer;
-  allTags: string[];
+    links: UserLinkItem[];
+    promotions: Dbt.urlString[];
+    connectedUsers: Dbt.userName[];
+    reachableUserCount: Dbt.integer;
+    allTags: string[];
 }
 
 export type UserLinkItem = {
-  link: Dbt.Link;
-  linkDepth: Dbt.integer;
-  viewCount: Dbt.integer;
-  promotionsCount: Dbt.integer;
-  deliveriesCount: Dbt.integer;
+    link: Dbt.Link;
+    linkDepth: Dbt.integer;
+    viewCount: Dbt.integer;
+    promotionsCount: Dbt.integer;
+    deliveriesCount: Dbt.integer;
 }
 
 export type SaveContentRequest = { content: Dbt.Content; }
@@ -184,35 +183,35 @@ export type AuthenticateRequest = { provider: string }
 export type AuthenticateResponse = { ok: boolean; }
 
 export type RequestBody = PromoteContentRequest | PromoteLinkRequest | InitializeRequest | LoadLinkRequest | GetRedirectRequest | ChangeSettingsRequest
-  | GetUserContentsRequest | GetUserLinksRequest | RedeemLinkRequest | SaveLinkRequest | SaveContentRequest | RemoveContentRequest | TransferCreditsRequest | AuthenticateRequest;
+    | GetUserContentsRequest | GetUserLinksRequest | RedeemLinkRequest | SaveLinkRequest | SaveContentRequest | RemoveContentRequest | TransferCreditsRequest | AuthenticateRequest;
 
 export type ResponseBody = PromoteContentResponse & PromoteLinkResponse & InitializeResponse & LoadLinkResponse & GetRedirectResponse & ChangeSettingsResponse
-  & GetUserContentsResponse & GetUserLinksResponse & RedeemLinkResponse & SaveLinkResponse & SaveContentResponse & RemoveContentResponse & TransferCreditsResponse & AuthenticateResponse;
+    & GetUserContentsResponse & GetUserLinksResponse & RedeemLinkResponse & SaveLinkResponse & SaveContentResponse & RemoveContentResponse & TransferCreditsResponse & AuthenticateResponse;
 
 // internal to server.
 export type RecvRequestBody = PromoteContentRequest & PromoteLinkRequest & InitializeRequest & LoadLinkRequest & GetRedirectRequest & ChangeSettingsRequest
-  & GetUserContentsRequest & GetUserLinksRequest & RedeemLinkRequest & SaveLinkRequest & SaveContentRequest & RemoveContentRequest & TransferCreditsRequest & AuthenticateRequest;
+    & GetUserContentsRequest & GetUserLinksRequest & RedeemLinkRequest & SaveLinkRequest & SaveContentRequest & RemoveContentRequest & TransferCreditsRequest & AuthenticateRequest;
 
 export type SendResponseBody = PromoteContentResponse | PromoteLinkResponse | InitializeResponse | LoadLinkResponse | GetRedirectResponse | ChangeSettingsResponse
-  | GetUserContentsResponse | GetUserLinksResponse | RedeemLinkResponse | SaveLinkResponse | SaveContentResponse | RemoveContentResponse | TransferCreditsResponse | AuthenticateResponse;
+    | GetUserContentsResponse | GetUserLinksResponse | RedeemLinkResponse | SaveLinkResponse | SaveContentResponse | RemoveContentResponse | TransferCreditsResponse | AuthenticateResponse;
 
 export type Handler<Request, Response> = (req: Request) => Promise<Response>;
 
 export type Request = {
-  jsonrpc: string,  // always "2.0"
-  id: number
-  method: Method,
-  params: RequestBody,
+    jsonrpc: string,  // always "2.0"
+    id: number
+    method: Method,
+    params: RequestBody,
 }
 
 export type Error = {
-  id: number;
-  error: { code?: number, message: string };
+    id: number;
+    error: { code?: number, message: string };
 }
 
 export type Result = {
-  id: number;
-  result: ResponseBody;
+    id: number;
+    result: ResponseBody;
 }
 
 export type Response = Result & Error;

@@ -6,8 +6,8 @@ import * as crypto from 'crypto';
 
 import * as Dbt from './datatypes';
 
-export function sleep(time) {
-  return new Promise((resolve) => setTimeout(resolve, time));
+export function sleep(millisecs: number) {
+  return new Promise((resolve) => setTimeout(resolve, millisecs));
 }
 
 export function textToBuffer(s: string): Buffer {
