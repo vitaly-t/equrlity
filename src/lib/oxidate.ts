@@ -437,6 +437,11 @@ export function today(): Date {
   return clearTime(new Date());
 };
 
+export function timeAgo(dt: Date): string {
+  let ts = TimeSpan.FromDates(dt, new Date());
+  return ts.toAgo();
+}
+
 function _toFormat(date: Date, format: string, replaceMap: Map<string, string>): string {
   var f = [format], i, l, s;
   var replace = function (str, rep) {
@@ -476,7 +481,7 @@ export function toFormat(date: Date, format: string): string {
 }
 
 var getReplaceMap = function (date: Date): Map<string, string> {
-  if (typeof date.getHours !== "function") throw new Error("Not a Date: "+date);
+  if (typeof date.getHours !== "function") throw new Error("Not a Date: " + date);
   let hours = (date.getHours() % 12) ? date.getHours() % 12 : 12;
   let m = new Map<string, string>()
   m.set('YYYY', date.getFullYear().toString());
@@ -526,36 +531,36 @@ var getUTCReplaceMap = function (date: Date): Map<string, string> {
   return m;
 };
 
-export function pauseableTimer(strt? : Date) {
-    let pstrt = new Date();
-    strt = strt || pstrt;
-    let rslt: any = {started: strt, paused: 0, pauseStarted: pstrt};
+export function pauseableTimer(strt?: Date) {
+  let pstrt = new Date();
+  strt = strt || pstrt;
+  let rslt: any = { started: strt, paused: 0, pauseStarted: pstrt };
 
-    rslt.pause = function() {
-        if (!rslt.isPaused()) rslt.pauseStarted = new Date();
-    };
+  rslt.pause = function () {
+    if (!rslt.isPaused()) rslt.pauseStarted = new Date();
+  };
 
-    rslt.unPause = function() {
-        if (rslt.isPaused()) {
-            let diff = TimeSpan.FromDates( rslt.pauseStarted, new Date() ).totalMilliseconds();
-            rslt.paused += diff;
-            rslt.pauseStarted = null;
-        }
-    };
+  rslt.unPause = function () {
+    if (rslt.isPaused()) {
+      let diff = TimeSpan.FromDates(rslt.pauseStarted, new Date()).totalMilliseconds();
+      rslt.paused += diff;
+      rslt.pauseStarted = null;
+    }
+  };
 
-    rslt.start = rslt.unPause;
+  rslt.start = rslt.unPause;
 
-    rslt.isPaused = function() { 
-        return rslt.pauseStarted === null;
-    };
+  rslt.isPaused = function () {
+    return rslt.pauseStarted === null;
+  };
 
-    rslt.elapsed = function() {
-        //console.log('elapsed called');
-        let now = rslt.isPaused() ? rslt.pauseStarted : new Date();
-        let msecs = TimeSpan.FromDates( rslt.started, now ).totalMilliseconds();
-        return msecs - rslt.paused;
-    };
+  rslt.elapsed = function () {
+    //console.log('elapsed called');
+    let now = rslt.isPaused() ? rslt.pauseStarted : new Date();
+    let msecs = TimeSpan.FromDates(rslt.started, now).totalMilliseconds();
+    return msecs - rslt.paused;
+  };
 
-    return rslt;
+  return rslt;
 
 };

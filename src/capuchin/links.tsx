@@ -12,8 +12,8 @@ import * as Constants from '../lib/constants';
 import * as OxiDate from '../lib/oxidate';
 import { rowStyle, btnStyle, lhcolStyle } from "../lib/contentView";
 import * as Tags from '../lib/tags';
+import { YesNoBox } from '../lib/dialogs';
 
-import { YesNoBox } from './dialogs';
 import { LinkEditor } from './linkEditor';
 import { AppState, postDeserialize } from "./AppState";
 import * as Chrome from './chrome';

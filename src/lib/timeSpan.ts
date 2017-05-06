@@ -13,6 +13,7 @@ export class TimeSpan {
   private msecPerMinute: number = 60000;
   private msecPerHour: number = 3600000;
   private msecPerDay: number = 86400000;
+  private msecPerWeek: number = 7 * 86400000;
   private msecs: number;
 
   constructor(milliseconds: number) {
@@ -57,19 +58,23 @@ export class TimeSpan {
   }
 
   totalSeconds(): number {
-    return this.msecs / this.msecPerSecond;
+    return Math.floor(this.msecs / this.msecPerSecond);
   }
 
   totalMinutes(): number {
-    return this.msecs / this.msecPerMinute;
+    return Math.floor(this.msecs / this.msecPerMinute);
   }
 
   totalHours(): number {
-    return this.msecs / this.msecPerHour;
+    return Math.floor(this.msecs / this.msecPerHour);
   }
 
   totalDays(): number {
-    return this.msecs / this.msecPerDay;
+    return Math.floor(this.msecs / this.msecPerDay);
+  }
+
+  totalWeeks(): number {
+    return Math.floor(this.msecs / this.msecPerWeek);
   }
 
   milliseconds(): number {
@@ -91,8 +96,29 @@ export class TimeSpan {
     return Math.floor(ms / this.msecPerHour);
   }
 
+  days(): number {
+    var ms = this.msecs % this.msecPerDay
+    return Math.floor(ms);
+  }
+
   toString(): string {
     return this.toFormat("H:MI:SS");
+  }
+
+  toAgo(): string {
+    let unit: string;
+    let n: number;
+    n = this.totalWeeks()
+    if (n) unit = "week";
+    if (!n) n = this.totalDays()
+    if (n) unit = "day";
+    if (!n) n = this.totalHours()
+    if (n) unit = "hour";
+    if (!n) n = this.totalMinutes()
+    if (n) unit = "minute";
+    if (!n) return "just now";
+    if (n > 1) unit += "s";
+    return n.toString() + unit + " ago";
   }
 
   toFormat(format: string): string {

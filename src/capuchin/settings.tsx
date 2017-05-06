@@ -14,7 +14,7 @@ import * as OxiDate from '../lib/oxidate';
 import { rowStyle, btnStyle, lhcolStyle } from "../lib/contentView";
 import * as Tags from '../lib/tags';
 
-import { YesNoBox } from './dialogs';
+import { YesNoBox } from '../lib/dialogs';
 import { AppState, postDeserialize } from "./AppState";
 import { uploadRequest } from "./Comms";
 import * as Chrome from './chrome';
@@ -22,7 +22,6 @@ import * as Chrome from './chrome';
 
 interface SettingsPageProps { appState: AppState };
 interface SettingsPageState { nickName: string, email: string };
-
 export class SettingsPage extends React.Component<SettingsPageProps, SettingsPageState> {
 
   constructor(props) {
@@ -117,26 +116,6 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
   }
 }
 
-function render(state: AppState) {
-  //console.log("render called for settings");
-  let elem = document.getElementById('app')
-  if (!elem) console.log("cannot get app element");
-  else {
-    ReactDOM.render(<SettingsPage appState={state} />, elem);
-  }
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-  chrome.runtime.sendMessage({ eventType: "GetState" }, st => render(postDeserialize(st)));
-});
-
-chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
-  if (message.eventType === "Render") {
-    let state: AppState = postDeserialize(message.appState);
-    render(state);
-  }
-});
-
 interface PublishContentProps { info: Dbt.Content, allTags: Tags.TagSelectOption[], onClose: () => void }
 interface PublishContentState { title: string, comment: string, tags: string[], isOpen: boolean, amount: number }
 export class PublishContent extends React.Component<PublishContentProps, PublishContentState> {
@@ -166,7 +145,7 @@ export class PublishContent extends React.Component<PublishContentProps, Publish
   save() {
     let { title, tags, amount, comment } = this.state;
     let info = this.props.info;
-    let req: Rpc.PromoteContentRequest = { contentId: info.contentId, title, comment, tags, amount };
+    let req: Rpc.PromoteContentRequest = { contentId: info.contentId, title, comment, tags, amount, signature: '' };
     Chrome.sendMessage({ eventType: "PromoteContent", req });
     this.close();
   }
@@ -205,3 +184,24 @@ export class PublishContent extends React.Component<PublishContentProps, Publish
     );
   }
 }
+
+function render(state: AppState) {
+  //console.log("render called for settings");
+  let elem = document.getElementById('app')
+  if (!elem) console.log("cannot get app element");
+  else {
+    ReactDOM.render(<SettingsPage appState={state} />, elem);
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  chrome.runtime.sendMessage({ eventType: "GetState" }, st => render(postDeserialize(st)));
+});
+
+chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
+  if (message.eventType === "Render") {
+    let state: AppState = postDeserialize(message.appState);
+    render(state);
+  }
+});
+

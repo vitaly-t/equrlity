@@ -71,6 +71,23 @@ export function shuffle<T>(array): T[] {
   return result;
 }
 
+export function partition<T>(a: T[], fn: (e: T) => boolean): [T[], T[]] {
+  let y: T[] = [];
+  let n: T[] = [];
+  a.forEach(e => {
+    if (fn(e)) y.push(e); else n.push(e);
+  })
+  return [y, n];
+}
+
+export function cmp<T, U>(a: T, b: T, fn: (e: T) => U): number {
+  let ta: U = fn(a);
+  let tb: U = fn(b);
+  if (ta < tb) return -1;
+  if (ta > tb) return +1;
+  return 0;
+}
+
 export function isPseudoQURL(url: Url): boolean {
   let srv = parse(serverUrl);
   return url.host === srv.host && url.protocol === srv.protocol;

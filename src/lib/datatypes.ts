@@ -26,7 +26,8 @@ export type content = string;
 export type blobId = number;
 export type blobContent = Buffer;
 export type contentId = string;
-export type contentCryptId = Buffer;
+export type comment = string;
+export type commentId = number;
 export type isPublic = boolean;
 export type linkId = string;
 export type publicKey = Buffer;
@@ -85,6 +86,16 @@ export interface Content {
   readonly cryptHash: varchar_200 | null
 };
 
+export interface Comment {
+  readonly commentId: commentId | null,
+  readonly contentId: contentId | null,
+  readonly userId: userId | null,
+  readonly comment: comment | null,
+  readonly created: created | null,
+  readonly updated: updated | null,
+  readonly parent: commentId | null
+};
+
 export interface Link {
   readonly linkId: linkId | null,
   readonly userId: userId | null,
@@ -92,7 +103,7 @@ export interface Link {
   readonly title: title | null,
   readonly created: created | null,
   readonly updated: updated | null,
-  readonly comment: text | null,
+  readonly comment: comment | null,
   readonly url: urlString | null,
   readonly prevLink: linkId | null,
   readonly tags: tag[] | null,

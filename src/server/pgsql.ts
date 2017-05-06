@@ -363,7 +363,7 @@ export async function handlePromoteContent(userId, req: Rpc.PromoteContentReques
 }
 
 async function _handlePromoteLink(t: ITask<any>, userId, req: Rpc.PromoteLinkRequest): Promise<[cache.CacheUpdate[], Rpc.PromoteLinkResponse]> {
-  let { publicKey, url, signature, title, comment, amount, tags } = req;
+  let { url, signature, title, comment, amount, tags } = req;
   let ourl = parse(url);
   let linkId = '';
   let link = null;
@@ -434,11 +434,12 @@ export async function registerInvitation(ipAddress: string, linkId: Dbt.linkId):
   return await db.tx(t => tasks.registerInvitation(t, ipAddress, linkId));
 }
 
-export async function insertContent(content: string, mime_ext: string, contentType: Dbt.contentType, title: string, userId: Dbt.userId): Promise<Dbt.Content> {
-  let cont = OxiGen.emptyRec<Dbt.Content>("contents");
-  title = title.replace(/_/g, " ");
-  cont = { ...cont, mime_ext, content, contentType, title, userId };
+export async function insertContent(cont: Dbt.Content): Promise<Dbt.Content> {
   return await db.task(t => tasks.insertContent(t, cont))
+}
+
+export async function deleteContent(cont: Dbt.Content) {
+  return await db.tx(t => tasks.deleteContent(t, cont))
 }
 
 export async function insertBlobContent(strm: any, content: string, mime_ext: string, contentType: Dbt.contentType, title: string, userId: Dbt.userId): Promise<Dbt.Content> {

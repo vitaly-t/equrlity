@@ -394,8 +394,7 @@ router.route({
       }
       let hash = parts.field.hash;
       if (hash !== cont.cryptHash || !validateContentSignature(pk, hash, parts.field.sig)) {
-        let { contentId } = cont;
-        await pg.deleteRecord<Dbt.Content>("contents", { contentId });
+        await pg.deleteContent(cont);
         throw new Error("Invalid hash for: " + part.filename);
       }
     } catch (err) {
@@ -538,8 +537,10 @@ router.post('/rpc', async function (ctx: any) {
           if (content.userId) throw new Error("incorrect user for content");
           content = { ...content, userId };
         }
+        let title = content.title.replace(/_/g, " ");
+        content = { ...content, title };
         if (content.contentId) content = await pg.updateRecord<Dbt.Content>("contents", content);
-        else content = await pg.insertRecord<Dbt.Content>("contents", content);
+        else content = await pg.insertContent(content);
         await pg.saveTags(req.content.tags)
         let result: Rpc.SaveContentResponse = { content };
         ctx.body = { id, result };
