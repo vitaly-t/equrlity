@@ -16,7 +16,7 @@ Utils.setTest(true);  // Not sure this is kosher ...
 import * as pg from '../server/pgsql';
 import * as cache from '../server/cache';
 
-let publicKey: JsonWebKey = { kty: '' };
+//let publicKey: JsonWebKey = { kty: '' };
 
 async function countLinks(): Promise<number> {
   return await pg.countRecordsInTable("links");
@@ -51,7 +51,7 @@ it("should work using direct calls", async () => {
   //let pr = await Crypto.generateKeyPair();
   //let publicKey = await Crypto.getPublicKeyJWK(pr);
 
-  let preq1: Rpc.PromoteLinkRequest = { publicKey, comment: "great comment", tags: [], url: "https://www.example.com/anydamnthing", signature: "", title: "wow awesome link", amount: 10 };
+  let preq1: Rpc.PromoteLinkRequest = { comment: "great comment", tags: [], url: "https://www.example.com/anydamnthing", signature: "", title: "wow awesome link", amount: 10 };
   let rsp1 = await pg.handlePromoteLink(u1.userId, preq1);
   let ok = rsp1 as Rpc.PromoteLinkResponse;
   expect(ok.link).toBeDefined("promote link call failed");
@@ -61,7 +61,7 @@ it("should work using direct calls", async () => {
   let link1 = cache.links.get(ok.link.linkId);
   expect(link1).toBeDefined("cache error on link1");
 
-  let preq2: Rpc.PromoteLinkRequest = { publicKey, comment: "another great comment", tags: [], url: Utils.linkToUrl(ok.link.linkId, ''), signature: "", title: "promote me baby", amount: 10 };
+  let preq2: Rpc.PromoteLinkRequest = { comment: "another great comment", tags: [], url: Utils.linkToUrl(ok.link.linkId, ''), signature: "", title: "promote me baby", amount: 10 };
   let rsp2 = await pg.handlePromoteLink(u2.userId, preq2);
   expect(await countLinks()).toEqual(2);
   expect(rsp2.link).toBeDefined("promote call failed");
@@ -76,7 +76,7 @@ it("should work using direct calls", async () => {
   expect(cache.userlinks.has(u3.userId)).toEqual(false);
 
   {  // new let namespace
-    let preq3: Rpc.PromoteLinkRequest = { publicKey, comment: "groovy", tags: [], url: "https://www.example.com/somethingelse", signature: "", title: "yaa!!", amount: 10 };
+    let preq3: Rpc.PromoteLinkRequest = { comment: "groovy", tags: [], url: "https://www.example.com/somethingelse", signature: "", title: "yaa!!", amount: 10 };
     let rsp = await pg.handlePromoteLink(u1.userId, preq3);
     expect(await countLinks()).toEqual(3);
 
@@ -100,7 +100,7 @@ it("should work using direct calls", async () => {
     expect(cache.links.get(linkId).amount).toEqual(linkbal - 1, "link amount not adjusted for view");
 
     expect(cache.userlinks.get(u1.userId).length).toEqual(1, "social graph not correct");
-    let preq4: Rpc.PromoteLinkRequest = { publicKey, comment: "groovy baby", tags: [], url: format(url), signature: "", title: "yaa2  !!", amount: 10 };
+    let preq4: Rpc.PromoteLinkRequest = { comment: "groovy baby", tags: [], url: format(url), signature: "", title: "yaa2  !!", amount: 10 };
     let rsp2 = await pg.handlePromoteLink(u3.userId, preq4);
     let ok2 = rsp2 as Rpc.PromoteLinkResponse;
     expect(ok2.link).toBeDefined("Promote call failed");
@@ -116,7 +116,7 @@ it("should work using direct calls", async () => {
     }
 
     // redeem link  testing - particularly re-grafting..
-    let preq5: Rpc.PromoteLinkRequest = { publicKey, comment: "groovy baby", tags: [], url: Utils.linkToUrl(ok.link.linkId, ''), signature: "", title: "yaal3!!", amount: 10 };
+    let preq5: Rpc.PromoteLinkRequest = { comment: "groovy baby", tags: [], url: Utils.linkToUrl(ok.link.linkId, ''), signature: "", title: "yaal3!!", amount: 10 };
     let rsp3 = await pg.handlePromoteLink(u4.userId, preq5);
     let ok3 = rsp3 as Rpc.PromoteLinkResponse;
     expect(ok3.link).toBeDefined("promote call failed");

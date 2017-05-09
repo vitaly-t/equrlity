@@ -16,7 +16,7 @@ import * as Tags from '../lib/tags';
 
 import { YesNoBox } from '../lib/dialogs';
 import { AppState, postDeserialize } from "./AppState";
-import { uploadRequest } from "./Comms";
+import { uploadRequest } from "../lib/axiosClient";
 import * as Chrome from './chrome';
 
 

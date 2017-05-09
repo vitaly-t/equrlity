@@ -34,7 +34,7 @@ export class MarkdownPreview extends React.Component<MarkdownPreviewProps, Markd
   }
 }
 
-interface MarkdownEditorProps { value: string, onSave?: (s: string) => void, onChange?: (s: string) => void }
+interface MarkdownEditorProps { value: string, title?: string, onSave?: (s: string) => void, onChange?: (s: string) => void, onAbandon?: () => void }
 interface MarkdownEditorState { value: string, previewing: boolean };
 export class MarkdownEditor extends React.Component<MarkdownEditorProps, MarkdownEditorState> {
 
@@ -59,6 +59,7 @@ export class MarkdownEditor extends React.Component<MarkdownEditorProps, Markdow
 
   abandon() {
     this.setState({ value: this.props.value });
+    this.props.onAbandon && this.props.onAbandon();
   }
 
   render() {
@@ -71,13 +72,18 @@ export class MarkdownEditor extends React.Component<MarkdownEditorProps, Markdow
 
     let disabled = this.props.value === this.state.value;
     let btns = [];
-    if (this.props.onSave) btns.push(<Button key="Abandon" style={btnStyle} disabled={disabled} onClick={() => this.abandon()} text="Abandon" />);
-    btns.push(<Button key="Preview" style={btnStyle} className="pt-intent-success" onClick={() => this.setState({ previewing: true })} text="Preview" />);
+    if (this.props.onAbandon || this.props.onSave) {
+      btns.push(<Button key="Abandon" style={btnStyle} disabled={disabled && !this.props.onAbandon} onClick={() => this.abandon()} text="Abandon" />);
+    }
+    btns.push(<Button key="Preview" style={btnStyle} disabled={this.state.value.length === 0} className="pt-intent-success" onClick={() => this.setState({ previewing: true })} text="Preview" />);
     if (this.props.onSave) {
       btns.push(<Button key="Save" style={btnStyle} disabled={disabled} className="pt-intent-primary" onClick={() => this.save()} text="Save" />);
     };
+    let ttl = null;
+    if (this.props.title) ttl = <Row gutter={gutter} align='bottom' style={rowStyle}><h5 style={{ marginTop: "10px" }}>{this.props.title}</h5></Row>;
 
     return <div className="pt-elevation-0" style={{ width: "100%", height: "100%", backgroundColor: "#F5F8FA" }}>
+      {ttl}
       <Row gutter={gutter} style={rowStyle} >
         <TextareaAutosize className="pt-elevation-2" style={{ margin: "5px", width: "100%", minHeight: "100px", maxHeight: "600px", backgroundColor: "white" }}
           value={this.state.value} onChange={e => this.onChange(e)} />

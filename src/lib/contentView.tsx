@@ -23,13 +23,13 @@ export const rowStyle = { width: '100%', marginTop: 2, marginLeft: 5, padding: 6
 export const btnStyle = { height: '24', marginTop: 2, marginLeft: 5, marginRight: 5, display: 'inline-block' };
 export const lhcolStyle = { width: '20%' };
 
-interface ContentViewProps { info: Dbt.Content, creator: string };
+interface ContentViewProps { info: Dbt.Content, owner: string };
 interface ContentViewState { };
 
 export class ContentView extends React.Component<ContentViewProps, ContentViewState> {
 
   render() {
-    let { info, creator } = this.props;
+    let { info, owner } = this.props;
     let h = { __html: md.render(info.content) };
     let lstedit = info.updated ? oxiDate.toFormat(new Date(info.updated), "DDDD, MMMM D @ HH:MIP") : 'never';
     let pub = info.published ? oxiDate.toFormat(new Date(info.published), "DDDD, MMMM D @ HH:MIP") : 'never';
@@ -43,8 +43,8 @@ export class ContentView extends React.Component<ContentViewProps, ContentViewSt
           <div style={{ display: 'inline' }}>Tags: </div>
           {tagbtns}
         </div>
-        <div style={rowStyle} >Created by: {creator}.</div>
-        <div style={rowStyle} >Last Edited: {lstedit}.</div>
+        <div style={rowStyle} >Uploaded by: {owner}.</div>
+        <div style={rowStyle} >Last Modified: {lstedit}.</div>
       </div>
     );
   }

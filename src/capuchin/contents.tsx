@@ -16,9 +16,9 @@ import { rowStyle, btnStyle, lhcolStyle } from "../lib/contentView";
 import * as Tags from '../lib/tags';
 import * as Hasher from '../lib/contentHasher';
 import { YesNoBox } from '../lib/dialogs';
+import { uploadRequest, signData } from "../lib/axiosClient";
 
 import { AppState, postDeserialize } from "./AppState";
-import { uploadRequest, signData } from "./Comms";
 import * as Chrome from './chrome';
 import { ContentEditor } from './contentEditor';
 
@@ -75,14 +75,14 @@ export class ContentsPage extends React.Component<ContentsPageProps, ContentsPag
       rdr.readAsArrayBuffer(f)
       while (rdr.readyState != 2) await Utils.sleep(2);
       let digest = calcDigest(rdr.result);
-      let sig = await signData(this.props.appState, digest);
+      let sig = await signData(this.props.appState.privateKey, digest);
       //console.log("digest: " + digest);
       var data = new FormData();
       data.append("hash", digest);
       data.append("sig", sig);
       data.append(f.name, f);
       let config = { onUploadProgress: (progressEvent) => { this.setUploadProgress(f.name, progressEvent.loaded / progressEvent.total) } };
-      let req = uploadRequest(this.props.appState);
+      let req = uploadRequest();
       let response = await req.post(Utils.serverUrl + '/upload/media', data, config);
       let cont: Dbt.Content = response.data;
       if (!cont || !cont.contentId) {

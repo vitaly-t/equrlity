@@ -8,7 +8,7 @@
     "build": "npm run clean && npm run mklib && npm run mksrv && npm run mkapp && npm run mkrelease",
     "clean": "rimraf dist",
     "gen": "npm run mkgen && node src/scripts/gentypes.js",
-    "mk": "npm run mklib && npm run mksrv && npm run mkapp",
+    "mk": "npm run mklib && npm run mksrv && npm run mkapp && npm run mkbndls",
     "mkapp": "webpack --config webpack.capuchin.js",
     "mkbndls": "webpack --config webpack.server.js",
     "mkrelease": "powershell src/scripts/cp2heroku.ps1",
@@ -111,7 +111,7 @@
     "style-loader": "^0.13.1",
     "text-encoding": "^0.6.4",
     "ts-loader": "^2.0.3",
-    "typescript": "^2.2.2",
+    "typescript": "^2.3.2",
     "webpack": "^2.4.1"
   },
   "engines": {

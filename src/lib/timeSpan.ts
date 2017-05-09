@@ -110,15 +110,21 @@ export class TimeSpan {
     let n: number;
     n = this.totalWeeks()
     if (n) unit = "week";
-    if (!n) n = this.totalDays()
-    if (n) unit = "day";
-    if (!n) n = this.totalHours()
-    if (n) unit = "hour";
-    if (!n) n = this.totalMinutes()
-    if (n) unit = "minute";
-    if (!n) return "just now";
+    else {
+      n = this.totalDays();
+      if (n) unit = "day";
+      else {
+        n = this.totalHours()
+        if (n) unit = "hour";
+        else {
+          n = this.totalMinutes()
+          if (n) unit = "minute";
+          else return "just now";
+        }
+      }
+    }
     if (n > 1) unit += "s";
-    return n.toString() + unit + " ago";
+    return n.toString() + " " + unit + " ago";
   }
 
   toFormat(format: string): string {

@@ -113,16 +113,25 @@ chrome.tabs.onActivated.addListener(({ tabId, windowId }) => {
 
 function addHeaders(details) {
   let hdrs = details.requestHeaders;
-  if (details.method === "GET") {
-    hdrs.push({ name: 'x-psq-client-version', value: 'capuchin-' + Utils.capuchinVersion() });
-    if (__state && __state.jwt) hdrs.push({ name: 'Authorization', value: 'Bearer ' + __state.jwt });
-  }
+  hdrs.push({ name: 'x-psq-client-version', value: 'capuchin-' + Utils.capuchinVersion() });
+  if (__state && __state.jwt) hdrs.push({ name: 'Authorization', value: 'Bearer ' + __state.jwt });
   return { requestHeaders: hdrs };
 }
 
 chrome.webRequest.onBeforeSendHeaders.addListener(addHeaders
   , { urls: [Utils.serverUrl + "/*"] }
   , ["blocking", "requestHeaders"]);
+
+
+function addResponseHeaders(details) {
+  let { responseHeaders } = details;
+  if (__state) responseHeaders.push({ name: 'x-psq-privkey', value: JSON.stringify(__state.privateKey) });
+  return { responseHeaders };
+}
+
+chrome.webRequest.onHeadersReceived.addListener(addResponseHeaders
+  , { urls: [Utils.serverUrl + "/*"] }
+  , ["blocking", "responseHeaders"]);
 
 
 function checkRedirect(details: chrome.webRequest.WebRequestBodyDetails) {

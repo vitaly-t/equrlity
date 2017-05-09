@@ -435,7 +435,11 @@ export async function registerInvitation(ipAddress: string, linkId: Dbt.linkId):
 }
 
 export async function insertContent(cont: Dbt.Content): Promise<Dbt.Content> {
-  return await db.task(t => tasks.insertContent(t, cont))
+  return await db.task(async t => {
+    let rslt = await tasks.insertContent(t, cont);
+    cache.contents.set(rslt.contentId, rslt);
+    return rslt;
+  });
 }
 
 export async function deleteContent(cont: Dbt.Content) {
@@ -448,9 +452,7 @@ export async function insertBlobContent(strm: any, content: string, mime_ext: st
     let cont = OxiGen.emptyRec<Dbt.Content>("contents");
     title = await tasks.getUniqueContentTitle(t, userId, title);
     cont = { ...cont, mime_ext, content, contentType, title, userId, blobId, cryptHash };
-    let rslt = await tasks.insertContent(t, cont);
-    cache.contents.set(rslt.contentId, rslt);
-    return rslt;
+    return await tasks.insertContent(t, cont);
   });
 }
 
@@ -462,6 +464,12 @@ export async function retrieveBlobContent(contentId: Dbt.contentId): Promise<Buf
     return await tasks.retrieveLargeObject(t, blobId);
   });
 }
+
+export async function getCommentsForContent(contentId: Dbt.contentId): Promise<Dbt.Comment[]> {
+  return await db.tx(async t => tasks.getCommentsForContent(t, contentId));
+}
+
+
 
 export async function saveTags(tags: Dbt.tag[]): Promise<Dbt.tag[]> {  // return list of tags added
   let newtags = tags.filter(t => !cache.tags.has(t));

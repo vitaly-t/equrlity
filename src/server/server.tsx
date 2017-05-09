@@ -33,6 +33,8 @@ import { ContentView } from '../lib/contentView';
 import { LinkLandingPage, HomePage, ContentLandingPage } from '../lib/landingPages';
 import { validateContentSignature } from '../lib/Crypto';
 
+//gen
+import * as OxiGen from '../gen/oxigen';
 
 // local
 import * as jwt from './jwt';
@@ -74,6 +76,8 @@ function htmlPage(body) {
   <meta charset="UTF-8">
   <meta name="google-site-verification" content="mJoHqP8RhSQWE6NhUmdXDjo8oWgUC6nrBELkQS8bEZU" />
   <link href="/node_modules/@blueprintjs/core/dist/blueprint.css" rel="stylesheet" />
+  <link href="/node_modules/react-select/dist/react-select.css" rel="stylesheet" />
+  <link href="/node_modules/react-simple-flex-grid/lib/main.css" rel="stylesheet" />
 </head>
 <body>
   ${body}
@@ -84,7 +88,7 @@ function htmlPage(body) {
 
 function postPage(cont: Dbt.Content): string {
   let creator = cache.users.get(cont.userId).userName;
-  let view = <ContentView info={cont} creator={creator} />;
+  let view = <ContentView info={cont} owner={creator} />;
   let ins = ReactDOMServer.renderToStaticMarkup(view);
   let body = htmlPage(ins);
   return body;
@@ -102,6 +106,8 @@ function mediaPage(cont: Dbt.Content): string {
 <head>
   <meta charset="UTF-8">
   <link href="/node_modules/@blueprintjs/core/dist/blueprint.css" rel="stylesheet" />
+  <link href="/node_modules/react-select/dist/react-select.css" rel="stylesheet" />
+  <link href="/node_modules/react-simple-flex-grid/lib/main.css" rel="stylesheet" />
   <link href="/node_modules/video.js/dist/video-js.css" rel="stylesheet" />
 </head>
 <body>
@@ -161,7 +167,7 @@ app.use(async (ctx, next) => {
   }
   if (msg) {
     ctx['invalidClientMsg'] = msg
-    console.log("Invalid Client : " + msg);
+    //console.log("Invalid Client : " + msg);
   }
   await next();
 });
@@ -207,6 +213,7 @@ publicRouter.get('/link/:id', async (ctx, next) => {
 
 });
 
+/*
 publicRouter.get('/content/*', async (ctx, next) => {
   if (isValidClient(ctx)) await next();
   else {
@@ -215,6 +222,51 @@ publicRouter.get('/content/*', async (ctx, next) => {
     let body = htmlPage(ins);
     ctx.body = body;
   }
+});
+*/
+
+publicRouter.get('/stream/content/:id', async (ctx, next) => {
+  let contentId = ctx.params.id;
+  let cont = cache.contents.get(contentId);
+  if (!cont || !cont.blobId) ctx.throw(404);
+  if (!isValidClient(ctx) && !cont.isPublic) ctx.throw(403);
+  let lob = await pg.retrieveBlobContent(contentId);
+  let strm = createReadStream(lob);
+  ctx.body = strm;
+});
+
+publicRouter.get('/load/content/:id', async (ctx, next) => {
+  let contentId = ctx.params.id;
+  let content = cache.contents.get(contentId);
+  if (!content) {
+    ctx.static = 404;
+    ctx.body = { id: -1, error: { message: "Invalid content" } };
+  }
+  if (!isValidClient(ctx) && !content.isPublic) {
+    ctx.static = 403;
+    ctx.body = { id: -1, error: { message: "Unauthorized access" } };
+  }
+  let owner = cache.users.get(content.userId).userName;
+  let a = await pg.getCommentsForContent(contentId)
+  let comments: Rpc.CommentItem[] = a.map(c => {
+    let userName = cache.users.get(c.userId).userName;
+    return { ...c, userName }
+  })
+  let result: Rpc.LoadContentResponse = { content, owner, comments }
+  ctx.body = { result };
+});
+
+publicRouter.get('/content/:id', async (ctx, next) => {
+  let contentId = ctx.params.id;
+  let cont = cache.contents.get(contentId);
+  if (!cont) ctx.throw(404);
+  if (!isValidClient(ctx) && !cont.isPublic) {
+    let view = <ContentLandingPage />;
+    let ins = ReactDOMServer.renderToStaticMarkup(view);
+    let body = htmlPage(ins);
+    ctx.body = body;
+  }
+  else ctx.body = await mediaPage(cont);
 });
 
 // need to serve this route before static files are enabled??
@@ -350,6 +402,7 @@ function checkPK(ctx: any, publicKey: JsonWebKey) {
 //const router = new Router();
 const router = Router();
 
+/*
 router.get('/content/:contentType/:title', async (ctx, next) => {
   let title = decodeURIComponent(ctx.params.title);
   let contentType = decodeURIComponent(ctx.params.contentType) as Dbt.contentType;
@@ -358,20 +411,7 @@ router.get('/content/:contentType/:title', async (ctx, next) => {
   if (!cont) ctx.throw(404);
   ctx.body = await mediaPage(cont);
 });
-
-router.get('/stream/content/:id', async (ctx, next) => {
-  let contentId = ctx.params.id;
-  let lob = await pg.retrieveBlobContent(contentId);
-  let strm = createReadStream(lob);
-  ctx.body = strm;
-});
-
-router.get('/content/:id', async (ctx, next) => {
-  let contentId = ctx.params.id;
-  let cont = cache.contents.get(contentId);
-  if (!cont) ctx.throw(404);
-  ctx.body = await mediaPage(cont);
-});
+*/
 
 router.route({
   method: 'post',
@@ -539,7 +579,10 @@ router.post('/rpc', async function (ctx: any) {
         }
         let title = content.title.replace(/_/g, " ");
         content = { ...content, title };
-        if (content.contentId) content = await pg.updateRecord<Dbt.Content>("contents", content);
+        if (content.contentId) {
+          content = await pg.updateRecord<Dbt.Content>("contents", content);
+          cache.contents.set(content.contentId, content);
+        }
         else content = await pg.insertContent(content);
         await pg.saveTags(req.content.tags)
         let result: Rpc.SaveContentResponse = { content };
@@ -562,6 +605,19 @@ router.post('/rpc', async function (ctx: any) {
         if (req.link.userId !== userId) throw new Error("incorrect user for content");
         let link = await pg.updateRecord<Dbt.Link>("links", req.link);
         let result: Rpc.SaveLinkResponse = { link };
+        ctx.body = { id, result };
+        break;
+      }
+      case "addComment": {
+        let req: Rpc.AddCommentRequest = params;
+        let { parent, comment, contentId } = req;
+        parent = parent || null;
+        let rec = OxiGen.emptyRec<Dbt.Comment>("comments");
+        rec = { ...rec, parent, comment, contentId, userId }
+        let cmt = await pg.insertRecord<Dbt.Comment>("comments", rec);
+        let userName = cache.users.get(userId).userName;
+        let itm: Rpc.CommentItem = { ...cmt, userName }
+        let result: Rpc.AddCommentResponse = { comment: itm };
         ctx.body = { id, result };
         break;
       }

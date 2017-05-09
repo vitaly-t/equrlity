@@ -4,10 +4,12 @@ import * as localForage from "localforage";
 import * as Comms from './Comms';
 import { Url, parse, format } from 'url';
 import { AxiosResponse } from 'axios';
+
 import * as Rpc from '../lib/rpc';
 import * as Dbt from '../lib/datatypes';
 import * as Utils from '../lib/utils';
 import { TagSelectOption } from '../lib/tags';
+import { sendAuthRequest, extractResult } from '../lib/axiosClient';
 
 export interface PromoteContent {
   eventType: "PromoteContent";
@@ -150,17 +152,10 @@ function extractHeadersToState(st: AppState, rsp: AxiosResponse): AppState {
   return { ...st, credits, moniker, jwt, email, authprov };
 }
 
-type rspBody = Rpc.ResponseBody; // no idea why this is necessary :-(
-function extractResult<rspBody>(response: AxiosResponse): Rpc.ResponseBody {
-  let rsp: Rpc.Response = response.data;
-  if (rsp.error) throw new Error("Server returned error: " + rsp.error.message);
-  return rsp.result;
-}
-
 export namespace AsyncHandlers {
 
   export async function authenticate(userInfo: chrome.identity.UserInfo, authToken: string, publicKey: JsonWebKey): Promise<string> {
-    const response = await Comms.sendAuthRequest({ userInfo, publicKey }, "Bearer " + authToken);
+    const response = await sendAuthRequest({ userInfo, publicKey }, "Bearer " + authToken);
     let result = "";
     if (response.status === 200) {
       result = response.data.jwt;

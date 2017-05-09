@@ -194,6 +194,7 @@ export default {
     comments: {
       rowType: "Comment",
       primaryKey: ["commentId"],
+      autoIncrement: "commentId",
       updated: "updated",
       foreignKeys: [
         { ref: "comments", columns: ["parent"] },
