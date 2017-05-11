@@ -56,7 +56,7 @@ export class MediaPage extends React.Component<MediaPageProps, MediaPageState> {
       <Row gutter={gutter}><h5 style={{ marginTop: "10px" }} >Comments:</h5></Row>
       <Row gutter={gutter}>
         <Col span={12}>
-          <CommentsPanel contentId={contentId} comments={this.state.comments} privKey={this.state.privKey} canCensor={false} userName={moniker} />
+          <CommentsPanel contentId={contentId} comments={this.state.comments} privKey={this.state.privKey} canCensor={moniker === owner} userName={moniker} />
         </Col>
       </Row>
     </div>

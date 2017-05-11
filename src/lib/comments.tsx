@@ -76,7 +76,15 @@ export class CommentItem extends React.Component<CommentItemProps, CommentItemSt
     let { depth, onReply, onEdit, node, canCensor, userName } = this.props;
     let { item, responses } = node;
     let { value, replying, editing } = this.state;
-    let rsps = responses.map(nd => <CommentItem key={nd.item.commentId} node={nd} depth={depth + 1} onReply={onReply} onEdit={onEdit} canCensor={canCensor} userName={userName} />);
+    let l = responses.length - 1;
+    let gutter = 0;
+    let w = "97%";
+    let rsps;
+
+    if (l >= 0) {
+      rsps = responses.map((nd, i) => <CommentItem key={nd.item.commentId} node={nd} depth={depth + 1} onReply={onReply} onEdit={onEdit} canCensor={canCensor} userName={userName} isLast={i === l} />);
+      rsps.unshift(<Row key="hr" gutter={gutter} justify="end"><hr style={{ width: w }} /></Row>);
+    }
     let reply;
     if (replying) {
       reply = <CommentEditor value={value} title="Add Reply:" isDirty={value.length > 0} enableAbandon={true}
@@ -90,25 +98,21 @@ export class CommentItem extends React.Component<CommentItemProps, CommentItemSt
       let btns = [];
       let btnStyle = { marginLeft: 5 };
       btns.push(<Button key="Reply" style={btnStyle} className="pt-minimal" iconName="comment" onClick={() => this.setState({ replying: true, value: '' })} ><span className="pt-text-muted">Reply</span></Button>);
+      if (item.userName === userName && responses.length === 0) {
+        btns.push(<Button key="Edit" style={btnStyle} className="pt-minimal" iconName="pt-icon-edit" onClick={() => this.setState({ editing: true, value: item.comment })} ><span className="pt-text-muted">Edit</span></Button>);
+      }
       if (this.props.canCensor) {
         btns.push(<Button key="Censor" style={btnStyle} className="pt-minimal" iconName="pt-icon-ban-circle" onClick={() => this.setState({ editing: true, value: '"NB: this comment has been removed by the moderator."' })} ><span className="pt-text-muted">Censor</span></Button>);
       }
-      else if (item.userName === userName && responses.length === 0) {
-        btns.push(<Button key="Edit" style={btnStyle} className="pt-minimal" iconName="pt-icon-edit" onClick={() => this.setState({ editing: true, value: item.comment })} ><span className="pt-text-muted">Edit</span></Button>);
-      }
       reply = <Row>{btns}</Row>
     }
-
-    let gutter = 0;
-    //let w = (100 - (depth * 3)).toString() + "%";
-    let w = "97%";
     return <div>
       <Row gutter={gutter} justify="end">
         <Col style={{ width: w }} >
           <span className="pt-text-muted" >{item.userName}, {OxiDate.timeAgo(new Date(item.created))}</span>
           <span><Button className="pt-minimal" onClick={() => this.toggleCollapsed()}
             iconName={this.state.collapsed ? "caret-right" : "caret-down"}>
-            <span className="pt-text-muted">{this.state.collapsed ? `[${responses.length} replies]` : ''}</span></Button>
+            <span className="pt-text-muted">{this.state.collapsed ? `[${responses.length} ${responses.length === 1 ? "reply" : "replies"}]` : ''}</span></Button>
           </span>
         </Col>
       </Row>
@@ -195,7 +199,7 @@ export class CommentsPanel extends React.Component<CommentsPanelProps, CommentsP
   render() {
     let { privKey, canCensor, userName } = this.props;
     let isDirty = this.state.newComment.length > 0
-    let itms = this.state.nodes.map(nd => <CommentItem key={nd.item.commentId} node={nd} depth={0} canCensor={canCensor} userName={userName}
+    let itms = this.state.nodes.map(nd => <CommentItem key={nd.item.commentId} node={nd} depth={0} canCensor={canCensor} userName={userName} isLast={false}
       onReply={(s, node) => this.addResponse(s, node)} onEdit={(s, node) => this.editComment(s, node)} />)
     return <div>
       {this.props.privKey && <CommentEditor value={this.state.newComment} isDirty={isDirty} title="Add Comment:"
