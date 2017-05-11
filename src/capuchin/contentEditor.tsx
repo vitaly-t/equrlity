@@ -51,8 +51,11 @@ export class ContentEditor extends React.Component<ContentEditorProps, ContentEd
     this.close();
   }
 
-  changeTitle(title) { this.setState({ title }); }
-  changeBody(content) { this.setState({ content }); }
+  changeContent(content: string) {
+    console.log("setting content state: " + content);
+    this.setState({ content });
+
+  }
   changeTags(tags: string[]) {
     this.setState({ tags });
     Chrome.sendSyncMessage({ eventType: "SaveTags", tags })
@@ -62,24 +65,25 @@ export class ContentEditor extends React.Component<ContentEditorProps, ContentEd
     let gutter = 20;
     let btnStyle = { marginRight: gutter / 2 };
     let rowStyle = { padding: 4 };
+    let { title, isPublic, content, tags, isOpen } = this.state;
     let isDirty = this.state.content !== this.props.info.content;
     let btns = [
       <Button style={btnStyle} key='save' className="pt-intent-primary" onClick={() => this.save()} text="Save" />,
       <Button style={btnStyle} key='stop' onClick={() => this.abandonEdit()} text="Abandon" />
     ];
     return (
-      <Dialog iconName="inbox" style={{ width: '80%' }} isOpen={this.state.isOpen} title={"Edit Content Info"} canOutsideClickClose={false} onClose={() => this.close()} >
+      <Dialog iconName="inbox" style={{ width: '80%' }} isOpen={isOpen} title={"Edit Content Info"} canOutsideClickClose={false} onClose={() => this.close()} >
         <div style={{ padding: gutter }}>
           <Row style={rowStyle} gutter={gutter}>
             <Col span={1}>Title:</Col>
             <Col span={8}>
-              <input type="text" style={{ width: '100%' }} value={this.state.title} onChange={e => this.changeTitle(e.target.value)} />
+              <input type="text" style={{ width: '100%' }} value={title} onChange={e => this.setState({ title: e.target.value })} />
             </Col>
-            <Col span={2}><Checkbox label="Public?" checked={this.state.isPublic} onChange={e => this.setState({ isPublic: !this.state.isPublic })} /></Col>
+            <Col span={2}><Checkbox label="Public?" checked={isPublic} onChange={e => this.setState({ isPublic: !this.state.isPublic })} /></Col>
           </Row>
           <Row span={2}>Body:</Row>
           <Row span={12}>
-            <MarkdownEditor value={this.state.content} onChange={s => this.changeBody(s)} isDirty={isDirty} allowHtml={true} />
+            <MarkdownEditor value={content} onChange={content => this.setState({ content })} isDirty={isDirty} allowHtml={true} />
           </Row>
           <Row style={rowStyle} gutter={gutter}>
             <Col span={1}>Tags:</Col>
