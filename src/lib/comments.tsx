@@ -3,6 +3,7 @@ import * as ReactDOM from "react-dom";
 import { Button, ITreeNode, Intent, Checkbox, Position, Toaster, Collapse } from "@blueprintjs/core";
 import { Url, format } from 'url';
 import { Row, Col } from 'react-simple-flex-grid';
+import * as Remarkable from 'remarkable';
 
 import * as Dbt from '../lib/datatypes';
 import * as Rpc from '../lib/rpc';
@@ -13,8 +14,10 @@ import * as OxiGen from '../gen/oxigen';
 import { rowStyle, btnStyle, lhcolStyle } from "../lib/ContentView";
 import * as Tags from '../lib/tags';
 import * as Comms from '../lib/axiosClient';
-
 import { MarkdownEditor } from '../lib/markdownEditor';
+
+const md = new Remarkable({ html: false });
+
 
 const gutter = 20;
 
@@ -25,55 +28,77 @@ const toast = Toaster.create({
 
 type CommentNode = { item: Rpc.CommentItem; responses: CommentNode[]; collapsed: boolean };
 
-interface CommentEditorProps { onReply: (s: string) => void, title?: string, onAbandon?: () => void };
+interface CommentEditorProps { value: string, isDirty: boolean, title?: string, onSave?: () => void, onChange: (s: string) => void, enableAbandon?: boolean, onAbandon?: () => void };
 interface CommentEditorState { };
 export class CommentEditor extends React.Component<CommentEditorProps, CommentEditorState> {
-  constructor(props) {
-    super(props);
-    this.state = {};
-  }
-
-  onSave(s: string) {
-    this.props.onReply(s);
-  }
 
   render() {
     let ttl = this.props.title || '';
     let onAbandon = this.props.onAbandon ? () => this.props.onAbandon() : null;
-    return <MarkdownEditor value='' title={ttl} onSave={s => this.onSave(s)} onAbandon={onAbandon} />
+    let onSave = this.props.onSave ? () => this.props.onSave() : null;
+    return <MarkdownEditor value={this.props.value} title={ttl} isDirty={this.props.isDirty} enableAbandon={this.props.enableAbandon}
+      onSave={onSave} onChange={s => this.props.onChange(s)} onAbandon={onAbandon} allowHtml={false} />
   }
 }
 
-interface CommentItemProps { node: CommentNode, depth: number, privKey: JsonWebKey, onReply: (s: string, parent: CommentNode) => void };
-interface CommentItemState { collapsed: boolean, replying: boolean };
+interface CommentItemProps {
+  node: CommentNode, depth: number, canCensor: boolean, userName: Dbt.userName, isLast?: boolean
+  onReply: (s: string, parent: CommentNode) => void, onEdit: (s: string, node: CommentNode) => void
+};
+interface CommentItemState { collapsed: boolean, replying: boolean, editing: boolean, value: string };
 export class CommentItem extends React.Component<CommentItemProps, CommentItemState> {
   constructor(props) {
     super(props);
-    this.state = { collapsed: this.props.node.collapsed, replying: false };
+    this.state = { collapsed: this.props.node.collapsed, replying: false, editing: false, value: "" };
   }
 
   toggleCollapsed() {
     let collapsed = !this.state.collapsed;
     this.setState({ collapsed });
-    //let collapsed = !this.props.node.collapsed;
     this.props.node.collapsed = collapsed;
-    //this.forceUpdate();
   }
 
-  onReply = async (comment: string) => {
-    this.props.onReply(comment, this.props.node);
+  onChange(value: string) {
+    this.setState({ value });
+  }
+
+  onReply() {
+    this.props.onReply(this.state.value, this.props.node);
     this.setState({ replying: false });
   }
 
+  onEdit() {
+    this.props.onEdit(this.state.value, this.props.node);
+    this.setState({ editing: false });
+  }
+
   render() {
-    let { depth, onReply, node, privKey } = this.props;
+    let { depth, onReply, onEdit, node, canCensor, userName } = this.props;
     let { item, responses } = node;
-    let rsps = responses.map(nd => <CommentItem key={nd.item.commentId} node={nd} depth={depth + 1} privKey={privKey} onReply={onReply} />);
-    let reply = this.state.replying
-      ? <CommentEditor title="Add Reply:" onReply={s => this.onReply(s)} onAbandon={() => this.setState({ replying: false })} />
-      : (this.props.privKey &&
-        <Button className="pt-minimal" iconName="comment" onClick={() => this.setState({ replying: true })} ><span className="pt-text-muted">Reply</span></Button>)
-      ;
+    let { value, replying, editing } = this.state;
+    let rsps = responses.map(nd => <CommentItem key={nd.item.commentId} node={nd} depth={depth + 1} onReply={onReply} onEdit={onEdit} canCensor={canCensor} userName={userName} />);
+    let reply;
+    if (replying) {
+      reply = <CommentEditor value={value} title="Add Reply:" isDirty={value.length > 0} enableAbandon={true}
+        onSave={() => this.onReply()} onChange={s => this.onChange(s)} onAbandon={() => this.setState({ replying: false })} />;
+    }
+    else if (editing) {
+      reply = <CommentEditor value={value} title="Edit Comment:" isDirty={item.comment !== value} enableAbandon={true}
+        onSave={() => this.onEdit()} onChange={s => this.onChange(s)} onAbandon={() => this.setState({ editing: false })} />;
+    }
+    else if (userName) {
+      let btns = [];
+      let btnStyle = { marginLeft: 5 };
+      btns.push(<Button key="Reply" style={btnStyle} className="pt-minimal" iconName="comment" onClick={() => this.setState({ replying: true, value: '' })} ><span className="pt-text-muted">Reply</span></Button>);
+      if (this.props.canCensor) {
+        btns.push(<Button key="Censor" style={btnStyle} className="pt-minimal" iconName="pt-icon-ban-circle" onClick={() => this.setState({ editing: true, value: '"NB: this comment has been removed by the moderator."' })} ><span className="pt-text-muted">Censor</span></Button>);
+      }
+      else if (item.userName === userName && responses.length === 0) {
+        btns.push(<Button key="Edit" style={btnStyle} className="pt-minimal" iconName="pt-icon-edit" onClick={() => this.setState({ editing: true, value: item.comment })} ><span className="pt-text-muted">Edit</span></Button>);
+      }
+      reply = <Row>{btns}</Row>
+    }
+
     let gutter = 0;
     //let w = (100 - (depth * 3)).toString() + "%";
     let w = "97%";
@@ -90,7 +115,7 @@ export class CommentItem extends React.Component<CommentItemProps, CommentItemSt
       <Collapse isOpen={!this.state.collapsed}>
         <Row gutter={gutter} justify="end">
           <Col style={{ width: w }} >
-            <p className="pt-ui-text-large">{item.comment}</p>
+            {!this.state.editing && <div className="pt-ui-text-large" dangerouslySetInnerHTML={{ __html: md.render(item.comment) }} />}
             {reply}
           </Col>
         </Row>
@@ -100,6 +125,9 @@ export class CommentItem extends React.Component<CommentItemProps, CommentItemSt
           </Col>
         </Row>
       </Collapse>
+      <Row gutter={gutter} justify="end">
+        {!this.props.isLast && <hr style={{ width: w }} />}
+      </Row>
     </div >
   }
 }
@@ -111,23 +139,23 @@ function buildTree(comments: Rpc.CommentItem[]): CommentNode[] {
     let node: CommentNode = { item, responses: [], collapsed: false };
     return node;
   });
-  let [y, n] = Utils.partition<CommentNode>(nodes, e => e.item.parent === 0);
+  let [n, y] = Utils.partition<CommentNode>(nodes, e => e.item.parent ? true : false);
   n.forEach(c => {
     let i = nodes.findIndex(e => e.item.commentId === c.item.parent);
-    if (i === -1) y.push(c); // throw new Error("orphaned comment found");
-    else nodes[i].responses.push(c);
+    if (i >= 0) nodes[i].responses.push(c);
+    //else y.push(c); // throw new Error("orphaned comment found");
   })
   return y;
 }
 
-interface CommentsPanelProps { contentId: Dbt.contentId, comments: Rpc.CommentItem[], privKey: JsonWebKey };
-interface CommentsPanelState { nodes: CommentNode[]; };
+interface CommentsPanelProps { contentId: Dbt.contentId, comments: Rpc.CommentItem[], privKey: JsonWebKey, canCensor: boolean, userName: Dbt.userName };
+interface CommentsPanelState { nodes: CommentNode[]; newComment: string };
 export class CommentsPanel extends React.Component<CommentsPanelProps, CommentsPanelState> {
 
   constructor(props: CommentsPanelProps) {
     super(props);
     let nodes = buildTree(props.comments);
-    this.state = { nodes };
+    this.state = { nodes, newComment: "" };
   }
 
   componentWillReceiveProps(props: CommentsPanelProps) {
@@ -139,23 +167,39 @@ export class CommentsPanel extends React.Component<CommentsPanelProps, CommentsP
     let contentId = this.props.contentId
     let parent = node ? node.item.commentId : 0;
     let signature = await Comms.signData(this.props.privKey, comment);
-    let req: Rpc.AddCommentRequest = { contentId, comment, parent, signature };
-    let _rsp = await Comms.sendApiRequest("addComment", req);
-    let rsp: Rpc.AddCommentResponse = Comms.extractResult(_rsp);
+    let req: Rpc.AditCommentRequest = { contentId, comment, parent, signature };
+    let _rsp = await Comms.sendApiRequest("aditComment", req);
+    let rsp: Rpc.AditCommentResponse = Comms.extractResult(_rsp);
     let newnd = { item: rsp.comment, responses: [], collapsed: false }
-    let nodes;
-    if (node) {
-      node.responses.push(newnd);
-      nodes = [...this.state.nodes]
+    let nodes = [...this.state.nodes];
+    let newComment = this.state.newComment;
+    if (node) node.responses.push(newnd);
+    else {
+      nodes.push(newnd);
+      newComment = '';
     }
-    else nodes = [...this.state.nodes, newnd];
-    this.setState({ nodes });
+    this.setState({ nodes, newComment });
+  }
+
+  editComment = async (comment, node: CommentNode) => {
+    let { commentId, contentId, parent } = node.item;
+    let signature = await Comms.signData(this.props.privKey, comment);
+    let req: Rpc.AditCommentRequest = { contentId, comment, parent, signature };
+    let _rsp = await Comms.sendApiRequest("aditComment", req);
+    let rsp: Rpc.AditCommentResponse = Comms.extractResult(_rsp);
+    node.item = rsp.comment;
+    let nodes = [...this.state.nodes];
+    this.setState({ nodes, newComment: '' });
   }
 
   render() {
-    let itms = this.state.nodes.map(nd => <CommentItem key={nd.item.commentId} node={nd} depth={0} privKey={this.props.privKey} onReply={(s, node) => this.addResponse(s, node)} />)
+    let { privKey, canCensor, userName } = this.props;
+    let isDirty = this.state.newComment.length > 0
+    let itms = this.state.nodes.map(nd => <CommentItem key={nd.item.commentId} node={nd} depth={0} canCensor={canCensor} userName={userName}
+      onReply={(s, node) => this.addResponse(s, node)} onEdit={(s, node) => this.editComment(s, node)} />)
     return <div>
-      {this.props.privKey && <CommentEditor title="Add Comment:" onReply={s => this.addResponse(s, null)} />}
+      {this.props.privKey && <CommentEditor value={this.state.newComment} isDirty={isDirty} title="Add Comment:"
+        onSave={() => this.addResponse(this.state.newComment, null)} onChange={(newComment) => this.setState({ newComment })} onAbandon={() => this.setState({ newComment: '' })} />}
       {itms}
     </div>;
   }

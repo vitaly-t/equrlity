@@ -63,7 +63,7 @@ import * as Dbt from './datatypes';
 //TODO: rename "getUserLinks" to "loadSettingsPage"
 export type Method = "initialize" | "authenticate" | "promoteContent" | "promoteLink" | "loadLink" | "getRedirect" | "changeSettings"
   | "getUserContents" | "loadContent" | "getUserLinks" | "redeemLink" | "saveContent" | "saveLink" | "removeContent" | "transferCredits"
-  | "addComment";
+  | "aditComment";
 
 /**
  * Informational type tags used to indicate intended usage.
@@ -108,14 +108,15 @@ export type LoadContentResponse = {
   comments: CommentItem[];
 }
 
-export type AddCommentRequest = {
+export type AditCommentRequest = {
+  commentId?: Dbt.commentId;
   contentId: Dbt.contentId;
   comment: string;
   parent: Dbt.commentId;
   signature: string;
 }
 
-export type AddCommentResponse = {
+export type AditCommentResponse = {
   comment: CommentItem;
 }
 
@@ -210,20 +211,20 @@ export type AuthenticateResponse = { ok: boolean; }
 
 export type RequestBody = PromoteContentRequest | PromoteLinkRequest | InitializeRequest | LoadLinkRequest | GetRedirectRequest | ChangeSettingsRequest
   | GetUserContentsRequest | GetUserLinksRequest | RedeemLinkRequest | SaveLinkRequest | SaveContentRequest | LoadContentRequest | RemoveContentRequest
-  | TransferCreditsRequest | AuthenticateRequest | AddCommentRequest;
+  | TransferCreditsRequest | AuthenticateRequest | AditCommentRequest;
 
 export type ResponseBody = PromoteContentResponse & PromoteLinkResponse & InitializeResponse & LoadLinkResponse & GetRedirectResponse & ChangeSettingsResponse
   & GetUserContentsResponse & GetUserLinksResponse & RedeemLinkResponse & SaveLinkResponse & SaveContentResponse & LoadContentResponse & RemoveContentResponse
-  & TransferCreditsResponse & AuthenticateResponse & AddCommentResponse;
+  & TransferCreditsResponse & AuthenticateResponse & AditCommentResponse;
 
 // internal to server.
 export type RecvRequestBody = PromoteContentRequest & PromoteLinkRequest & InitializeRequest & LoadLinkRequest & GetRedirectRequest & ChangeSettingsRequest
   & GetUserContentsRequest & GetUserLinksRequest & RedeemLinkRequest & SaveLinkRequest & SaveContentRequest & LoadContentRequest & RemoveContentRequest
-  & TransferCreditsRequest & AuthenticateRequest & AddCommentRequest;
+  & TransferCreditsRequest & AuthenticateRequest & AditCommentRequest;
 
 export type SendResponseBody = PromoteContentResponse | PromoteLinkResponse | InitializeResponse | LoadLinkResponse | GetRedirectResponse | ChangeSettingsResponse
   | GetUserContentsResponse | GetUserLinksResponse | RedeemLinkResponse | SaveLinkResponse | SaveContentResponse | LoadContentResponse | RemoveContentResponse
-  | TransferCreditsResponse | AuthenticateResponse | AddCommentResponse;
+  | TransferCreditsResponse | AuthenticateResponse | AditCommentResponse;
 
 export type Handler<Request, Response> = (req: Request) => Promise<Response>;
 

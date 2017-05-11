@@ -32,12 +32,6 @@ export class ContentEditor extends React.Component<ContentEditorProps, ContentEd
     this.state = { title, content, tags, isError: false, isPublic, prevContent: content, isOpen: true };
   }
 
-  ctrls: {
-    title: HTMLInputElement,
-    body: HTMLTextAreaElement,
-    investment: HTMLInputElement,
-  } = { title: null, body: null, investment: null };
-
   save() {
     if (this.state.isError) return;
     let { title, tags, isPublic, content } = this.state;
@@ -57,7 +51,7 @@ export class ContentEditor extends React.Component<ContentEditorProps, ContentEd
     this.close();
   }
 
-  changeTitle(e) { this.setState({ title: e.target.value }); }
+  changeTitle(title) { this.setState({ title }); }
   changeBody(content) { this.setState({ content }); }
   changeTags(tags: string[]) {
     this.setState({ tags });
@@ -68,7 +62,7 @@ export class ContentEditor extends React.Component<ContentEditorProps, ContentEd
     let gutter = 20;
     let btnStyle = { marginRight: gutter / 2 };
     let rowStyle = { padding: 4 };
-
+    let isDirty = this.state.content !== this.props.info.content;
     let btns = [
       <Button style={btnStyle} key='save' className="pt-intent-primary" onClick={() => this.save()} text="Save" />,
       <Button style={btnStyle} key='stop' onClick={() => this.abandonEdit()} text="Abandon" />
@@ -79,13 +73,13 @@ export class ContentEditor extends React.Component<ContentEditorProps, ContentEd
           <Row style={rowStyle} gutter={gutter}>
             <Col span={1}>Title:</Col>
             <Col span={8}>
-              <input type="text" style={{ width: '100%' }} ref={(e) => this.ctrls.title = e} value={this.state.title} onChange={e => this.changeTitle(e)} />
+              <input type="text" style={{ width: '100%' }} value={this.state.title} onChange={e => this.changeTitle(e.target.value)} />
             </Col>
             <Col span={2}><Checkbox label="Public?" checked={this.state.isPublic} onChange={e => this.setState({ isPublic: !this.state.isPublic })} /></Col>
           </Row>
           <Row span={2}>Body:</Row>
           <Row span={12}>
-            <MarkdownEditor value={this.state.content} onChange={s => this.changeBody(s)} />
+            <MarkdownEditor value={this.state.content} onChange={s => this.changeBody(s)} isDirty={isDirty} allowHtml={true} />
           </Row>
           <Row style={rowStyle} gutter={gutter}>
             <Col span={1}>Tags:</Col>

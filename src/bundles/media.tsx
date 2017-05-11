@@ -11,43 +11,40 @@ import { CommentsPanel } from '../lib/comments';
 import { ContentView } from '../lib/contentView';
 
 interface MediaPageProps { mime: string, contentId: Dbt.contentId };
-interface MediaPageState { privKey: JsonWebKey, owner: Dbt.userName, comments: Rpc.CommentItem[], content: Dbt.Content };
+interface MediaPageState { privKey: JsonWebKey, owner: Dbt.userName, moniker: Dbt.userName, comments: Rpc.CommentItem[], content: Dbt.Content };
 export class MediaPage extends React.Component<MediaPageProps, MediaPageState> {
 
   constructor(props) {
     super(props);
-    this.state = { privKey: null, comments: [], owner: '', content: null };
+    this.state = { privKey: null, comments: [], owner: '', moniker: '', content: null };
   }
 
   componentDidMount = async () => {
     let req = Comms.clientRequest();
     let response = await req.get(Utils.serverUrl + "/load/content/" + this.props.contentId);
-    let privKey: JsonWebKey = null;
+    let privKey: JsonWebKey;
+    let moniker: string;
     let pk = response.headers['x-psq-privkey']
-    if (pk) privKey = JSON.parse(pk);
+    if (pk) {
+      privKey = JSON.parse(pk);
+      moniker = response.headers['x-psq-moniker'];
+    }
     let rsp: Rpc.Response = response.data;
     if (rsp.error) throw new Error("Server returned error: " + rsp.error.message);
     let rslt: Rpc.LoadContentResponse = rsp.result;
     let { content, comments, owner } = rslt;
-    this.setState({ content, privKey, comments, owner });
+    this.setState({ content, privKey, comments, owner, moniker });
   }
 
   render() {
     let { contentId, mime } = this.props;
-    let { content, privKey, comments, owner } = this.state;
+    let { content, privKey, comments, owner, moniker } = this.state;
 
-    const opts: any = {
-      autoplay: false,
-      controls: true,
-      sources: [{
-        src: '/stream/content/' + contentId,
-        type: mime
-      }]
-    }
+    let viewer = mime.startsWith("image") ? <img src={'/stream/content/' + contentId} />
+      : mime.startsWith("audio") ? <AudioPlayer poster='http://localhost:8080/stream/content/bA3jno' src={'/stream/content/' + contentId} mime={mime} />
+        : mime.startsWith("video") ? <VideoPlayer poster='http://localhost:8080/stream/content/bA3jno' src={'/stream/content/' + contentId} mime={mime} />
+          : <p>Invalid mime type</p>;
 
-    let viewer = mime.startsWith("audio") ? <AudioPlayer options={opts} />
-      : mime.startsWith("video") ? <VideoPlayer options={opts} />
-        : <p>Invalid mime type</p>;
     let gutter = 10;
     let cont;
     if (content) cont = <ContentView info={content} owner={owner} />;
@@ -59,7 +56,7 @@ export class MediaPage extends React.Component<MediaPageProps, MediaPageState> {
       <Row gutter={gutter}><h5 style={{ marginTop: "10px" }} >Comments:</h5></Row>
       <Row gutter={gutter}>
         <Col span={12}>
-          <CommentsPanel contentId={contentId} comments={this.state.comments} privKey={this.state.privKey} />
+          <CommentsPanel contentId={contentId} comments={this.state.comments} privKey={this.state.privKey} canCensor={false} userName={moniker} />
         </Col>
       </Row>
     </div>

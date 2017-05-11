@@ -125,7 +125,14 @@ chrome.webRequest.onBeforeSendHeaders.addListener(addHeaders
 
 function addResponseHeaders(details) {
   let { responseHeaders } = details;
-  if (__state) responseHeaders.push({ name: 'x-psq-privkey', value: JSON.stringify(__state.privateKey) });
+  if (__state) {
+    responseHeaders.push({ name: 'x-psq-privkey', value: JSON.stringify(__state.privateKey) });
+    if (responseHeaders.findIndex(e => e.name === 'x-psq-moniker') < 0) {
+      responseHeaders.push({ name: 'x-psq-credits', value: __state.credits.toString() });
+      responseHeaders.push({ name: 'x-psq-moniker', value: __state.moniker });
+      responseHeaders.push({ name: 'x-psq-email', value: __state.email });
+    }
+  }
   return { responseHeaders };
 }
 

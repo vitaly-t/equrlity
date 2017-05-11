@@ -21,22 +21,20 @@ export class PopupPanel extends React.Component<PopupPanelProps, PopupPanelState
     this.state = { promoteAmount: 0, url: props.appState.activeUrl, title: '', comment: '', tags: [] };
   }
 
-  ctrls: { amountInput?: HTMLInputElement, url?: HTMLTextAreaElement, title?: HTMLTextAreaElement, comment?: HTMLTextAreaElement } = {}
-
-  changePromoteAmount() {
-    this.setState({ promoteAmount: parseInt(this.ctrls.amountInput.value) });
+  changePromoteAmount(value: string) {
+    this.setState({ promoteAmount: parseInt(value) });
   }
 
-  changeUrl() {
-    this.setState({ url: this.ctrls.url.value });
+  changeUrl(url: string) {
+    this.setState({ url });
   }
 
-  changeTitle() {
-    this.setState({ title: this.ctrls.title.value });
+  changeTitle(title: string) {
+    this.setState({ title });
   }
 
-  changeComment() {
-    this.setState({ comment: this.ctrls.comment.value });
+  changeComment(comment: string) {
+    this.setState({ comment });
   }
 
   changeTags(tags: string[]) {
@@ -107,26 +105,22 @@ export class PopupPanel extends React.Component<PopupPanelProps, PopupPanelState
       pnl = (<div>
         <Row style={rowStyle} gutter={gutter} align="top">
           <Col span={lspan}>Source URL : </Col>
-          <Col span={rspan}><TextareaAutosize style={{ width: '100%' }} value={this.state.url} ref={(e) => this.ctrls.title = e}
-            onChange={(e) => this.changeUrl()} /></Col>
+          <Col span={rspan}><TextareaAutosize style={{ width: '100%' }} value={this.state.url} onChange={(e) => this.changeUrl(e.target.value)} /></Col>
         </Row>
         {infoDiv}
         <Row style={rowStyle} gutter={gutter} align="top">
           <Col span={lspan}>Investment amount</Col>
-          <Col span={2}><input style={{ width: '100%' }} type="number" ref={(e) => this.ctrls.amountInput = e} max={st.credits}
-            value={this.state.promoteAmount} onChange={(e) => this.changePromoteAmount()} /></Col>
+          <Col span={2}><input style={{ width: '100%' }} type="number" max={st.credits} value={this.state.promoteAmount} onChange={(e) => this.changePromoteAmount(e.target.value)} /></Col>
           <Col span={3}> / {st.credits} available.</Col>
           <Col span={4}>{promTxt}</Col>
         </Row>
         <Row style={rowStyle} gutter={gutter} align="top">
           <Col span={lspan}>Link Description: </Col>
-          <Col span={rspan}><TextareaAutosize style={{ width: '100%' }} ref={(e) => this.ctrls.title = e}
-            value={this.state.title} onChange={(e) => this.changeTitle()} /></Col>
+          <Col span={rspan}><TextareaAutosize style={{ width: '100%' }} value={this.state.title} onChange={(e) => this.changeTitle(e.target.value)} /></Col>
         </Row>
         <Row style={rowStyle} gutter={gutter} align="top">
           <Col span={lspan}>Comment:</Col>
-          <Col span={rspan}><TextareaAutosize style={{ width: '100%' }} ref={(e) => this.ctrls.comment = e}
-            value={this.state.comment} onChange={(e) => this.changeComment()} /></Col>
+          <Col span={rspan}><TextareaAutosize style={{ width: '100%' }} value={this.state.comment} onChange={(e) => this.changeComment(e.target.value)} /></Col>
         </Row>
         <Row style={rowStyle} gutter={gutter} align="top">
           <Col span={lspan}>Tags:</Col>

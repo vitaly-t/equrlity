@@ -441,6 +441,7 @@ router.route({
       console.log(err);
       ctx.throw(err);
     }
+    cache.contents.set(cont.contentId, cont);
     ctx.body = JSON.stringify(cont);
   }
 });
@@ -608,16 +609,24 @@ router.post('/rpc', async function (ctx: any) {
         ctx.body = { id, result };
         break;
       }
-      case "addComment": {
-        let req: Rpc.AddCommentRequest = params;
-        let { parent, comment, contentId } = req;
+      case "aditComment": {
+        let req: Rpc.AditCommentRequest = params;
+        let { parent, comment, contentId, commentId } = req;
         parent = parent || null;
-        let rec = OxiGen.emptyRec<Dbt.Comment>("comments");
-        rec = { ...rec, parent, comment, contentId, userId }
-        let cmt = await pg.insertRecord<Dbt.Comment>("comments", rec);
-        let userName = cache.users.get(userId).userName;
+        let cmt: Dbt.Comment;
+        if (commentId) {
+          let rec = pg.retrieveRecord<Dbt.Comment>("comments", { commentId });
+          rec = { ...rec, comment }
+          cmt = await pg.updateRecord<Dbt.Comment>("comments", rec);
+        }
+        else {
+          let rec = OxiGen.emptyRec<Dbt.Comment>("comments");
+          rec = { ...rec, parent, comment, contentId, userId }
+          cmt = await pg.insertRecord<Dbt.Comment>("comments", rec);
+        }
+        let userName = cache.users.get(cmt.userId).userName;
         let itm: Rpc.CommentItem = { ...cmt, userName }
-        let result: Rpc.AddCommentResponse = { comment: itm };
+        let result: Rpc.AditCommentResponse = { comment: itm };
         ctx.body = { id, result };
         break;
       }
