@@ -129,6 +129,12 @@ export function contentToUrl(contentId: Dbt.contentId): Dbt.urlString {
   return format(srv);
 }
 
+export function homePageUrl(userName: Dbt.userName): Dbt.urlString {
+  let srv = parse(serverUrl);
+  srv.pathname = "/user/" + userName;
+  return format(srv);
+}
+
 export function genHashId(len: number): string {
   let chars = "abcdefghijklmnopqrstuwxyzABCDEFGHIJKLMNOPQRSTUWXYZ0123456789";
   let rnd = crypto.randomBytes(len)

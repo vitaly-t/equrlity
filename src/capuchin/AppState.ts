@@ -1,18 +1,16 @@
 import { Url, format, parse } from 'url';
 import { UserLinkItem } from '../lib/rpc';
 import * as Dbt from '../lib/datatypes';
-import *as Utils from '../lib/utils';
+import * as Utils from '../lib/utils';
 import { TagSelectOption } from '../lib/tags';
-
-export interface LinkInfo { pseudoqUrl: Url, linkDepth: number, linkPromoter: string };
 
 
 export interface AppState {
   publicKey: JsonWebKey | null;
   privateKey: JsonWebKey | null;
-  links: Map<string, LinkInfo>;
-  redirects: Map<string, string>;   // keys are pseudoq urls - values are source urls 
+  links: Map<string, Dbt.Content>;
   activeUrl: string | null;
+  homePage: Dbt.urlString;
   moniker: string;
   email: string;
   authprov: string;
@@ -32,31 +30,14 @@ export interface AppState {
 export function initState(): AppState {
   console.log("initState called");
   return {
-    publicKey: null, privateKey: null, links: new Map<string, LinkInfo>(), redirects: new Map<string, string>(),
-    activeUrl: null, moniker: 'unknown', authprov: '', email: '', credits: 0, jwt: '', lastErrorMessage: '',
+    publicKey: null, privateKey: null, links: new Map<string, Dbt.Content>(),
+    activeUrl: null, moniker: 'unknown', authprov: '', email: '', credits: 0, jwt: '', lastErrorMessage: '', homePage: '',
     investments: [], promotions: [], connectedUsers: [], reachableUserCount: 0, contents: [], allTags: [], currentContent: null, currentLink: null
   };
 }
 
-export function getLinked(state: AppState, curl: string): LinkInfo {
+export function getBookmark(state: AppState, curl: string): Dbt.Content {
   return state.links.get(prepareUrl(curl));
-}
-
-export function setLink(state: AppState, curl_: string, syn_: string, linkDepth: number, linkPromoter: string): AppState {
-  let contentUrl = prepareUrl(curl_);
-  let pseudoqUrl = prePrepareUrl(syn_);
-  if (!pseudoqUrl.hash) pseudoqUrl.hash = '#' + contentUrl
-  else pseudoqUrl.hash = pseudoqUrl.hash.replace(' ', '_');
-  let info = state.links.get(contentUrl);
-  if (info && format(info.pseudoqUrl) === format(pseudoqUrl)) return state;
-  let links = new Map(state.links)
-  links.set(contentUrl, { pseudoqUrl, linkDepth, linkPromoter });
-  let redir = format(pseudoqUrl);
-  let i = redir.indexOf('#');
-  redir = redir.substring(0, i);
-  let redirects = new Map(state.redirects);
-  redirects.set(redir, contentUrl);
-  return { ...state, links, redirects };
 }
 
 // serialization occurs by sendMessages between background "page"" and popup panel
@@ -66,11 +47,7 @@ export function preSerialize(st: AppState): any {
   st.links.forEach((v, k) => {
     links[k] = v;
   });
-  let redirects = Object.create(null);
-  st.redirects.forEach((v, k) => {
-    redirects[k] = v;
-  });
-  return { ...st, links, redirects };
+  return { ...st, links };
 }
 
 export function postDeserialize(st: any): AppState {
@@ -78,26 +55,7 @@ export function postDeserialize(st: any): AppState {
   for (const k in st.links) {
     links.set(k, st.links[k]);
   };
-  let redirects = new Map<string, string>();
-  for (const k in st.redirects) {
-    redirects.set(k, st.redirects[k]);
-  };
-  return { ...st, links, redirects };
-}
-
-export function expandedUrl(state: AppState, curl_: string = state.activeUrl): string {
-  let curl = prepareUrl(curl_)
-  let rslt = curl;
-  if (isSeen(state, curl)) {
-    let info: LinkInfo = state.links.get(curl);
-    if (info) rslt = format(info.pseudoqUrl);
-  }
-  return rslt;
-}
-
-export function getRedirectUrl(state: AppState, curl_: string): string | null {
-  let curl = prepareUrl(curl_)
-  return state.redirects.get(curl);
+  return { ...st, links };
 }
 
 export function setLoading(state: AppState, curl_: string): AppState {

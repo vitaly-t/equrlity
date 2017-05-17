@@ -60,7 +60,7 @@ export class LinksPage extends React.Component<LinksPageProps, LinksPageState> {
 
         return (
           <tr key={l.linkId} >
-            <td><a href="url" >{url}</a></td>
+            <td><a href={url} target="_blank" >{url}</a></td>
             <td>{l.contentId}</td>
             <td>{l.comment}</td>
             <td>{item.linkDepth}</td>

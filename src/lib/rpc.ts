@@ -61,8 +61,8 @@ import * as Dbt from './datatypes';
  */
 
 //TODO: rename "getUserLinks" to "loadSettingsPage"
-export type Method = "initialize" | "authenticate" | "promoteContent" | "promoteLink" | "loadLink" | "getRedirect" | "changeSettings"
-  | "getUserContents" | "loadContent" | "getUserLinks" | "redeemLink" | "saveContent" | "saveLink" | "removeContent" | "transferCredits"
+export type Method = "initialize" | "authenticate" | "promoteContent" | "bookmarkLink" | "loadLink" | "getRedirect" | "changeSettings"
+  | "getUserContents" | "loadContent" | "getUserSettings" | "getUserLinks" | "redeemLink" | "saveContent" | "saveLink" | "removeContent" | "transferCredits"
   | "aditComment";
 
 /**
@@ -120,18 +120,17 @@ export type AditCommentResponse = {
   comment: CommentItem;
 }
 
-export type PromoteLinkRequest = {
+export type BookmarkLinkRequest = {
+  contentId?: Dbt.contentId;
   url: Dbt.urlString;
   title: string;
   comment: string;
   tags: string[];
-  amount: Integer;
   signature: string;
 }
 
-export type PromoteLinkResponse = {
-  link: Dbt.Link;
-  linkDepth: Integer;
+export type BookmarkLinkResponse = {
+  content: Dbt.Content;
 }
 
 export type LoadLinkRequest = {
@@ -139,30 +138,23 @@ export type LoadLinkRequest = {
 }
 
 export type LoadLinkResponse = {
-  found: boolean;
-  url?: UrlString;
-  linkDepth?: Integer;
-  linkPromoter?: string;
+  content: Dbt.Content;
 }
 
-export type GetRedirectRequest = { linkUrl: UrlString; }
-
-export type GetRedirectResponse = {
-  found: boolean;
-  contentUrl?: UrlString;
-  linkDepth?: Integer;
-  linkPromoter?: string;
-}
-
-export type ChangeSettingsRequest = {
+export type UserSettings = {
   userName: string;
   email: string;
+  homePage: Dbt.urlString;
+  info: string;
 }
 
+export type GetUserSettingsRequest = {}
+export type GetUserSettingsResponse = UserSettings;
+
+export type ChangeSettingsRequest = UserSettings;
 export type ChangeSettingsResponse = { ok: boolean; }
 
 export type GetUserContentsRequest = {}
-
 export type GetUserContentsResponse = {
   contents: Dbt.Content[];
 }
@@ -209,22 +201,22 @@ export type AuthenticateRequest = { provider: string }
 
 export type AuthenticateResponse = { ok: boolean; }
 
-export type RequestBody = PromoteContentRequest | PromoteLinkRequest | InitializeRequest | LoadLinkRequest | GetRedirectRequest | ChangeSettingsRequest
+export type RequestBody = PromoteContentRequest | BookmarkLinkRequest | InitializeRequest | LoadLinkRequest | ChangeSettingsRequest
   | GetUserContentsRequest | GetUserLinksRequest | RedeemLinkRequest | SaveLinkRequest | SaveContentRequest | LoadContentRequest | RemoveContentRequest
-  | TransferCreditsRequest | AuthenticateRequest | AditCommentRequest;
+  | TransferCreditsRequest | AuthenticateRequest | AditCommentRequest | GetUserSettingsRequest;
 
-export type ResponseBody = PromoteContentResponse & PromoteLinkResponse & InitializeResponse & LoadLinkResponse & GetRedirectResponse & ChangeSettingsResponse
+export type ResponseBody = PromoteContentResponse & BookmarkLinkResponse & InitializeResponse & LoadLinkResponse & ChangeSettingsResponse
   & GetUserContentsResponse & GetUserLinksResponse & RedeemLinkResponse & SaveLinkResponse & SaveContentResponse & LoadContentResponse & RemoveContentResponse
-  & TransferCreditsResponse & AuthenticateResponse & AditCommentResponse;
+  & TransferCreditsResponse & AuthenticateResponse & AditCommentResponse & GetUserSettingsResponse;
 
 // internal to server.
-export type RecvRequestBody = PromoteContentRequest & PromoteLinkRequest & InitializeRequest & LoadLinkRequest & GetRedirectRequest & ChangeSettingsRequest
+export type RecvRequestBody = PromoteContentRequest & BookmarkLinkRequest & InitializeRequest & LoadLinkRequest & ChangeSettingsRequest
   & GetUserContentsRequest & GetUserLinksRequest & RedeemLinkRequest & SaveLinkRequest & SaveContentRequest & LoadContentRequest & RemoveContentRequest
-  & TransferCreditsRequest & AuthenticateRequest & AditCommentRequest;
+  & TransferCreditsRequest & AuthenticateRequest & AditCommentRequest & GetUserSettingsRequest;
 
-export type SendResponseBody = PromoteContentResponse | PromoteLinkResponse | InitializeResponse | LoadLinkResponse | GetRedirectResponse | ChangeSettingsResponse
+export type SendResponseBody = PromoteContentResponse | BookmarkLinkResponse | InitializeResponse | LoadLinkResponse | ChangeSettingsResponse
   | GetUserContentsResponse | GetUserLinksResponse | RedeemLinkResponse | SaveLinkResponse | SaveContentResponse | LoadContentResponse | RemoveContentResponse
-  | TransferCreditsResponse | AuthenticateResponse | AditCommentResponse;
+  | TransferCreditsResponse | AuthenticateResponse | AditCommentResponse | GetUserSettingsResponse;
 
 export type Handler<Request, Response> = (req: Request) => Promise<Response>;
 

@@ -10,6 +10,7 @@ import * as React from 'react';
 import * as ReactDOM from 'react-dom';
 import * as Rpc from '../lib/rpc';
 import * as Dbt from '../lib/datatypes';
+import * as Utils from '../lib/utils';
 
 import { TagGroup } from './tags';
 
@@ -32,8 +33,8 @@ export class ContentView extends React.Component<ContentViewProps, ContentViewSt
     let { info, owner } = this.props;
     let h = { __html: md.render(info.content) };
     let lstedit = info.updated ? oxiDate.toFormat(new Date(info.updated), "DDDD, MMMM D @ HH:MIP") : 'never';
-    let pub = info.published ? oxiDate.toFormat(new Date(info.published), "DDDD, MMMM D @ HH:MIP") : 'never';
     let tags = info.tags
+    let hpg = Utils.homePageUrl(owner);
     let tagbtns = <TagGroup tags={tags} />;
     return (
       <div>
@@ -43,7 +44,7 @@ export class ContentView extends React.Component<ContentViewProps, ContentViewSt
           <div style={{ display: 'inline' }}>Tags: </div>
           {tagbtns}
         </div>
-        <div style={rowStyle} >Uploaded by: {owner}.</div>
+        <div style={rowStyle} >Uploaded by: <a href={hpg} target="_blank">{owner}</a>.</div>
         <div style={rowStyle} >Last Modified: {lstedit}.</div>
       </div>
     );

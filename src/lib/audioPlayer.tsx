@@ -3,6 +3,8 @@ import * as React from 'react';
 const DEFAULT_LISTEN_INTERVAL = 10000;
 
 export type AudioPlayerProps = {
+  src: string;
+  type: string;
   autoPlay?: boolean;
   listenInterval?: number;
   listenTracker?: any;
@@ -16,7 +18,6 @@ export type AudioPlayerProps = {
   onPlay?: any;
   onSeeked?: any;
   preload?: string;
-  src: string;
   controls?: boolean;
   style?: Object;
 };
@@ -126,13 +127,13 @@ export class AudioPlayer extends React.Component<AudioPlayerProps, AudioPlayerSt
       <audio
         className='react-audio-player'
         style={this.props.style}
-        src={this.props.src || ''}
         autoPlay={this.props.autoPlay}
         preload={this.props.preload}
         controls={controls}
         ref={(ref) => { this.ctrls.audioEl = ref; }}
         onPlay={this.props.onPlay}
       >
+        <source src={this.props.src} type={this.props.type} />
         <p>Your browser does not support the <code>audio </code> element.</p >
       </audio>
     );

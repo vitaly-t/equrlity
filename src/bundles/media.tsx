@@ -5,7 +5,8 @@ import { Row, Col } from 'react-simple-flex-grid';
 import * as Dbt from '../lib/datatypes';
 import * as Rpc from '../lib/rpc';
 import * as Utils from '../lib/utils';
-import { AudioPlayer, VideoPlayer } from '../lib/mediaPlayer';
+import { VideoPlayer } from '../lib/mediaPlayer';
+import { AudioPlayer } from '../lib/audioPlayer';
 import * as Comms from '../lib/axiosClient';
 import { CommentsPanel } from '../lib/comments';
 import { ContentView } from '../lib/contentView';
@@ -41,9 +42,9 @@ export class MediaPage extends React.Component<MediaPageProps, MediaPageState> {
     let { content, privKey, comments, owner, moniker } = this.state;
 
     let viewer = mime.startsWith("image") ? <img src={'/stream/content/' + contentId} />
-      : mime.startsWith("audio") ? <AudioPlayer poster='http://localhost:8080/stream/content/bA3jno' src={'/stream/content/' + contentId} mime={mime} />
+      : mime.startsWith("audio") ? <AudioPlayer src={'/stream/content/' + contentId} type={mime} />
         : mime.startsWith("video") ? <VideoPlayer poster='http://localhost:8080/stream/content/bA3jno' src={'/stream/content/' + contentId} mime={mime} />
-          : <p>Invalid mime type</p>;
+          : null; //<p>Invalid mime type</p>;
 
     let gutter = 10;
     let cont;

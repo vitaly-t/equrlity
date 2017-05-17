@@ -40,6 +40,9 @@ export default {
       tsType: "Date",
       sqlType: "date"
     },
+    db_hash: {
+      sqlType: "varchar(200)",
+    },
     email: {
       tsType: "string",
       sqlType: "varchar(160)"
@@ -120,17 +123,17 @@ export default {
   },
   tupleTypes: {
     Auth: ["authProvider", "authId", "userId", "created", "updated"],
-    Content: ["contentId", "contentType", "title", "userId", "blobId", "content", "created", "updated", "published", "isPublic",
+    Blob: ["db_hash", "blobId", "created", "userId"],
+    Content: ["contentId", "contentType", "title", "userId", "db_hash", "content", "created", "updated", "isPublic",
       { name: "url", type: "urlString" },
       { name: "mime_ext", type: "varchar(8)" },
       { name: "tags", type: "tag", multiValued: true },
-      { name: "cryptHash", type: "varchar(200)" },
     ],
     Comment: ["commentId", "contentId", "userId", "comment", "created", "updated",
       { name: "parent", type: "commentId" },
     ],
     Invitation: ["ipAddress", "linkId", "created", "updated"],
-    Link: ["linkId", "userId", "contentId", "title", "created", "updated", "comment",
+    Link: ["linkId", "userId", "contentId", "title", "created", "updated", "comment", "isPublic",
       { name: "url", type: "urlString" },
       { name: "prevLink", type: "linkId" },
       { name: "tags", type: "tag", multiValued: true },
@@ -140,7 +143,9 @@ export default {
       { name: "delivered", type: "timestamp" }
     ],
     Tag: ["tag", "created"],
-    User: ["userId", "publicKey", "userName", "email", "created", "updated",
+    User: ["userId", "userName", "created", "updated",
+      { name: "home_page", type: "urlString" },
+      { name: "info", type: "text" },
       { name: "credits", type: "integer" },
       { name: "groups", type: "userGroup", multiValued: true }
     ],
@@ -182,14 +187,21 @@ export default {
         { ref: "users", columns: ["userId"] }
       ],
     },
+    blobs: {
+      rowType: "Blob",
+      primaryKey: ["db_hash"],
+      foreignKeys: [
+        { ref: "users", columns: ["userId"] },
+      ],
+    },
     contents: {
       rowType: "Content",
       primaryKey: ["contentId"],
       updated: "updated",
       foreignKeys: [
         { ref: "users", columns: ["userId"] },
+        { ref: "blobs", columns: ["db_hash"] },
       ],
-      uniques: [["contentType", "title"]],
     },
     comments: {
       rowType: "Comment",

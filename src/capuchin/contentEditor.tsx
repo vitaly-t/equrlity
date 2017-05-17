@@ -29,6 +29,7 @@ export class ContentEditor extends React.Component<ContentEditorProps, ContentEd
     let p = props.info;
     let { title, tags, content, isPublic } = p
     if (!tags) tags = [];
+    content = content || '';
     this.state = { title, content, tags, isError: false, isPublic, prevContent: content, isOpen: true };
   }
 

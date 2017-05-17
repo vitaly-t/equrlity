@@ -13,33 +13,52 @@ import * as Constants from '../lib/constants';
 import * as OxiDate from '../lib/oxidate';
 import { rowStyle, btnStyle, lhcolStyle } from "../lib/contentView";
 import * as Tags from '../lib/tags';
-
+import { MarkdownEditor } from '../lib/markdownEditor';
 import { YesNoBox } from '../lib/dialogs';
 import { AppState, postDeserialize } from "./AppState";
-import { uploadRequest } from "../lib/axiosClient";
+import { uploadRequest, sendApiRequest } from "../lib/axiosClient";
 import * as Chrome from './chrome';
 
 
 interface SettingsPageProps { appState: AppState };
-interface SettingsPageState { nickName: string, email: string };
+interface SettingsPageState { settings: Rpc.UserSettings, prevInfo: string };
 export class SettingsPage extends React.Component<SettingsPageProps, SettingsPageState> {
 
-  constructor(props) {
+  constructor(props: SettingsPageProps) {
     super(props);
-    console.log("email received: " + props.appState.email);
-    this.state = { nickName: props.appState.moniker, email: props.appState.email };
+    let settings: Rpc.UserSettings = { userName: props.appState.moniker, email: props.appState.email, homePage: '', info: '' };
+    this.state = { settings, prevInfo: '' };
   }
 
-  ctrls: {
-    nickNameInput?: HTMLInputElement, emailInput?: HTMLInputElement
-  } = {}
+  componentDidMount = async () => {
+    let response = await sendApiRequest("getUserSettings", {});
+    let rsp: Rpc.Response = response.data;
+    if (rsp.error) throw new Error("Server returned error: " + rsp.error.message);
+    let settings: Rpc.UserSettings = rsp.result;
+    let prevInfo = settings.info
+    this.setState({ settings, prevInfo });
+  }
 
-  changeNickName() { this.setState({ nickName: this.ctrls.nickNameInput.value }); }
-  changeEmail() { this.setState({ email: this.ctrls.emailInput.value }); }
+  changeUserName(userName) {
+    let settings = { ...this.state.settings, userName }
+    this.setState({ settings });
+  }
+  changeEmail(email) {
+    let settings = { ...this.state.settings, email }
+    this.setState({ settings });
+  }
+  changeHomePage(homePage) {
+    let settings = { ...this.state.settings, homePage }
+    this.setState({ settings });
+  }
+  changeInfo(info) {
+    let settings = { ...this.state.settings, info }
+    this.setState({ settings });
+  }
 
   saveSettings = () => {
     console.log("saving settings");
-    let settings: Rpc.ChangeSettingsRequest = { userName: this.state.nickName, email: this.state.email };
+    let settings = this.state.settings;
     Chrome.sendMessage({ eventType: "ChangeSettings", settings });
   }
 
@@ -49,6 +68,7 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
     let vsp = <div style={{ height: 20 }} />;
     let divStyle = { width: '100%', marginTop: 5, marginLeft: 5, padding: 6 };
     let lhcolStyle = { width: '20%' };
+    let { userName, email, homePage, info } = this.state.settings;
 
     let userp = userNames.length > 0 ? <div><p>You are currently directly connected with another {userNames.length} user{userNames.length > 1 ? "s" : ""}.</p>
       <p>Your social graph currently extends to {st.reachableUserCount} reachable users.</p>
@@ -89,99 +109,39 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
         {vsp}
         <h5>Your Settings:</h5>
         <div style={divStyle}>
-          <p>To ensure your privacy, we do not store any information whatsoever about your account on our servers, other than an internally generated identifier
-            and your  nickname.
-            We use web standard JWTs (Javascript Web Token - see <a href="https://jwt.io" target="_blank">https://jwt.io)</a>) to store any and all other identifying information inside your web browser's local storage, and ensure that
+          <p>To ensure your privacy, we do not store any information whatsoever about your account on our servers, other than an internally generated identifier,
+            your nickname, and your homepage (should you choose to provide one).  We retain your homepage to allow the system to present links in content pages, and also to
+            automatically redirect visitors there as appropriate - eg. if they don&apos;t have the extension installed.</p>
+          <p>We use web standard JWTs (Javascript Web Token - see <a href="https://jwt.io" target="_blank">https://jwt.io)</a>) to store any and all other identifying information inside your web browser's local storage, and ensure that
             it never appears on disk on our servers. This means that
             it is simply impossible for anybody hacking our servers to gain access to any information about you personally.  Nor can we ever be coerced by
             any legal authority whatsoever to provide information which we simply do not have access to.
           </p>
-          <p>We do not use passwords at all.  In the future we intend to provide standard "Social Login" functionality (Keybase, Facebook, GitHub, Twitter, Google, LinkedIn etc)
+          <p>We do not use passwords at all.  In the future we may provide standard "Social Login" functionality (Keybase, Facebook, GitHub, Twitter, Google, LinkedIn etc)
             to allow for independant establishment of your identity, and the sharing of accounts across multiple devices based on that established identity.</p>
+          <p>For the time being the only client available is the Chrome browser extension, which can only be made available through the Google Store.
+            We therefore rely on your Google identity, given that it is implicitly required to obtain the extension in the first place.</p>
         </div>
         <div style={divStyle}>
           <div style={lhcolStyle} >Nickname: </div>
-          <input type="text" style={{ width: '60%' }} name="NickName" id="nickId" ref={(e) => this.ctrls.nickNameInput = e}
-            value={this.state.nickName} onChange={(e) => this.changeNickName()} />
+          <input type="text" style={{ width: '60%' }} name="NickName" id="nickId" value={userName} onChange={(e) => this.changeUserName(e.target.value)} />
         </div>
         <div style={divStyle}>
           <div style={lhcolStyle} >Email: </div>
-          <input type="email" style={{ width: '60%' }} name="Email" id="emailId" ref={(e) => this.ctrls.emailInput = e}
-            value={this.state.email} onChange={(e) => this.changeEmail()} />
+          <input type="email" style={{ width: '60%' }} name="Email" id="emailId" value={email} onChange={(e) => this.changeEmail(e.target.value)} />
+        </div>
+        <div style={divStyle}>
+          <div style={lhcolStyle} >HomePage: </div>
+          <input type="text" style={{ width: '60%' }} name="HomePage" id="homePageId" value={homePage} onChange={(e) => this.changeHomePage(e.target.value)} />
+        </div>
+        <div style={divStyle}>
+          <div style={lhcolStyle} >Further Info: </div>
+          <MarkdownEditor value={info} onChange={info => this.changeInfo(info)} isDirty={info !== this.state.prevInfo} allowHtml={true} />
         </div>
         <div style={divStyle}>
           <Button className="pt-intent-primary" onClick={this.saveSettings} text="Save Settings" />
         </div>
       </div>);
-  }
-}
-
-interface PublishContentProps { info: Dbt.Content, allTags: Tags.TagSelectOption[], onClose: () => void }
-interface PublishContentState { title: string, comment: string, tags: string[], isOpen: boolean, amount: number }
-export class PublishContent extends React.Component<PublishContentProps, PublishContentState> {
-  constructor(props: PublishContentProps) {
-    super(props);
-    let tags = props.info.tags || [];
-    this.state = { isOpen: true, amount: 10, title: props.info.title, tags, comment: '' };
-  }
-
-  ctrls: {
-    title: HTMLInputElement,
-    tags: HTMLInputElement,
-    comment: HTMLInputElement,
-    investment: HTMLInputElement,
-  } = { title: null, tags: null, comment: null, investment: null };
-
-  changeTitle(e) { this.setState({ title: e.target.value }); }
-  changeTags(e) { this.setState({ tags: e.target.value }); }
-  changeComment(e) { this.setState({ comment: e.target.value }); }
-  changeInvestment(e) { this.setState({ amount: parseInt(e.target.value) }); }
-
-  close() {
-    this.props.onClose();
-    this.setState({ isOpen: false });
-  }
-
-  save() {
-    let { title, tags, amount, comment } = this.state;
-    let info = this.props.info;
-    let req: Rpc.PromoteContentRequest = { contentId: info.contentId, title, comment, tags, amount, signature: '' };
-    Chrome.sendMessage({ eventType: "PromoteContent", req });
-    this.close();
-  }
-
-  public render() {
-    if (!this.state.isOpen) return null;
-    let pubdiv = null;
-    let ttl = "Promote Content"
-    return (
-      <Dialog iconName="inbox" isOpen={this.state.isOpen} title={ttl} onClose={() => this.close()} >
-        <div className="pt-dialog-body">
-          <div style={rowStyle} >
-            <div style={lhcolStyle}>Title:</div>
-            <input type="text" style={{ marginTop: 6, height: "30px", width: '100%' }} ref={(e) => this.ctrls.title = e} value={this.state.title} onChange={e => this.changeTitle(e)} />
-          </div>
-          <div style={rowStyle} >
-            <div style={lhcolStyle}>Comment:</div>
-            <input type="text" style={{ marginTop: 6, height: "30px", width: '100%' }} ref={(e) => this.ctrls.comment = e} value={this.state.comment} onChange={e => this.changeComment(e)} />
-          </div>
-          <div style={rowStyle} >
-            <div style={lhcolStyle}>Tags:</div>
-            <Tags.TagGroupEditor tags={this.state.tags} allTags={this.props.allTags} onChange={(tags) => this.changeTags(tags)} />
-          </div>
-          <div style={rowStyle} >
-            <div style={{ display: 'inline' }}>Investment amount:</div>
-            <input type="number" style={{ display: 'inline', height: "24px", marginTop: "6px", width: '100px' }} ref={(e) => this.ctrls.investment = e} value={this.state.amount} onChange={e => this.changeInvestment(e)} />
-          </div>
-        </div>
-        <div className="pt-dialog-footer">
-          <div className="pt-dialog-footer-actions">
-            <Button text="Cancel" onClick={() => this.close()} />
-            <Button intent={Intent.PRIMARY} onClick={() => this.save()} text="Publish" />
-          </div>
-        </div>
-      </Dialog >
-    );
   }
 }
 

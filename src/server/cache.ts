@@ -150,6 +150,11 @@ export function get_user_from_auth(prov, authId) {
   return rslt;
 }
 
+export function getUserByName(userName: Dbt.userName): Dbt.User {
+  for (let u of users.values()) if (u.userName === userName) return u;
+  return null;
+}
+
 export function getConnectedUserNames(userId): Dbt.userName[] {
   if (!userlinks.has(userId)) return [];
   return userlinks.get(userId).map(id => users.get(id).userName);
@@ -175,4 +180,5 @@ export function getReachableUserIds(userId): Dbt.userId[] {
   }
   return rslt;
 }
+
 

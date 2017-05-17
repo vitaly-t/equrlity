@@ -1,6 +1,6 @@
 import { AxiosResponse } from 'axios';
 import * as Rpc from '../lib/rpc';
-import { AppState } from './AppState';
+import { AppState, getBookmark } from './AppState';
 import * as Utils from '../lib/utils';
 import * as Dbt from '../lib/datatypes';
 import { signData, sendApiRequest } from '../lib/axiosClient';
@@ -16,10 +16,12 @@ export async function sendRemoveContent(st: AppState, req: Rpc.RemoveContentRequ
   return await sendApiRequest("removeContent", req);
 }
 
-export async function sendPromoteLink(st: AppState, url: string, title: string, comment: string, amount: number, tags: string[]): Promise<AxiosResponse> {
+export async function sendBookmarkLink(st: AppState, url: string, title: string, comment: string, tags: string[]): Promise<AxiosResponse> {
   const signature = await signData(st.privateKey, url);
-  let req: Rpc.PromoteLinkRequest = { url, signature, title, comment, amount, tags };
-  return await sendApiRequest("promoteLink", req);
+  let req: Rpc.BookmarkLinkRequest = { url, signature, title, comment, tags };
+  let cont = getBookmark(st, url);
+  if (cont) req = { ...req, contentId: cont.contentId };
+  return await sendApiRequest("bookmarkLink", req);
 }
 
 export async function sendInitialize(st: AppState): Promise<AxiosResponse> {

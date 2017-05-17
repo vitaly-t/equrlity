@@ -1,6 +1,6 @@
 import * as React from 'react';
 import * as ReactDOM from "react-dom";
-import { Button, Dialog, Intent, ProgressBar, Checkbox, Position, Toaster } from "@blueprintjs/core";
+import { Button, Dialog, Intent, ProgressBar, Checkbox, Position, Toaster, Popover, PopoverInteractionKind } from "@blueprintjs/core";
 import * as Dropzone from 'react-dropzone';
 import { Url, format } from 'url';
 import axios, { AxiosResponse, AxiosError } from 'axios';
@@ -27,7 +27,7 @@ type UploadProgress = { fileName: string, progress: number }
 const gutter = 20;
 
 interface ContentsPageProps { appState: AppState };
-interface ContentsPageState { uploadProgress: UploadProgress[], publishingContent?: Dbt.Content, editingContent?: Dbt.Content, confirmDeleteContent?: Dbt.Content };
+interface ContentsPageState { uploadProgress: UploadProgress[], promotingContent?: Dbt.Content, editingContent?: Dbt.Content, confirmDeleteContent?: Dbt.Content, filters: string[] };
 
 const toast = Toaster.create({
   className: "contents-toaster",
@@ -39,7 +39,7 @@ export class ContentsPage extends React.Component<ContentsPageProps, ContentsPag
 
   constructor(props) {
     super(props);
-    this.state = { uploadProgress: [] };
+    this.state = { uploadProgress: [], filters: [] };
   }
 
   setUploadProgress(nm: string, progress: number) {
@@ -89,7 +89,7 @@ export class ContentsPage extends React.Component<ContentsPageProps, ContentsPag
         toast.show({ message: "Server failed to process: " + f.fileName });
         return;
       }
-      if (digest !== cont.cryptHash) {
+      if (digest !== cont.db_hash) {
         toast.show({ message: "Server returned incorrect hash for: " + f.fileName });
         return;
       }
@@ -104,6 +104,18 @@ export class ContentsPage extends React.Component<ContentsPageProps, ContentsPag
     this.setState({ editingContent: cont });
   }
 
+  addFilter(f: string) {
+    let filters = [...this.state.filters, f];
+    this.setState({ filters });
+  }
+
+  removeFilter(f: string) {
+    let filters = [...this.state.filters];
+    let i = filters.indexOf(f);
+    if (i >= 0) filters.splice(i, 1);
+    this.setState({ filters });
+  }
+
   render() {
     let st = this.props.appState;
     let contsdiv = <p>You do not currently have any uploaded contents.</p>
@@ -114,37 +126,65 @@ export class ContentsPage extends React.Component<ContentsPageProps, ContentsPag
       let onYes = () => Chrome.sendMessage({ eventType: "RemoveContent", req: { contentId } });
       contsdiv = <YesNoBox message={msg} onYes={onYes} onClose={onClose} />
     }
-    else if (this.state.publishingContent) {
-      let onClose = () => this.setState({ publishingContent: null });
-      contsdiv = <PublishContent info={this.state.publishingContent} allTags={this.props.appState.allTags} onClose={onClose} />
+    else if (this.state.promotingContent) {
+      let onClose = () => this.setState({ promotingContent: null });
+      contsdiv = <PromoteContent info={this.state.promotingContent} allTags={this.props.appState.allTags} onClose={onClose} />
     }
     else if (this.state.editingContent) {
       let onClose = () => this.setState({ editingContent: null });
       contsdiv = <ContentEditor info={this.state.editingContent} allTags={this.props.appState.allTags} creator={this.props.appState.moniker} onClose={onClose} />
     }
     else if (st.contents.length > 0) {
-      let rows = st.contents.map(p => {
+      let tagfilter = (tags: string[], typ: string): boolean => {
+        if (!tags) tags = [];
+        let fltrs = this.state.filters;
+        for (let f of fltrs) if (tags.indexOf(f) < 0 && f !== typ) return false;
+        return true;
+      }
+      let rows = st.contents.filter(p => tagfilter(p.tags, p.contentType)).map(p => {
         let url = p.contentType === 'link' ? p.url : Utils.contentToUrl(p.contentId)
         //let created = p.created ? OxiDate.toFormat(new Date(p.created), "DDDD, MMMM D @ HH:MIP") : '';
         let updated = p.updated ? OxiDate.toFormat(new Date(p.updated), "DDDD, MMMM D @ HH:MIP") : '';
-        let remove = () => { this.setState({ confirmDeleteContent: p }) };
-        let btns = [<Button onClick={remove} text="Delete" />];
-        let tags = p.tags && p.tags.length > 0 ? p.tags.join(", ") : '';
-        let edit = () => { this.setState({ editingContent: p }) };
-        btns.push(<Button onClick={edit} text="Edit" />);
+        //let tags = p.tags && p.tags.length > 0 ? p.tags.join(", ") : '';
+        let tags = <Tags.TagGroup tags={p.tags} onClick={(s) => this.addFilter(s)} />;
 
-        let publish = () => { this.setState({ publishingContent: p }) };
-        btns.push(<Button onClick={publish} text="Publish" />);
+        let btns = [];
+
+        let edit = () => { this.setState({ editingContent: p }) };
+        btns.push(<Button key="edit" onClick={edit} text="Edit" />);
+
+        let clone = () => {
+          let cont = { ...p, contentId: null };
+          let req: Rpc.SaveContentRequest = { content: cont };
+          Chrome.sendMessage({ eventType: "SaveContent", req });
+        };
+        btns.push(<Button key="clone" onClick={clone} text="Clone" />);
+
+        let promote = () => { this.setState({ promotingContent: p }) };
+        btns.push(<Button key="promote" onClick={promote} text="Promote" />);
+
+        let remove = () => { this.setState({ confirmDeleteContent: p }) };
+        btns.push(<Button key="remove" onClick={remove} text="Delete" />);
+
+        let btngrp = (
+          <div className="pt-button-group pt-vertical pt-align-left pt-large">
+            {btns}
+          </div>
+        );
+        let pop = (<Popover content={btngrp} popoverClassName="pt-minimal" interactionKind={PopoverInteractionKind.HOVER} position={Position.BOTTOM} >
+          <Button iconName="pt-icon-cog" text="" />
+        </Popover>
+        );
 
         return (
           <tr key={p.contentId} >
-            <td>{p.contentType}</td>
-            <td><a href={url} >{url}</a></td>
+            <td><Tags.TagGroup tags={[p.contentType]} onClick={(s) => this.addFilter(s)} /></td>
+            <td><a href={url} target="_blank" >{url}</a></td>
             <td>{p.title}</td>
             <td><Checkbox disabled defaultChecked={p.isPublic} /></td>
             <td>{updated}</td>
             <td>{tags}</td>
-            <td>{btns}</td>
+            <td>{pop}</td>
           </tr>
         );
       });
@@ -166,8 +206,14 @@ export class ContentsPage extends React.Component<ContentsPageProps, ContentsPag
           </tbody>
         </table>);
     }
-
     let vsp = <div style={{ height: 20 }} />;
+
+    let fltrDiv = null;
+    if (this.state.filters.length > 0) {
+      let fltrs = <Tags.TagGroup tags={this.state.filters} onRemove={(s) => this.removeFilter(s)} />;
+      fltrDiv = <div>{vsp}<Row>Showing :  {fltrs}</Row></div>;
+    }
+
     let divStyle = { width: '100%', marginTop: 5, marginLeft: 5, padding: 6 };
     let lhcolStyle = { width: '20%' };
     let uploadDiv;
@@ -194,6 +240,7 @@ export class ContentsPage extends React.Component<ContentsPageProps, ContentsPag
       <div>
         <div>
           <h4>Your Contents : </h4>
+          {fltrDiv}
           {vsp}
           {contsdiv}
           {vsp}
@@ -217,22 +264,15 @@ class DisplayPost extends React.Component<DisplayPostProps, {}> {
   }
 }
 
-interface PublishContentProps { info: Dbt.Content, allTags: Tags.TagSelectOption[], onClose: () => void }
-interface PublishContentState { title: string, comment: string, tags: string[], isOpen: boolean, amount: number }
-class PublishContent extends React.Component<PublishContentProps, PublishContentState> {
+interface PromoteContentProps { info: Dbt.Content, allTags: Tags.TagSelectOption[], onClose: () => void }
+interface PromoteContentState { title: string, comment: string, tags: string[], isOpen: boolean, amount: number }
+class PromoteContent extends React.Component<PromoteContentProps, PromoteContentState> {
 
-  constructor(props: PublishContentProps) {
+  constructor(props: PromoteContentProps) {
     super(props);
     let tags = props.info.tags || [];
     this.state = { isOpen: true, amount: 10, title: props.info.title, tags, comment: '' };
   }
-
-  ctrls: {
-    title: HTMLInputElement,
-    tags: HTMLInputElement,
-    comment: HTMLInputElement,
-    investment: HTMLInputElement,
-  } = { title: null, tags: null, comment: null, investment: null };
 
   changeTitle(e) { this.setState({ title: e.target.value }); }
   changeTags(e) { this.setState({ tags: e.target.value }); }
@@ -261,11 +301,11 @@ class PublishContent extends React.Component<PublishContentProps, PublishContent
         <div className="pt-dialog-body">
           <div style={rowStyle} >
             <div style={lhcolStyle}>Title:</div>
-            <input type="text" style={{ marginTop: 6, height: "30px", width: '100%' }} ref={(e) => this.ctrls.title = e} value={this.state.title} onChange={e => this.changeTitle(e)} />
+            <input type="text" style={{ marginTop: 6, height: "30px", width: '100%' }} value={this.state.title} onChange={e => this.changeTitle(e)} />
           </div>
           <div style={rowStyle} >
             <div style={lhcolStyle}>Comment:</div>
-            <input type="text" style={{ marginTop: 6, height: "30px", width: '100%' }} ref={(e) => this.ctrls.comment = e} value={this.state.comment} onChange={e => this.changeComment(e)} />
+            <input type="text" style={{ marginTop: 6, height: "30px", width: '100%' }} value={this.state.comment} onChange={e => this.changeComment(e)} />
           </div>
           <div style={rowStyle} >
             <div style={lhcolStyle}>Tags:</div>
@@ -273,13 +313,13 @@ class PublishContent extends React.Component<PublishContentProps, PublishContent
           </div>
           <div style={rowStyle} >
             <div style={{ display: 'inline' }}>Investment amount:</div>
-            <input type="number" style={{ display: 'inline', height: "24px", marginTop: "6px", width: '100px' }} ref={(e) => this.ctrls.investment = e} value={this.state.amount} onChange={e => this.changeInvestment(e)} />
+            <input type="number" style={{ display: 'inline', height: "24px", marginTop: "6px", width: '100px' }} value={this.state.amount} onChange={e => this.changeInvestment(e)} />
           </div>
         </div>
         <div className="pt-dialog-footer">
           <div className="pt-dialog-footer-actions">
             <Button text="Cancel" onClick={() => this.close()} />
-            <Button intent={Intent.PRIMARY} onClick={() => this.save()} text="Publish" />
+            <Button intent={Intent.PRIMARY} onClick={() => this.save()} text="Promote" />
           </div>
         </div>
       </Dialog >
