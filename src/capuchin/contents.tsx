@@ -254,16 +254,6 @@ export class ContentsPage extends React.Component<ContentsPageProps, ContentsPag
   }
 }
 
-interface DisplayPostProps { info: Dbt.Content };
-class DisplayPost extends React.Component<DisplayPostProps, {}> {
-  public render() {
-    return <div>
-      <Row style={rowStyle} gutter={gutter} align="top">
-      </Row>
-    </div>
-  }
-}
-
 interface PromoteContentProps { info: Dbt.Content, allTags: Tags.TagSelectOption[], onClose: () => void }
 interface PromoteContentState { title: string, comment: string, tags: string[], isOpen: boolean, amount: number }
 class PromoteContent extends React.Component<PromoteContentProps, PromoteContentState> {

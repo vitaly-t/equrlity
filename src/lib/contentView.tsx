@@ -36,9 +36,10 @@ export class ContentView extends React.Component<ContentViewProps, ContentViewSt
     let tags = info.tags
     let hpg = Utils.homePageUrl(owner);
     let tagbtns = <TagGroup tags={tags} />;
+    let hdr = (info.contentType === "post") ? null : <h3>{info.title}</h3>;
     return (
       <div>
-        <h2>{info.title}</h2>
+        {hdr}
         <div style={rowStyle} dangerouslySetInnerHTML={h} />
         <div style={rowStyle} >
           <div style={{ display: 'inline' }}>Tags: </div>

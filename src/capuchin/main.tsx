@@ -14,25 +14,14 @@ function render(state: AppState) {
   }
 }
 
-function renderServerMessage(msg: string) {
-  console.log("renderServerMessage called");
-  let elem = document.getElementById('app')
-  if (!elem) console.log("cannot get app element");
-  else {
-    ReactDOM.render(<PopupPanel serverMessage={msg} />, elem);
-  }
-}
-
 document.addEventListener('DOMContentLoaded', () => {
-  chrome.runtime.sendMessage({ eventType: "GetState" }, st => render(postDeserialize(st)) );
+  // entry point of app!!
+  chrome.runtime.sendMessage({ eventType: "GetState" }, st => render(postDeserialize(st)));
 });
 
 chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
   if (message.eventType === "Render") {
     let state: AppState = postDeserialize(message.appState);
     render(state);
-  }
-  else if (message.eventType === "RenderMessage") {
-    renderServerMessage(message.msg);
   }
 });

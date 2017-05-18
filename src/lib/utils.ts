@@ -40,7 +40,7 @@ export function setTest(l: boolean) {
 }
 
 export function capuchinVersion() {
-  return "0.9.0";
+  return "0.9.2";
 }
 
 export const serverUrl = isDev() ? "http://localhost:8080" : "https://www.pseudoq.com";

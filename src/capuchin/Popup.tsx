@@ -2,7 +2,7 @@ import * as React from 'react';
 import { Url, format } from 'url';
 import { Row, Col } from 'react-simple-flex-grid';
 import TextareaAutosize from 'react-autosize-textarea';
-import { Button, Intent } from "@blueprintjs/core";
+import { Button, Intent, Toaster, Position } from "@blueprintjs/core";
 
 import * as Rpc from '../lib/rpc';
 import * as Dbt from '../lib/datatypes';
@@ -11,9 +11,13 @@ import { TagGroupEditor } from '../lib/tags';
 import * as Chrome from './chrome';
 import { AppState, isWaiting, getBookmark } from "./AppState";
 
-export interface PopupPanelProps { appState?: AppState; serverMessage?: string };
-export interface PopupPanelState { url: Dbt.urlString, title: string, comment: string, tags: string[] };
+const toast = Toaster.create({
+    className: "popup-toaster",
+    position: Position.TOP,
+});
 
+export interface PopupPanelProps { appState: AppState };
+export interface PopupPanelState { url: Dbt.urlString, title: string, comment: string, tags: string[] };
 export class PopupPanel extends React.Component<PopupPanelProps, PopupPanelState> {
 
     constructor(props: PopupPanelProps) {
@@ -42,10 +46,6 @@ export class PopupPanel extends React.Component<PopupPanelProps, PopupPanelState
 
     render() {
         let props = this.props;
-        if (props.serverMessage) {
-            console.log("rendering server message...");
-            return <div>Server error: {props.serverMessage} </div>;
-        }
         let st = props.appState;
         let curl = st.activeUrl
 
@@ -69,7 +69,7 @@ export class PopupPanel extends React.Component<PopupPanelProps, PopupPanelState
         let pnl = <div>
             <p>No active URL found</p>
         </div>
-        if (st.lastErrorMessage) pnl = <div>Error: {st.lastErrorMessage}</div>
+        if (st.lastErrorMessage) toast.show({ message: "Error: " + st.lastErrorMessage });
         if (curl) {
             let cont = getBookmark(st, curl);
             let lbl = "Save";
@@ -78,7 +78,6 @@ export class PopupPanel extends React.Component<PopupPanelProps, PopupPanelState
                 Chrome.sendMessage({ eventType: "BookmarkLink", url, title, comment, tags });
                 window.close();
             }
-            let promTxt = null;
             btns.push(<Button key="Save" style={btnStyle} className="pt-intent-primary" onClick={saveaction} text={lbl} />);
             pnl = (<div>
                 <Row style={rowStyle} gutter={gutter} align="top">

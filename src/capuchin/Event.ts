@@ -274,6 +274,7 @@ export namespace AsyncHandlers {
         let curl = prepareUrl(curl_);
         if (!curl) return (st => { return { ...st, activeUrl: null }; });
         let response = await Comms.sendLoadLink(state, curl);
+        let activeTab = await currentTab()
         let thunk = (st: AppState) => {
             st = extractHeadersToState(st, response);
             let rslt: Rpc.LoadLinkResponse = extractResult(response);
@@ -281,6 +282,9 @@ export namespace AsyncHandlers {
             if (rslt.content) {
                 let links = st.links;
                 links.set(curl, rslt.content)
+                chrome.browserAction.setBadgeBackgroundColor({ color: "#2EE6D6", tabId: activeTab.id });
+                let text = chrome.browserAction.getBadgeText({}, s => { if (!s) chrome.browserAction.setBadgeText({ text: "*", tabId: activeTab.id }); })
+
                 st = { ...st, links };  // not really doing anything but shows correct form ...
             }
             return st;

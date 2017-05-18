@@ -19,13 +19,13 @@ import { AppState, postDeserialize } from "./AppState";
 import * as Chrome from './chrome';
 
 interface LinksPageProps { appState: AppState };
-interface LinksPageState { transferAmount: number, transferTo: string, editingLink: Dbt.Link };
+interface LinksPageState { transferAmount: number, transferTo: string, editingLink: Dbt.Link, filters: string[] };
 
 export class LinksPage extends React.Component<LinksPageProps, LinksPageState> {
 
   constructor(props: LinksPageProps) {
     super(props);
-    this.state = { transferAmount: 0, transferTo: '', editingLink: null };
+    this.state = { transferAmount: 0, transferTo: '', editingLink: null, filters: [] };
   }
 
   ctrls: {
@@ -35,6 +35,20 @@ export class LinksPage extends React.Component<LinksPageProps, LinksPageState> {
 
   changeTransferAmount() { this.setState({ transferAmount: parseInt(this.ctrls.transferAmount.value) }); }
   changeTransferTo() { this.setState({ transferTo: this.ctrls.transferTo.value }); }
+
+  addFilter(f: string) {
+    let filters = [...this.state.filters, f];
+    this.setState({ filters });
+  }
+
+  removeFilter(f: string) {
+    let filters = [...this.state.filters];
+    let i = filters.indexOf(f);
+    if (i >= 0) filters.splice(i, 1);
+    this.setState({ filters });
+  }
+
+
 
   render() {
     let st = this.props.appState;
@@ -49,7 +63,9 @@ export class LinksPage extends React.Component<LinksPageProps, LinksPageState> {
         let l = item.link
         let linkId = l.linkId;
         let url = Utils.linkToUrl(linkId, l.title);
-        let tags = l.tags && l.tags.length > 0 ? l.tags.join(", ") : '';
+        //let tags = l.tags && l.tags.length > 0 ? l.tags.join(", ") : '';
+        let tags = <Tags.TagGroup tags={l.tags} onClick={(s) => this.addFilter(s)} />;
+
         let redeem = () => { Chrome.sendMessage({ eventType: "RedeemLink", linkId }); };
         let redeemText = l.amount > 0 ? "Redeem" : "Delete";
         let btns = [<Button onClick={redeem} text={redeemText} />];
@@ -133,6 +149,13 @@ export class LinksPage extends React.Component<LinksPageProps, LinksPageState> {
     }
 
     let vsp = <div style={{ height: 20 }} />;
+    let fltrDiv = null;
+    if (this.state.filters.length > 0) {
+      let fltrs = <Tags.TagGroup tags={this.state.filters} onRemove={(s) => this.removeFilter(s)} />;
+      fltrDiv = <div>{vsp}<Row>Showing :  {fltrs}</Row></div>;
+    }
+
+
     let divStyle = { width: '100%', marginTop: 5, marginLeft: 5, padding: 6 };
     let lhcolStyle = { width: '20%' };
     let transfer = () => {
@@ -166,6 +189,7 @@ export class LinksPage extends React.Component<LinksPageProps, LinksPageState> {
         {transferDiv}
         {vsp}
         <h4>Your Investments : </h4>
+        {fltrDiv}
         {vsp}
         {invdiv}
         {vsp}

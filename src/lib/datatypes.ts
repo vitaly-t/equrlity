@@ -4,7 +4,7 @@
 export type authId = string;
 export type authProvider = "facebook" | "github" | "twitter" | "linkedin" | "chrome";
 export type binary = Buffer;
-export type contentType = "video" | "post" | "audio" | "image" | "link" | "html";
+export type contentType = "post" | "video" | "audio" | "image" | "link";
 export type created = Date;
 export type date = Date;
 export type db_hash = string;
@@ -110,7 +110,6 @@ export interface Link {
   readonly updated: updated | null,
   readonly comment: comment | null,
   readonly isPublic: isPublic | null,
-  readonly url: urlString | null,
   readonly prevLink: linkId | null,
   readonly tags: tag[] | null,
   readonly amount: integer | null

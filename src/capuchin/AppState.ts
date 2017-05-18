@@ -51,6 +51,7 @@ export function preSerialize(st: AppState): any {
 }
 
 export function postDeserialize(st: any): AppState {
+  if (!st) return initState();
   let links = new Map<string, Url>();
   for (const k in st.links) {
     links.set(k, st.links[k]);

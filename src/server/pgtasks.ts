@@ -187,7 +187,7 @@ export async function promoteContent(t: ITask<any>, userId, req: Rpc.PromoteCont
     if (userId !== cont.userId) throw new Error("Content owned by different user");
     let rslt: CacheUpdate[] = [];
     let link = OxiGen.emptyRec<Dbt.Link>("links");
-    link = { ...link, userId, contentId, tags, url: '', amount, comment, title }
+    link = { ...link, userId, contentId, tags, amount, comment, title }
     link = await insertLink(t, link);
     rslt.push({ table: "links" as CachedTable, record: link });
     Array.prototype.push.apply(rslt, await adjustUserBalance(t, usr, -amount));
@@ -209,9 +209,8 @@ export async function promoteLink(t: ITask<any>, userId: Dbt.userId, url: string
         if (Utils.isPseudoQLinkURL(ourl)) {
             prevLink = Utils.getLinkIdFromUrl(parse(url));
             let link = await retrieveRecord<Dbt.Link>(t, "links", { linkId: prevLink });
-            url = link.url;
         }
-        let link: Dbt.Link = { ...emptyLink(), prevLink, userId, url, comment, contentId, amount, tags };
+        let link: Dbt.Link = { ...emptyLink(), prevLink, userId, comment, contentId, amount, tags };
         link = await insertLink(t, link);
         rslt.push({ table: "links" as CachedTable, record: link });
         Array.prototype.push.apply(rslt, await adjustUserBalance(t, usr, -amount));

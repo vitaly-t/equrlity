@@ -86,14 +86,6 @@ function htmlPage(body) {
 `;
 }
 
-function postPage(cont: Dbt.Content): string {
-    let creator = cache.users.get(cont.userId).userName;
-    let view = <ContentView info={cont} owner={creator} />;
-    let ins = ReactDOMServer.renderToStaticMarkup(view);
-    let body = htmlPage(ins);
-    return body;
-}
-
 function mediaPage(cont: Dbt.Content): string {
     //if (cont.contentType === 'post') return postPage(cont);
     let mime_type = cont.contentType + "/" + cont.mime_ext;
@@ -163,7 +155,11 @@ app.use(async (ctx, next) => {
     else {
         let [client, version] = client_ver.split("-");
         if (client !== 'capuchin') msg = 'Unknown Client';
-        else if (version !== Utils.capuchinVersion()) msg = 'Client is out-of-date and requires upgrade';
+        else {
+            if (version !== Utils.capuchinVersion()) {
+                msg = `Client (${version}) is behind server (${Utils.capuchinVersion()})  and requires upgrade`;
+            }
+        }
     }
     if (msg) {
         ctx['invalidClientMsg'] = msg
@@ -201,7 +197,7 @@ publicRouter.get('/link/:id', async (ctx, next) => {
         if (cont.contentType === 'link') {
             if (isClient) await pg.payForView(viewerId, linkId)
             ctx.status = 303;
-            ctx.redirect(link.url);
+            ctx.redirect(cont.url);
             return;
         }
         pg.registerContentView(viewerId, cont.contentId, ip, linkId);
@@ -209,7 +205,8 @@ publicRouter.get('/link/:id', async (ctx, next) => {
         return;
     }
     pg.registerInvitation(ip, linkId);
-    let view = <LinkLandingPage link={link} userName={userName} />;
+    let url = link.isPublic && cont.contentType === 'link' ? cont.url : null;
+    let view = <LinkLandingPage url={url} userName={userName} />;
     let ins = ReactDOMServer.renderToStaticMarkup(view);
     let body = htmlPage(ins);
     ctx.body = body;

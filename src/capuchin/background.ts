@@ -68,31 +68,50 @@ async function launchSystemTab(nm: string) {
     if (!tabids.has(nm)) await createSystemTab(nm);
 }
 
-async function initialize() {
-    console.log("initializing...");
-    localForage.config({ name: 'pseudoq-capuchin' });
-    const keys: string[] = await localForage.keys();
-    const userInfo: chrome.identity.UserInfo = await getProfile();
-    const chromeToken: string = await getChromeAccessToken();
-    await createKeyPairIf(keys);
-    const publicKey = await localForage.getItem<JsonWebKey>('publicKey');
-    const privateKey = await localForage.getItem<JsonWebKey>('privateKey');
-    const jwt = await AsyncHandlers.authenticate(userInfo, chromeToken, publicKey);
-    if (!jwt) throw new Error("Unable to authenticate");
-    await handleMessage({ eventType: "Thunk", fn: ((st: AppState) => { return { ...st, publicKey, privateKey, jwt } }) });
-    handleAsyncMessage({ eventType: "Initialize" });
+async function __init() {
+    console.log("__init called");
+    let st = currentState();
+    if (!st.jwt) {
+        localForage.config({ name: 'pseudoq-capuchin' });
+        const keys: string[] = await localForage.keys();
+        const userInfo: chrome.identity.UserInfo = await getProfile();
+        const chromeToken: string = await getChromeAccessToken();
+        await createKeyPairIf(keys);
+        const publicKey = await localForage.getItem<JsonWebKey>('publicKey');
+        const privateKey = await localForage.getItem<JsonWebKey>('privateKey');
+        const jwt = await AsyncHandlers.authenticate(userInfo, chromeToken, publicKey);
+        if (!jwt) throw new Error("Unable to authenticate");
+        await handleMessage({ eventType: "Thunk", fn: ((st: AppState) => { return { ...st, publicKey, privateKey, jwt } }) });
+    }
 }
 
-chrome.runtime.onStartup.addListener(initialize);
+let __initialized = false;
+async function initialize() {
+    if (__initialized) return;
+    console.log("initializing...");
+    let st = currentState();
+    __initialized = true;
+    try {
+        if (!st.jwt) await __init();
+        await handleAsyncMessage({ eventType: "Initialize" });
+    }
+    catch (e) {
+        await handleMessage({ eventType: "Thunk", fn: ((st: AppState) => { throw (e) }) });
+        __initialized = false;
+    }
+}
 
-chrome.runtime.onInstalled.addListener(initialize);
+//chrome.runtime.onStartup.addListener(initialize);
 
-chrome.runtime.onMessage.addListener((message, sender, cb) => {
+//chrome.runtime.onInstalled.addListener(initialize);
+
+chrome.runtime.onMessage.addListener(async (message, sender, cb) => {
     if (message.eventType === 'Render') {
         // unfortunately, we don't appear to be able to dispatch a message to the popup without also receiving it here :-(
         return true;
     }
     if (message.eventType == "GetState") {
+        if (!__initialized) await initialize();
         let st = preSerialize(currentState());
         cb(st);
     }
@@ -123,16 +142,15 @@ chrome.webRequest.onBeforeSendHeaders.addListener(addHeaders
     , ["blocking", "requestHeaders"]);
 
 
-function addResponseHeaders(details) {
+async function addResponseHeaders(details) {
+    if (!__initialized) await initialize();
     let { responseHeaders } = details;
-    if (__state) {
-        responseHeaders.push({ name: 'x-psq-privkey', value: JSON.stringify(__state.privateKey) });
-        if (responseHeaders.findIndex(e => e.name === 'x-psq-moniker') < 0) {
-            responseHeaders.push({ name: 'x-psq-credits', value: __state.credits.toString() });
-            responseHeaders.push({ name: 'x-psq-moniker', value: __state.moniker });
-            responseHeaders.push({ name: 'x-psq-email', value: __state.email });
-            responseHeaders.push({ name: 'x-psq-homepage', value: __state.homePage });
-        }
+    responseHeaders.push({ name: 'x-psq-privkey', value: JSON.stringify(__state.privateKey) });
+    if (responseHeaders.findIndex(e => e.name === 'x-psq-moniker') < 0) {
+        responseHeaders.push({ name: 'x-psq-credits', value: __state.credits.toString() });
+        responseHeaders.push({ name: 'x-psq-moniker', value: __state.moniker });
+        responseHeaders.push({ name: 'x-psq-email', value: __state.email });
+        responseHeaders.push({ name: 'x-psq-homepage', value: __state.homePage });
     }
     return { responseHeaders };
 }
@@ -143,6 +161,7 @@ chrome.webRequest.onHeadersReceived.addListener(addResponseHeaders
 
 
 export async function handleAsyncMessage(event: Message) {
+    if (!__initialized) await initialize();
     let st = currentState();
     let fn = null;
     //console.log("Async Handling :" + event.eventType);
@@ -201,17 +220,17 @@ export async function handleAsyncMessage(event: Message) {
                 break;
             }
         }
-        if (fn) handleMessage({ eventType: "Thunk", fn }, true);
+        if (fn) handleMessage({ eventType: "Thunk", fn });
     }
     catch (e) {
         let fn = (st: AppState) => { return { ...st, lastErrorMessage: e.message }; };
-        handleMessage({ eventType: "Thunk", fn }, true);
-        if (e.message === "Network Error") setTimeout(() => initialize(), 15000);
+        handleMessage({ eventType: "Thunk", fn });
+        if (e.message === "Network Error") __initialized = false;
     }
 
 }
 
-export function handleMessage(event: Message, async: boolean = false): AppState {
+export function handleMessage(event: Message): AppState {
     function storeState(st: AppState): void {
         if (__state !== st) {
             __state = st;
@@ -249,8 +268,9 @@ export function handleMessage(event: Message, async: boolean = false): AppState 
     }
     catch (e) {
         console.log("error in handler :" + e.message);
-        st.lastErrorMessage = e.message;
-        if (e.message === "Network Error") setTimeout(() => initialize(), 15000);
+        st = { ...st, lastErrorMessage: e.message };
+        storeState(st);
+        if (e.message === "Network Error") __initialized = false;
     }
     return st;
 }

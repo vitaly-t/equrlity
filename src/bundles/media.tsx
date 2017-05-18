@@ -40,10 +40,10 @@ export class MediaPage extends React.Component<MediaPageProps, MediaPageState> {
   render() {
     let { contentId, mime } = this.props;
     let { content, privKey, comments, owner, moniker } = this.state;
-
-    let viewer = mime.startsWith("image") ? <img src={'/stream/content/' + contentId} />
-      : mime.startsWith("audio") ? <AudioPlayer src={'/stream/content/' + contentId} type={mime} />
-        : mime.startsWith("video") ? <VideoPlayer poster='http://localhost:8080/stream/content/bA3jno' src={'/stream/content/' + contentId} mime={mime} />
+    let src = '/stream/content/' + contentId;
+    let viewer = mime.startsWith("image") ? <img src={src} />
+      : mime.startsWith("audio") ? <AudioPlayer src={src} type={mime} />
+        : mime.startsWith("video") ? <VideoPlayer /*poster='http://localhost:8080/stream/content/bA3jno'*/ src={src} mime={mime} />
           : null; //<p>Invalid mime type</p>;
 
     let gutter = 10;
