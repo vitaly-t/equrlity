@@ -64,7 +64,7 @@ export class LinksPage extends React.Component<LinksPageProps, LinksPageState> {
         let linkId = l.linkId;
         let url = Utils.linkToUrl(linkId, l.title);
         //let tags = l.tags && l.tags.length > 0 ? l.tags.join(", ") : '';
-        let tags = <Tags.TagGroup tags={l.tags} onClick={(s) => this.addFilter(s)} />;
+        let tags = <Tags.TagGroup tags={l.tags} onClick={s => this.addFilter(s)} />;
 
         let redeem = () => { Chrome.sendMessage({ eventType: "RedeemLink", linkId }); };
         let redeemText = l.amount > 0 ? "Redeem" : "Delete";

@@ -65,8 +65,7 @@ it("should work using direct calls", async () => {
   expect(await countLinks()).toEqual(2);
   expect(rsp2.link).toBeDefined("promote call failed");
   expect(cache.users.get(u2.userId).credits).toEqual(990);
-  /*
-  //expect(cache.getChainFromLinkId(rsp2.link.linkId).length).toEqual(2, "link not chained");
+  expect(cache.getChainFromLinkId(rsp2.link.linkId).length).toEqual(2, "link not chained");
 
   // test social graph updated
   expect(cache.userlinks.get(u1.userId).length).toEqual(1);
@@ -104,19 +103,20 @@ it("should work using direct calls", async () => {
     expect(rsp2.link).toBeDefined("Promote call failed");
     expect(cache.userlinks.get(u1.userId).length).toEqual(2, "social graph not extended");
     {
-      //let bal = cache.links.get(linkId).amount;
-      //expect(cache.getChainFromLinkId(rsp2.link.linkId).length).toEqual(2, "link not chained");
+      let bal = cache.links.get(linkId).amount;
+      expect(cache.getChainFromLinkId(rsp2.link.linkId).length).toEqual(2, "link not chained");
 
       // user4 views promoted link
-      //await pg.payForView(u4.userId, rsp2.link.linkId);
-      //let newbal = cache.links.get(linkId).amount;
-      //expect(newbal).toEqual(bal + 1, "incorrect payment for chained view");
+      await pg.payForView(u4.userId, rsp2.link.linkId);
+      let newbal = cache.links.get(linkId).amount;
+      expect(newbal).toEqual(bal + 1, "incorrect payment for chained view");
     }
 
     // redeem link  testing - particularly re-grafting..
     let preq5: Rpc.BookmarkLinkRequest = { comment: "groovy baby", tags: [], url: Utils.linkToUrl(rsp.link.linkId, ''), signature: "", title: "yaal3!!" };
     let rsp3 = await pg.bookmarkAndInvestInLink(u4.userId, preq5, 10);
     expect(rsp3.link).toBeDefined("promote call failed");
+    expect(rsp3.link.prevLink).toEqual(rsp.link.linkId);
 
     {
       let bal = cache.users.get(u1.userId).credits;
@@ -125,13 +125,13 @@ it("should work using direct calls", async () => {
       await pg.redeemLink(link);
       let newbal = cache.users.get(u1.userId).credits;
       expect(bal + linkbal).toEqual(newbal, "link balance not redeemed");
-      let links = await pg.getLinksForUrl(link.url);
+      let url = cache.contents.get(link.contentId).url;
+      let links = await pg.getLinksForUrl(url);
       let rootLinks = links.filter(l => !l.prevLink);
       expect(rootLinks.length).toEqual(2);
     }
 
   }
-  */
 });
 
 it("should work for blobs", async () => {
