@@ -1,10 +1,15 @@
-"use strict";
-
 import { Url, parse, format } from 'url';
 import { TextEncoder, TextDecoder } from 'text-encoding';
 import * as crypto from 'crypto';
 
 import * as Dbt from './datatypes';
+
+export const serverUrl = isDev() ? "http://localhost:8080" : "https://www.pseudoq.com";
+export const chromeAuthUrl = "https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=";
+
+export function capuchinVersion() {
+  return "0.9.3";
+}
 
 export function sleep(millisecs: number) {
   return new Promise((resolve) => setTimeout(resolve, millisecs));
@@ -38,14 +43,6 @@ export function isTest() {
 export function setTest(l: boolean) {
   return _isTest = l;
 }
-
-export function capuchinVersion() {
-  return "0.9.2";
-}
-
-export const serverUrl = isDev() ? "http://localhost:8080" : "https://www.pseudoq.com";
-export const chromeAuthUrl = "https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=";
-
 
 export function printBase64Binary(byteArray: Uint8Array): string {
   return btoa(String.fromCharCode(...byteArray));

@@ -117,10 +117,11 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
             it is simply impossible for anybody hacking our servers to gain access to any information about you personally.  Nor can we ever be coerced by
             any legal authority whatsoever to provide information which we simply do not have access to.
           </p>
-          <p>We do not use passwords at all.  In the future we may provide standard "Social Login" functionality (Keybase, Facebook, GitHub, Twitter, Google, LinkedIn etc)
-            to allow for independant establishment of your identity, and the sharing of accounts across multiple devices based on that established identity.</p>
+          <p>We do not use passwords at all.  </p>
           <p>For the time being the only client available is the Chrome browser extension, which can only be made available through the Google Store.
-            We therefore rely on your Google identity, given that it is implicitly required to obtain the extension in the first place.</p>
+            We therefore rely on your Google identity, given that it is implicitly required to obtain the extension in the first place.
+            In the future we may provide standard "Social Login" functionality for other providers (Keybase, Facebook, GitHub, Twitter, LinkedIn etc)
+            to allow for independant establishment of your identity, and the sharing of accounts across multiple devices based on that established identity.</p>
         </div>
         <div style={divStyle}>
           <div style={lhcolStyle} >Nickname: </div>

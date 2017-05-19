@@ -4,7 +4,7 @@
 export type authId = string;
 export type authProvider = "facebook" | "github" | "twitter" | "linkedin" | "chrome";
 export type binary = Buffer;
-export type contentType = "post" | "video" | "audio" | "image" | "link";
+export type contentType = "post" | "video" | "audio" | "image" | "bookmark";
 export type created = Date;
 export type date = Date;
 export type db_hash = string;

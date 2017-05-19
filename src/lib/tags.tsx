@@ -38,8 +38,8 @@ class Qtag extends React.Component<QtagProps, {}> {
   render() {
     let { label, onClick, onRemove, style } = this.props;
     if (!style) style = { marginLeft: '3px' };  //TODO merge styles stuff
-    if (onRemove) return <Tag className="pt-minimal pt-round" style={style} key={'tag:' + label} onRemove={() => onRemove(label)} > {label}</Tag>;
-    return <Tag className="pt-minimal pt-round" style={style} key={'tag:' + label} onClick={() => onClick && onClick(label)} > {label}</Tag>;
+    if (onRemove) return <Tag className="pt-minimal pt-round" style={style} onRemove={() => onRemove(label)} > {label}</Tag>;
+    return <Tag className="pt-minimal pt-round" style={style} onClick={() => onClick && onClick(label)} > {label}</Tag>;
   }
 }
 
@@ -47,7 +47,7 @@ interface TagGroupProps { tags: string[], onClick?: (label: string) => void, onR
 export class TagGroup extends React.Component<TagGroupProps, {}> {
   render() {
     if (!this.props.tags) return null;
-    let tags = this.props.tags.map(label => <Qtag label={label} onRemove={this.props.onRemove} onClick={this.props.onClick} />);
+    let tags = this.props.tags.map(label => <Qtag key={'tag:' + label} label={label} onRemove={this.props.onRemove} onClick={this.props.onClick} />);
     return <div>{tags}</div>
   }
 };
@@ -72,8 +72,8 @@ export class TagGroupEditor extends React.Component<TagGroupEditorProps, {}> {
   }
 
   render() {
-    let tags = this.props.tags.map(label => <Qtag label={label} style={{ leftMargin: '3px', height: '26px' }} onRemove={() => this.removeTag(label)} />);
-    tags.push(<Creatable key="__new__" style={{ display: 'inline-block', width: '100px', height: '26px', leftMargin: '3px' }} options={this.props.allTags} onChange={(v) => this.addTag(v)} />);
+    let tags = this.props.tags.map(label => <Qtag key={'tag:' + label} label={label} style={{ marginLeft: '3px', height: '26px' }} onRemove={() => this.removeTag(label)} />);
+    tags.push(<Creatable key="__new__" style={{ display: 'inline-block', width: '100px', height: '26px', marginLeft: '3px' }} options={this.props.allTags} onChange={(v) => this.addTag(v)} />);
     return <Row>{tags}</Row>;
   }
 };

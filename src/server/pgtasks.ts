@@ -44,7 +44,7 @@ export async function retrieveRecord<T>(t: ITask<any>, tblnm: string, pk: Object
 }
 
 export async function retrieveBookmark(t: ITask<any>, url: Dbt.urlString, userId: Dbt.userId): Promise<Dbt.Content> {
-  let rslt = await t.any(`select * from contents where url = '${url}' and "userId" = '${userId}' and "contentType" = 'link' `);
+  let rslt = await t.any(`select * from contents where url = '${url}' and "userId" = '${userId}' and "contentType" = 'bookmark' `);
   if (rslt.length > 0) return rslt[0];
   return null;
 }
@@ -188,7 +188,7 @@ export async function promoteContent(t: ITask<any>, userId, req: Rpc.PromoteCont
   if (!cont) throw new Error("Content not found");
   if (userId !== cont.userId) throw new Error("Content owned by different user");
   let prevLink: Dbt.linkId;
-  if (cont.contentType === "link") {
+  if (cont.contentType === "bookmark") {
     let url = parse(cont.url);
     if (Utils.isPseudoQLinkURL(url)) prevLink = Utils.getLinkIdFromUrl(url);
   }
@@ -207,7 +207,7 @@ export async function promoteLink(t: ITask<any>, userId: Dbt.userId, url: string
   let ourl = parse(url);
   let cont = OxiGen.emptyRec<Dbt.Content>("contents");
   let rslt: CacheUpdate[] = [];
-  cont = { ...cont, userId, title, contentType: "link", url, content: comment, tags }
+  cont = { ...cont, userId, title, contentType: "bookmark", url, content: comment, tags }
   cont = await insertContent(t, cont);
   rslt.push({ table: "contents" as CachedTable, record: cont });
   if (amount > 0) {
@@ -464,7 +464,7 @@ export async function handleBookmarkLink(t: ITask<any>, userId: Dbt.userId, req:
   }
   else {
     content = OxiGen.emptyRec<Dbt.Content>("contents");
-    content = { ...content, title, tags, url, userId, content: comment, contentType: "link" }
+    content = { ...content, title, tags, url, userId, content: comment, contentType: "bookmark" }
     content = await insertContent(t, content);
   }
   return content;

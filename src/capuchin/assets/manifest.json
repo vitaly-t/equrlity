@@ -9,9 +9,9 @@
   },
   "permissions": [
     "tabs",
-    "*://pseudoqurl.heroku.com/*",
-    "*://*.pseudoq.com/*",
-    "*://pseudoq.com/*",
+    "https://pseudoqurl.heroku.com/*",
+    "https://*.pseudoq.com/*",
+    "https://pseudoq.com/*",
     "http://localhost:8080/*",
     "webNavigation",
     "webRequest",

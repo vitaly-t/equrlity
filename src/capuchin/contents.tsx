@@ -142,10 +142,7 @@ export class ContentsPage extends React.Component<ContentsPageProps, ContentsPag
         return true;
       }
       let rows = st.contents.filter(p => tagfilter(p.tags, p.contentType)).map(p => {
-        let url = p.contentType === 'link' ? p.url : Utils.contentToUrl(p.contentId)
-        //let created = p.created ? OxiDate.toFormat(new Date(p.created), "DDDD, MMMM D @ HH:MIP") : '';
-        let updated = p.updated ? OxiDate.toFormat(new Date(p.updated), "DDDD, MMMM D @ HH:MIP") : '';
-        //let tags = p.tags && p.tags.length > 0 ? p.tags.join(", ") : '';
+        let url = p.contentType === 'bookmark' ? p.url : Utils.contentToUrl(p.contentId)
         let tags = <Tags.TagGroup tags={p.tags} onClick={(s) => this.addFilter(s)} />;
 
         let btns = [];
@@ -175,14 +172,12 @@ export class ContentsPage extends React.Component<ContentsPageProps, ContentsPag
           <Button iconName="pt-icon-cog" text="" />
         </Popover>
         );
-
         return (
           <tr key={p.contentId} >
             <td><Tags.TagGroup tags={[p.contentType]} onClick={(s) => this.addFilter(s)} /></td>
             <td><a href={url} target="_blank" >{url}</a></td>
             <td>{p.title}</td>
-            <td><Checkbox disabled defaultChecked={p.isPublic} /></td>
-            <td>{updated}</td>
+            <td><Checkbox disabled checked={p.isPublic} /></td>
             <td>{tags}</td>
             <td>{pop}</td>
           </tr>
@@ -196,7 +191,6 @@ export class ContentsPage extends React.Component<ContentsPageProps, ContentsPag
               <th>Link</th>
               <th>Title</th>
               <th>Public?</th>
-              <th>Updated</th>
               <th>Tags</th>
               <th>Actions</th>
             </tr>

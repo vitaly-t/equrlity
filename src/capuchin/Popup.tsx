@@ -55,8 +55,8 @@ export class PopupPanel extends React.Component<PopupPanelProps, PopupPanelState
         let contentsAction = () => launch('contents');
         let settingsAction = () => launch('settings');
         let gutter = 20;
-        let lspan = 3;
-        let rspan = 9;
+        let lspan = 2;
+        let rspan = 10;
         let btnStyle = { marginRight: 10 };
         let rowStyle = { marginBottom: 10 };
         let btns = [
@@ -80,12 +80,15 @@ export class PopupPanel extends React.Component<PopupPanelProps, PopupPanelState
             }
             btns.push(<Button key="Save" style={btnStyle} className="pt-intent-primary" onClick={saveaction} text={lbl} />);
             pnl = (<div>
+                <Row style={rowStyle} gutter={gutter} justify="center">
+                    <h4>Bookmark Details</h4>
+                </Row>
                 <Row style={rowStyle} gutter={gutter} align="top">
-                    <Col span={lspan}>Source URL : </Col>
+                    <Col span={lspan}>URL:</Col>
                     <Col span={rspan}><TextareaAutosize style={{ width: '100%' }} value={this.state.url} /></Col>
                 </Row>
                 <Row style={rowStyle} gutter={gutter} align="top">
-                    <Col span={lspan}>Link Description: </Col>
+                    <Col span={lspan}>Title:</Col>
                     <Col span={rspan}><TextareaAutosize style={{ width: '100%' }} value={this.state.title} onChange={(e) => this.changeTitle(e.target.value)} /></Col>
                 </Row>
                 <Row style={rowStyle} gutter={gutter} align="top">

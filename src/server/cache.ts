@@ -134,7 +134,7 @@ export function getLinkDepth(link: Dbt.Link): Dbt.integer {
 export function getContentFromLinkId(linkId: Dbt.linkId): Dbt.urlString | null {
   let link = links.get(linkId);
   let cont = contents.get(link.contentId);
-  if (cont.contentType === "link") return cont.title;
+  if (cont.contentType === "bookmark") return cont.title;
   return Utils.contentToUrl(cont.contentId);
 }
 
