@@ -21,13 +21,13 @@ import * as Chrome from './chrome';
 
 
 interface SettingsPageProps { appState: AppState };
-interface SettingsPageState { settings: Rpc.UserSettings, prevInfo: string };
+interface SettingsPageState { settings: Rpc.UserSettings, prevSettings: Rpc.UserSettings };
 export class SettingsPage extends React.Component<SettingsPageProps, SettingsPageState> {
 
   constructor(props: SettingsPageProps) {
     super(props);
     let settings: Rpc.UserSettings = { userName: props.appState.moniker, email: props.appState.email, homePage: '', info: '' };
-    this.state = { settings, prevInfo: '' };
+    this.state = { settings, prevSettings: settings };
   }
 
   componentDidMount = async () => {
@@ -35,30 +35,39 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
     let rsp: Rpc.Response = response.data;
     if (rsp.error) throw new Error("Server returned error: " + rsp.error.message);
     let settings: Rpc.UserSettings = rsp.result;
-    let prevInfo = settings.info
-    this.setState({ settings, prevInfo });
+    this.setState({ settings, prevSettings: settings });
   }
 
   changeUserName(userName) {
     let settings = { ...this.state.settings, userName }
     this.setState({ settings });
   }
+
   changeEmail(email) {
     let settings = { ...this.state.settings, email }
     this.setState({ settings });
   }
+
   changeHomePage(homePage) {
     let settings = { ...this.state.settings, homePage }
     this.setState({ settings });
   }
+
   changeInfo(info) {
     let settings = { ...this.state.settings, info }
     this.setState({ settings });
   }
 
+  isDirty(): boolean {
+    let { userName, email, homePage, info } = this.state.settings;
+    let p = this.state.prevSettings;
+    return userName !== p.userName || email !== p.email || homePage !== p.homePage || info !== p.info;
+  }
+
   saveSettings = () => {
     console.log("saving settings");
     let settings = this.state.settings;
+    this.setState({ prevSettings: settings });
     Chrome.sendMessage({ eventType: "ChangeSettings", settings });
   }
 
@@ -67,7 +76,7 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
     let userNames = st.connectedUsers;
     let vsp = <div style={{ height: 20 }} />;
     let divStyle = { width: '100%', marginTop: 5, marginLeft: 5, padding: 6 };
-    let lhcolStyle = { width: '20%' };
+    let lhcolStyle = { marginBottom: "5px" };
     let { userName, email, homePage, info } = this.state.settings;
 
     let userp = userNames.length > 0 ? <div><p>You are currently directly connected with another {userNames.length} user{userNames.length > 1 ? "s" : ""}.</p>
@@ -100,14 +109,38 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
 
     return (
       <div>
-        <h3>Status and Settings.</h3>
+        <h4>Your Settings:</h4>
+        <div className="pt-elevation-0" style={{ width: "100%", height: "100%", marginTop: 5, marginLeft: 5, padding: 6, backgroundColor: "#F5F8FA" }}>
+          <div style={divStyle}>
+            <div className="pt-text-muted" style={lhcolStyle} >Public Name: </div>
+            <input type="text" style={{ width: '60%' }} name="NickName" id="nickId" value={userName} onChange={(e) => this.changeUserName(e.target.value)} />
+          </div>
+          <div style={divStyle}>
+            <div className="pt-text-muted" style={lhcolStyle} >Email: </div>
+            <input type="email" style={{ width: '60%' }} name="Email" id="emailId" value={email} onChange={(e) => this.changeEmail(e.target.value)} />
+          </div>
+          <div style={divStyle}>
+            <div className="pt-text-muted" style={lhcolStyle} >HomePage: </div>
+            <input type="text" style={{ width: '60%' }} name="HomePage" id="homePageId" value={homePage} onChange={(e) => this.changeHomePage(e.target.value)} />
+          </div>
+          <div style={divStyle}>
+            <div className="pt-text-muted" style={lhcolStyle} >Further Info: </div>
+            <MarkdownEditor value={info} onChange={info => this.changeInfo(info)} allowHtml={true} />
+          </div>
+          <div style={divStyle}>
+            <Button className="pt-intent-primary" disabled={!this.isDirty()} onClick={this.saveSettings} text="Save Settings" />
+          </div>
+        </div>
+        {vsp}
+        <h4>Current status.</h4>
         <div style={divStyle}>
-          <p>Using Server Url: {Utils.serverUrl}. Version: {Utils.capuchinVersion()} </p>
+          <p>Using server URL: {Utils.serverUrl}.</p>
+          <p>Version: {Utils.capuchinVersion()}. </p>
           {userp}
           {/*authdiv*/}
         </div>
         {vsp}
-        <h5>Your Settings:</h5>
+        <h4>Privacy Policy.</h4>
         <div style={divStyle}>
           <p>To ensure your privacy, we do not store any information whatsoever about your account on our servers, other than an internally generated identifier,
             your nickname, and your homepage (should you choose to provide one).  We retain your homepage to allow the system to present links in content pages, and also to
@@ -122,25 +155,6 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
             We therefore rely on your Google identity, given that it is implicitly required to obtain the extension in the first place.
             In the future we may provide standard "Social Login" functionality for other providers (Keybase, Facebook, GitHub, Twitter, LinkedIn etc)
             to allow for independant establishment of your identity, and the sharing of accounts across multiple devices based on that established identity.</p>
-        </div>
-        <div style={divStyle}>
-          <div style={lhcolStyle} >Nickname: </div>
-          <input type="text" style={{ width: '60%' }} name="NickName" id="nickId" value={userName} onChange={(e) => this.changeUserName(e.target.value)} />
-        </div>
-        <div style={divStyle}>
-          <div style={lhcolStyle} >Email: </div>
-          <input type="email" style={{ width: '60%' }} name="Email" id="emailId" value={email} onChange={(e) => this.changeEmail(e.target.value)} />
-        </div>
-        <div style={divStyle}>
-          <div style={lhcolStyle} >HomePage: </div>
-          <input type="text" style={{ width: '60%' }} name="HomePage" id="homePageId" value={homePage} onChange={(e) => this.changeHomePage(e.target.value)} />
-        </div>
-        <div style={divStyle}>
-          <div style={lhcolStyle} >Further Info: </div>
-          <MarkdownEditor value={info} onChange={info => this.changeInfo(info)} isDirty={info !== this.state.prevInfo} allowHtml={true} />
-        </div>
-        <div style={divStyle}>
-          <Button className="pt-intent-primary" onClick={this.saveSettings} text="Save Settings" />
         </div>
       </div>);
   }

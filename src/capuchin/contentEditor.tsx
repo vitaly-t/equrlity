@@ -19,7 +19,7 @@ import { MarkdownEditor } from '../lib/markdownEditor';
 import * as Chrome from './chrome';
 
 
-interface ContentEditorProps { info: Dbt.Content, allTags: Tags.TagSelectOption[], creator: string, onClose: () => void }
+interface ContentEditorProps { info: Dbt.Content, allTags: Tags.TagSelectOption[], creator: string, style?: any, onClose: () => void }
 interface ContentEditorState { url: Dbt.urlString, title: string, content: string, tags: string[], isError: boolean, isPublic: boolean, prevContent: string, isOpen: boolean };
 
 export class ContentEditor extends React.Component<ContentEditorProps, ContentEditorState> {
@@ -67,6 +67,7 @@ export class ContentEditor extends React.Component<ContentEditorProps, ContentEd
     let gutter = 20;
     let btnStyle = { marginRight: gutter / 2 };
     let rowStyle = { padding: 4 };
+    let lspan = 1;
     let { title, isPublic, content, tags, isOpen } = this.state;
     let { info } = this.props;
     let isDirty = content !== info.content;
@@ -78,29 +79,36 @@ export class ContentEditor extends React.Component<ContentEditorProps, ContentEd
     let updated = info.updated ? OxiDate.toFormat(new Date(info.updated), "DDDD, MMMM D @ HH:MIP") : '';
     let typ = info.contentType
     let hashDiv;
-    if (info.db_hash) hashDiv = <Row style={rowStyle} gutter={gutter}><Col span={2}>Hash:</Col><Col span={10}>{info.db_hash}</Col></Row>;
+    if (info.db_hash) hashDiv =
+      <Row style={rowStyle} gutter={gutter}>
+        <Col span={lspan}>Mime ext.:</Col>
+        <Col span={1}>{info.mime_ext}</Col>
+        <Col span={lspan}>Hash:</Col>
+        <Col span={6}>{info.db_hash}</Col>
+      </Row>;
     let urlDiv;
     if (typ === 'bookmark') urlDiv = <div>
-      <Row style={rowStyle} gutter={gutter}><Col span={2}>Content ID:</Col><Col span={10}>{info.contentId}</Col></Row>
-      <Row style={rowStyle} gutter={gutter}><Col span={2}>Target:</Col><Col span={10}><input type="text" style={{ width: '100%' }} value={this.state.url} onChange={e => this.setState({ url: e.target.value })} /></Col></Row>
+      <Row style={rowStyle} gutter={gutter}><Col span={lspan}>Content ID:</Col><Col span={10}>{info.contentId}</Col></Row>
+      <Row style={rowStyle} gutter={gutter}><Col span={lspan}>Target:</Col><Col span={10}><input type="text" style={{ width: '100%' }} value={this.state.url} onChange={e => this.setState({ url: e.target.value })} /></Col></Row>
     </div>;
     let ttl =
       typ === "bookmark" ? "Edit Bookmark"
         : typ === "post" ? "Edit Post"
           : `Edit ${typ} content`;
+    let styl = this.props.style || { width: '90%' };
     return (
-      <Dialog iconName="inbox" style={{ width: '600px' }} isOpen={isOpen} title={ttl} canOutsideClickClose={false} onClose={() => this.close()} >
+      <Dialog iconName="inbox" style={styl} isOpen={isOpen} title={ttl} canOutsideClickClose={false} onClose={() => this.close()} >
         <div style={{ padding: gutter }}>
           {urlDiv}
           <Row style={rowStyle} gutter={gutter}>
-            <Col span={2}>Title:</Col>
+            <Col span={lspan}>Title:</Col>
             <Col span={8}>
               <input type="text" style={{ width: '100%' }} value={title} onChange={e => this.setState({ title: e.target.value })} />
             </Col>
             <Col span={2}><Checkbox label="Public?" checked={isPublic} onChange={e => this.setState({ isPublic: !this.state.isPublic })} /></Col>
           </Row>
           <Row style={rowStyle} gutter={gutter}>
-            <Col span={2}>Body:</Col>
+            <Col span={lspan}>Body:</Col>
           </Row>
           <Row style={rowStyle} gutter={gutter}>
             <Col span={12}>
@@ -109,7 +117,7 @@ export class ContentEditor extends React.Component<ContentEditorProps, ContentEd
           </Row>
           {hashDiv}
           <Row style={rowStyle} gutter={gutter}>
-            <Col span={2}>Tags:</Col>
+            <Col span={lspan}>Tags:</Col>
             <Col span={10}>
               <Tags.TagGroupEditor tags={this.state.tags} allTags={this.props.allTags} onChange={tags => this.changeTags(tags)} />
             </Col>

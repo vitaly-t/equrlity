@@ -27,7 +27,7 @@ type UploadProgress = { fileName: string, progress: number }
 const gutter = 20;
 
 interface ContentsPageProps { appState: AppState };
-interface ContentsPageState { uploadProgress: UploadProgress[], promotingContent?: Dbt.Content, editingContent?: Dbt.Content, confirmDeleteContent?: Dbt.Content, filters: string[] };
+interface ContentsPageState { uploadProgress: UploadProgress[], cancelUpload: boolean, promotingContent?: Dbt.Content, editingContent?: Dbt.Content, confirmDeleteContent?: Dbt.Content, filters: string[] };
 
 const toast = Toaster.create({
   className: "contents-toaster",
@@ -39,15 +39,14 @@ export class ContentsPage extends React.Component<ContentsPageProps, ContentsPag
 
   constructor(props) {
     super(props);
-    this.state = { uploadProgress: [], filters: [] };
+    this.state = { uploadProgress: [], filters: [], cancelUpload: false };
   }
 
   setUploadProgress(nm: string, progress: number) {
     let uploadProgress = [...this.state.uploadProgress]
     let i = uploadProgress.findIndex(u => u.fileName === nm);
     if (i < 0) {
-      toast.show({ message: "Missing file: " + nm });
-      //console.log("file gone?");
+      if (!this.state.cancelUpload) toast.show({ message: "Missing file: " + nm });
     }
     else {
       if (progress === 1) uploadProgress.splice(i, 1);
@@ -81,9 +80,31 @@ export class ContentsPage extends React.Component<ContentsPageProps, ContentsPag
       data.append("hash", digest);
       data.append("sig", sig);
       data.append(f.name, f);
-      let config = { onUploadProgress: (progressEvent) => { this.setUploadProgress(f.name, progressEvent.loaded / progressEvent.total) } };
+      let CancelToken = axios.CancelToken;
+      let source = CancelToken.source();
+      let cancelToken = source.token
+      let config = {
+        cancelToken, onUploadProgress: (progressEvent) => {
+          if (this.state.cancelUpload) {
+            source.cancel("upload cancelled");
+            this.setState({ uploadProgress: [] });
+          }
+          this.setUploadProgress(f.name, progressEvent.loaded / progressEvent.total)
+        }
+      };
       let req = uploadRequest();
-      let response = await req.post(Utils.serverUrl + '/upload/media', data, config);
+
+      let response;
+      try {
+        response = await req.post(Utils.serverUrl + '/upload/media', data, config);
+      }
+      catch (e) {
+        if (axios.isCancel(e)) {
+          toast.show({ message: "Upload cancelled" });
+          return;
+        }
+        throw (e);
+      }
       let cont: Dbt.Content = response.data;
       if (!cont || !cont.contentId) {
         toast.show({ message: "Server failed to process: " + f.fileName });
@@ -96,6 +117,7 @@ export class ContentsPage extends React.Component<ContentsPageProps, ContentsPag
       Chrome.sendSyncMessage({ eventType: "AddContents", contents: [cont] })
     }
     for (var f of acceptedFiles) await uploadFile(f);
+    if (this.state.cancelUpload) this.setState({ cancelUpload: false });
   }
 
   createPost() {
@@ -217,6 +239,7 @@ export class ContentsPage extends React.Component<ContentsPageProps, ContentsPag
         <div>
           <h4>Uploading : </h4>
           {uplds}
+          <Button className="pt-intent-primary" onClick={() => this.setState({ cancelUpload: true })} text="Cancel" />
         </div>
     }
     else {

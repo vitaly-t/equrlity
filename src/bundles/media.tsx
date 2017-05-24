@@ -6,7 +6,7 @@ import * as Dbt from '../lib/datatypes';
 import * as Rpc from '../lib/rpc';
 import * as Utils from '../lib/utils';
 import { VideoPlayer } from '../lib/mediaPlayer';
-import { AudioPlayer } from '../lib/audioPlayer';
+import { WavesurferPlayer, AudioPlayer } from '../lib/audioPlayer';
 import * as Comms from '../lib/axiosClient';
 import { CommentsPanel } from '../lib/comments';
 import { ContentView } from '../lib/contentView';
@@ -40,10 +40,10 @@ export class MediaPage extends React.Component<MediaPageProps, MediaPageState> {
   render() {
     let { contentId, mime } = this.props;
     let { content, privKey, comments, owner, moniker } = this.state;
-    let src = '/stream/content/' + contentId;
+    let src = '/blob/content/' + contentId;
     let viewer = mime.startsWith("image") ? <img src={src} />
       : mime.startsWith("audio") ? <AudioPlayer src={src} type={mime} />
-        : mime.startsWith("video") ? <VideoPlayer /*poster='http://localhost:8080/stream/content/bA3jno'*/ src={src} mime={mime} />
+        : mime.startsWith("video") ? <VideoPlayer /*poster='???'*/ src={'/stream/content/' + contentId} mime={mime} />
           : null; //<p>Invalid mime type</p>;
 
     let gutter = 10;
@@ -51,7 +51,7 @@ export class MediaPage extends React.Component<MediaPageProps, MediaPageState> {
     if (content) cont = <ContentView info={content} owner={owner} />;
     return <div>
       <Row gutter={gutter}>
-        <Col>{viewer}</Col>
+        <Col span={3}>{viewer}</Col>
         <Col>{cont}</Col>
       </Row>
       <Row gutter={gutter}><h5 style={{ marginTop: "10px" }} >Comments:</h5></Row>

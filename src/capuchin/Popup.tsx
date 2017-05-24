@@ -2,114 +2,132 @@ import * as React from 'react';
 import { Url, format } from 'url';
 import { Row, Col } from 'react-simple-flex-grid';
 import TextareaAutosize from 'react-autosize-textarea';
-import { Button, Intent, Toaster, Position } from "@blueprintjs/core";
+import { Button, Intent, Toaster, Position, Popover, PopoverInteractionKind } from "@blueprintjs/core";
 
 import * as Rpc from '../lib/rpc';
 import * as Dbt from '../lib/datatypes';
-import { TagGroupEditor } from '../lib/tags';
+import { TagGroupEditor, TagSelectOption } from '../lib/tags';
 
 import * as Chrome from './chrome';
 import { AppState, isWaiting, getBookmark } from "./AppState";
 
 const toast = Toaster.create({
-    className: "popup-toaster",
-    position: Position.TOP,
+  className: "popup-toaster",
+  position: Position.TOP,
 });
 
+export interface BookmarkPanelProps { appState: AppState };
+export interface BookmarkPanelState { url: Dbt.urlString, title: string, comment: string, tags: string[] };
+export class BookmarkPanel extends React.Component<BookmarkPanelProps, BookmarkPanelState> {
+
+  constructor(props: BookmarkPanelProps) {
+    super(props);
+    let url = props.appState.activeUrl
+    let st: BookmarkPanelState = { url, title: '', comment: '', tags: [] };
+    if (url) {
+      let cont = getBookmark(props.appState, url);
+      if (cont) st = { url, title: cont.title, comment: cont.content, tags: cont.tags };
+    }
+    this.state = st;
+  }
+
+  changeTitle(title: string) {
+    this.setState({ title });
+  }
+
+  changeComment(comment: string) {
+    this.setState({ comment });
+  }
+
+  changeTags(tags: string[]) {
+    this.setState({ tags });
+    Chrome.sendSyncMessage({ eventType: "SaveTags", tags })
+  }
+
+  render() {
+    let props = this.props;
+    let st = props.appState;
+    let curl = st.activeUrl
+
+    let gutter = 20;
+    let lspan = 2;
+    let rspan = 10;
+    let btnStyle = { marginRight: 10 };
+    let rowStyle = { marginBottom: 10 };
+    let saveaction = () => {
+      let { title, comment, tags, url } = this.state;
+      Chrome.sendMessage({ eventType: "BookmarkLink", url, title, comment, tags });
+      window.close();
+    }
+    let btns = [
+      <Button key="Close" style={btnStyle} onClick={() => window.close()} text="Close" />,
+      <Button key="Save" style={btnStyle} className="pt-intent-primary" onClick={saveaction} text="Save" />
+    ]
+
+    return (<div className="pt-elevation-0" style={{ width: "100%", height: "100%", backgroundColor: "#F5F8FA" }}>
+      <div style={{ margin: "16px" }}>
+        <Row style={rowStyle} gutter={gutter} justify="center">
+          <h4 className="pt-text-muted" style={{ marginTop: "16px" }}>Bookmark Details</h4>
+        </Row>
+        <Row style={rowStyle} gutter={gutter} align="top">
+          <Col span={lspan}> <span className="pt-text-muted" >URL:</span></Col>
+          <Col span={rspan}><TextareaAutosize disabled={!curl} className="pt-elevation-2" style={{ width: '100%' }} value={this.state.url} /></Col>
+        </Row>
+        <Row style={rowStyle} gutter={gutter} align="top">
+          <Col span={lspan}> <span className="pt-text-muted" >Title:</span></Col>
+          <Col span={rspan}><TextareaAutosize className="pt-elevation-2" style={{ width: '100%' }} value={this.state.title} onChange={(e) => this.changeTitle(e.target.value)} /></Col>
+        </Row>
+        <Row style={rowStyle} gutter={gutter} align="top">
+          <Col span={lspan}> <span className="pt-text-muted" >Comment:</span></Col>
+          <Col span={rspan}><TextareaAutosize className="pt-elevation-2" style={{ width: '100%' }} value={this.state.comment} onChange={(e) => this.changeComment(e.target.value)} /></Col>
+        </Row>
+        <Row style={rowStyle} gutter={gutter} align="top">
+          <Col span={lspan}> <span className="pt-text-muted" >Tags:</span></Col>
+          <Col span={rspan}><TagGroupEditor tags={this.state.tags} allTags={this.props.appState.allTags} onChange={(tags) => this.changeTags(tags)} /></Col>
+        </Row>
+        <Row style={rowStyle} gutter={gutter} justify="end" align="top">
+          {btns}
+        </Row>
+      </div>
+    </div>);
+  }
+}
+
 export interface PopupPanelProps { appState: AppState };
-export interface PopupPanelState { url: Dbt.urlString, title: string, comment: string, tags: string[] };
+export interface PopupPanelState { };
 export class PopupPanel extends React.Component<PopupPanelProps, PopupPanelState> {
 
-    constructor(props: PopupPanelProps) {
-        super(props);
-        let url = props.appState.activeUrl
-        let st: PopupPanelState = { url, title: '', comment: '', tags: [] };
-        if (url) {
-            let cont = getBookmark(props.appState, url);
-            if (cont) st = { url, title: cont.title, comment: cont.content, tags: cont.tags };
-        }
-        this.state = st;
-    }
+  render() {
+    let props = this.props;
+    let st = props.appState;
+    let curl = st.activeUrl
 
-    changeTitle(title: string) {
-        this.setState({ title });
-    }
+    let launch = (page) => Chrome.sendMessage({ eventType: "LaunchPage", page });
+    let linksAction = () => launch('links');
+    let usersAction = () => launch('users');
+    let contentsAction = () => launch('contents');
+    let settingsAction = () => launch('settings');
+    let gutter = 20;
+    let btnStyle = { marginRight: 10 };
+    let rowStyle = { marginBottom: 10 };
+    let btns = [
+      <Button key="Settings" style={btnStyle} className="pt-intent-success" onClick={settingsAction} text="Settings" />,
+      <Button key="Investments" style={btnStyle} className="pt-intent-success" onClick={linksAction} text="Investments" />,
+      //<Button key="People" style={btnStyle} className="pt-intent-success" onClick={usersAction} text="People" />,
+      <Button key="Contents" style={btnStyle} className="pt-intent-success" onClick={contentsAction} text="Contents" />,
+    ]
+    if (!curl) btns.unshift(<Button key="Close" style={btnStyle} onClick={() => window.close()} text="Close" />);
 
-    changeComment(comment: string) {
-        this.setState({ comment });
-    }
-
-    changeTags(tags: string[]) {
-        this.setState({ tags });
-        Chrome.sendSyncMessage({ eventType: "SaveTags", tags })
-    }
-
-    render() {
-        let props = this.props;
-        let st = props.appState;
-        let curl = st.activeUrl
-
-        let launch = (page) => Chrome.sendMessage({ eventType: "LaunchPage", page });
-        let linksAction = () => launch('links');
-        let usersAction = () => launch('users');
-        let contentsAction = () => launch('contents');
-        let settingsAction = () => launch('settings');
-        let gutter = 20;
-        let lspan = 2;
-        let rspan = 10;
-        let btnStyle = { marginRight: 10 };
-        let rowStyle = { marginBottom: 10 };
-        let btns = [
-            <Button key="Close" style={btnStyle} onClick={() => window.close()} text="Close" />,
-            <Button key="Settings" style={btnStyle} className="pt-intent-success" onClick={settingsAction} text="Settings" />,
-            <Button key="Investments" style={btnStyle} className="pt-intent-success" onClick={linksAction} text="Investments" />,
-            //<Button key="People" style={btnStyle} className="pt-intent-success" onClick={usersAction} text="People" />,
-            <Button key="Contents" style={btnStyle} className="pt-intent-success" onClick={contentsAction} text="Contents" />,
-        ]
-        let pnl = <div>
-            <p>No active URL found</p>
-        </div>
-        if (st.lastErrorMessage) toast.show({ message: "Error: " + st.lastErrorMessage });
-        if (curl) {
-            let cont = getBookmark(st, curl);
-            let lbl = "Save";
-            let saveaction = () => {
-                let { title, comment, tags, url } = this.state;
-                Chrome.sendMessage({ eventType: "BookmarkLink", url, title, comment, tags });
-                window.close();
-            }
-            btns.push(<Button key="Save" style={btnStyle} className="pt-intent-primary" onClick={saveaction} text={lbl} />);
-            pnl = (<div>
-                <Row style={rowStyle} gutter={gutter} justify="center">
-                    <h4>Bookmark Details</h4>
-                </Row>
-                <Row style={rowStyle} gutter={gutter} align="top">
-                    <Col span={lspan}>URL:</Col>
-                    <Col span={rspan}><TextareaAutosize style={{ width: '100%' }} value={this.state.url} /></Col>
-                </Row>
-                <Row style={rowStyle} gutter={gutter} align="top">
-                    <Col span={lspan}>Title:</Col>
-                    <Col span={rspan}><TextareaAutosize style={{ width: '100%' }} value={this.state.title} onChange={(e) => this.changeTitle(e.target.value)} /></Col>
-                </Row>
-                <Row style={rowStyle} gutter={gutter} align="top">
-                    <Col span={lspan}>Comment:</Col>
-                    <Col span={rspan}><TextareaAutosize style={{ width: '100%' }} value={this.state.comment} onChange={(e) => this.changeComment(e.target.value)} /></Col>
-                </Row>
-                <Row style={rowStyle} gutter={gutter} align="top">
-                    <Col span={lspan}>Tags:</Col>
-                    <Col span={rspan}><TagGroupEditor tags={this.state.tags} allTags={this.props.appState.allTags} onChange={(tags) => this.changeTags(tags)} /></Col>
-                </Row>
-            </div>);
-        }
-        let btnRow = (
-            <Row style={rowStyle} gutter={gutter} justify="end" align="top">
-                {btns}
-            </Row>
-        );
-        return <div>
-            {pnl}
-            {btnRow}
-        </div >
-    }
+    if (st.lastErrorMessage) toast.show({ message: "Error: " + st.lastErrorMessage });
+    return <div>
+      <Row style={rowStyle} gutter={gutter} justify="space-between">
+        <Col span={3}><h2><b>PseudoQURL</b></h2></Col>
+        <Col span={9}>
+          <Row style={rowStyle} gutter={gutter} justify="end">{btns}</Row>
+        </Col>
+      </Row>
+      {curl && <BookmarkPanel appState={this.props.appState} />}
+    </div>
+  }
 }
 

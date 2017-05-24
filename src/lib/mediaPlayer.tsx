@@ -1,7 +1,5 @@
 import * as React from 'react';
 import * as videojs from 'video.js'
-//import wavesurfer from 'wavesurfer.js'
-import * as wavesurfer from './videojs-wavesurfer';
 
 interface PlayerProps { src: string, poster?: string, mime: string }
 interface PlayerState { player?: videojs.Player }

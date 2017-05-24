@@ -1,13 +1,14 @@
-"use strict";
 
 import * as React from 'react';
+import * as ReactDOM from "react-dom";
+
 import { Button, Dialog } from "@blueprintjs/core";
 import { Row, Col } from 'react-simple-flex-grid';
 import TextareaAutosize from 'react-autosize-textarea';
 
 import * as Remarkable from 'remarkable';
 
-interface MarkdownPreviewProps { text: string, allowHtml: boolean, onClose: () => void };
+interface MarkdownPreviewProps { text: string, allowHtml: boolean, newTab?: boolean, onClose: () => void };
 interface MarkdownPreviewState { isOpen: boolean, md: any };
 export class MarkdownPreview extends React.Component<MarkdownPreviewProps, MarkdownPreviewState> {
 
@@ -28,20 +29,25 @@ export class MarkdownPreview extends React.Component<MarkdownPreviewProps, Markd
     const rowStyle = { width: '100%', marginTop: 2, marginLeft: 5, padding: 6 };
 
     return (
-      <Dialog iconName="inbox" style={{ width: '90%', height: '90%' }} isOpen={this.state.isOpen} title={"Preview rendered Markdown"} canOutsideClickClose={true} onClose={() => this.close()} >
+      <Dialog iconName="inbox" style={{ width: '95%' }} isOpen={this.state.isOpen} title={"Preview rendered Markdown"} canOutsideClickClose={true} onClose={() => this.close()} >
         <div style={rowStyle} dangerouslySetInnerHTML={h} />
       </Dialog >
     );
   }
 }
 
-interface MarkdownEditorProps { value: string, title?: string, isDirty?: boolean, enableAbandon?: boolean, allowHtml: boolean, onSave?: () => void, onChange: (s: string) => void, onAbandon?: () => void }
+interface MarkdownEditorProps { value: string, title?: string, isDirty?: boolean, enableAbandon?: boolean, allowHtml: boolean, onSave?: () => void, onChange: (s: string) => void, onAbandon?: () => void, onPreview?: (s: string) => void }
 interface MarkdownEditorState { previewing: boolean };
 export class MarkdownEditor extends React.Component<MarkdownEditorProps, MarkdownEditorState> {
 
   constructor(props: MarkdownEditorProps) {
     super(props);
     this.state = { previewing: false };
+  }
+
+  preview() {
+    if (this.props.onPreview) this.props.onPreview(this.props.value);
+    else this.setState({ previewing: true })
   }
 
   render() {
@@ -57,7 +63,7 @@ export class MarkdownEditor extends React.Component<MarkdownEditorProps, Markdow
     if (this.props.onAbandon) {
       btns.push(<Button key="Abandon" style={btnStyle} disabled={!isDirty && !this.props.enableAbandon} onClick={() => this.props.onAbandon()} text="Abandon" />);
     }
-    btns.push(<Button key="Preview" style={btnStyle} disabled={this.props.value.length === 0} className="pt-intent-success" onClick={() => this.setState({ previewing: true })} text="Preview" />);
+    btns.push(<Button key="Preview" style={btnStyle} disabled={this.props.value.length === 0} className="pt-intent-success" onClick={() => this.preview()} text="Preview" />);
     if (this.props.onSave) {
       btns.push(<Button key="Save" style={btnStyle} disabled={!isDirty} className="pt-intent-primary" onClick={() => this.props.onSave()} text="Save" />);
     };

@@ -165,15 +165,23 @@ app.use(async (ctx, next) => {
     ctx['invalidClientMsg'] = msg
     //console.log("Invalid Client : " + msg);
   }
-  await next();
+  try {
+    await next();
+  }
+  catch (e) {
+    console.log("Error: " + e.message);
+    throw (e);
+  }
 });
 
 app.use(jwt.jwt(jwtOptions));
 
+/*
 publicRouter.get('/download/pseudoqurl.crx', async function (ctx, next) {
   ctx.headers['Content-Type'] = "application/x-chrome-extension";
   await send(ctx, './assets/pseudoqurl.crx');
 });
+*/
 
 publicRouter.get('/download/pseudoqurl.zip', async function (ctx, next) {
   await send(ctx, './assets/pseudoqurl-plugin.zip');
@@ -221,6 +229,15 @@ publicRouter.get('/stream/content/:id', async (ctx, next) => {
   let lob = await pg.retrieveBlobContent(contentId);
   let strm = createReadStream(lob);
   ctx.body = strm;
+});
+
+publicRouter.get('/blob/content/:id', async (ctx, next) => {
+  let contentId = ctx.params.id;
+  let cont = cache.contents.get(contentId);
+  if (!cont || !cont.db_hash) ctx.throw(404);
+  if (!isValidClient(ctx) && !cont.isPublic) ctx.throw(403);
+  let lob = await pg.retrieveBlobContent(contentId);
+  ctx.body = lob;
 });
 
 publicRouter.get('/load/content/:id', async (ctx, next) => {
@@ -460,7 +477,7 @@ router.post('/rpc', async function (ctx: any) {
         let usr = getUser(userId);
         if (!usr) throw new Error("Internal error getting user details");
         let redirectUrl = ctx['redirectUrl'];
-        let allTags = Array.from(cache.tags);
+        let allTags = await pg.loadTags();
         let result: Rpc.InitializeResponse = { ok: true, allTags, redirectUrl };
         ctx.body = { id, result };
         break;

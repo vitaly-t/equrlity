@@ -38,8 +38,10 @@ class Qtag extends React.Component<QtagProps, {}> {
   render() {
     let { label, onClick, onRemove, style } = this.props;
     if (!style) style = { marginLeft: '3px' };  //TODO merge styles stuff
-    if (onRemove) return <Tag className="pt-minimal pt-round" style={style} onRemove={() => onRemove(label)} > {label}</Tag>;
-    return <Tag className="pt-minimal pt-round" style={style} onClick={() => onClick && onClick(label)} > {label}</Tag>;
+    let lblStyle = onClick || onRemove ? { cursor: "pointer" } : {};
+    let lbl = <div className="pt-text-muted" style={lblStyle}>{label}</div>
+    if (onRemove) return <Tag className="pt-minimal pt-round" style={style} onClick={() => onRemove(label)} onRemove={() => onRemove(label)} > {lbl}</Tag>;
+    return <Tag className="pt-minimal pt-round" style={style} onClick={() => onClick && onClick(label)} >{lbl}</Tag>;
   }
 }
 
