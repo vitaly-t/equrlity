@@ -196,6 +196,10 @@ export async function checkMonikerUsed(name: string): Promise<boolean> {
   return await db.task(t => tasks.checkMonikerUsed(t, name));
 };
 
+export async function checkProfilePic(profile_pic: Dbt.db_hash, userId: Dbt.userId): Promise<boolean> {
+  return await db.task(t => tasks.checkProfilePic(t, profile_pic, userId));
+};
+
 export async function getAllAnonymousMonikers(): Promise<Dbt.userName[]> {
   return await db.task(t => tasks.getAllAnonymousMonikers(t));
 };
@@ -480,14 +484,17 @@ export async function retrieveBlobContent(contentId: Dbt.contentId): Promise<Buf
   return await db.tx(async t => {
     let cont = await tasks.retrieveRecord<Dbt.Content>(t, "contents", { contentId });
     if (!cont.db_hash) return null;
-    let blob = await tasks.retrieveRecord<Dbt.Blob>(t, "blobs", { db_hash: cont.db_hash });
-    let blobId = blob.blobId;
-    return await tasks.retrieveLargeObject(t, blobId);
+    return await tasks.retrieveBlob(t, cont.db_hash);
   });
 }
 
+export async function retrieveBlob(db_hash: Dbt.db_hash): Promise<Buffer> {
+  //NB must use tx when dealing with large objects.
+  return await db.tx(t => tasks.retrieveBlob(t, db_hash));
+}
+
 export async function getCommentsForContent(contentId: Dbt.contentId): Promise<Dbt.Comment[]> {
-  return await db.tx(async t => tasks.getCommentsForContent(t, contentId));
+  return await db.task(t => tasks.getCommentsForContent(t, contentId));
 }
 
 export async function saveTags(tags: Dbt.tag[]): Promise<Dbt.tag[]> {  // return list of tags added

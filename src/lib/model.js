@@ -145,6 +145,7 @@ export default {
     User: ["userId", "userName", "created", "updated",
       { name: "home_page", type: "urlString" },
       { name: "info", type: "text" },
+      { name: "profile_pic", type: "db_hash" },
       { name: "credits", type: "integer" },
       { name: "groups", type: "userGroup", multiValued: true }
     ],
@@ -163,7 +164,7 @@ export default {
       rowType: "Tag",
       primaryKey: ["tag"]
     },
-    users: {
+    users: {  // can't create fk for blob as it would create circular fk refs b/w blobs and users.
       rowType: "User",
       primaryKey: ["userId"],
       uniques: [["userName"]],

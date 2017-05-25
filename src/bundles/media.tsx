@@ -42,7 +42,7 @@ export class MediaPage extends React.Component<MediaPageProps, MediaPageState> {
     let { content, privKey, comments, owner, moniker } = this.state;
     let src = '/blob/content/' + contentId;
     let viewer = mime.startsWith("image") ? <img src={src} />
-      : mime.startsWith("audio") ? <AudioPlayer src={src} type={mime} />
+      : mime.startsWith("audio") ? <WavesurferPlayer src={src} type={mime} />
         : mime.startsWith("video") ? <VideoPlayer /*poster='???'*/ src={'/stream/content/' + contentId} mime={mime} />
           : null; //<p>Invalid mime type</p>;
 

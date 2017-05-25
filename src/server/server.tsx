@@ -275,6 +275,17 @@ publicRouter.get('/content/:id', async (ctx, next) => {
   else ctx.body = await mediaPage(cont);
 });
 
+publicRouter.get('/user/:id/img', async (ctx, next) => {
+  let userName = ctx.params.id;
+  let user = cache.getUserByName(userName);
+  if (!user) ctx.throw(404);
+  if (!user.profile_pic) ctx.body = "No image provided";
+  else {
+    let img = await pg.retrieveBlob(user.profile_pic);
+    ctx.body = img;
+  }
+});
+
 publicRouter.get('/user/:id', async (ctx, next) => {
   let userName = ctx.params.id;
   let user = cache.getUserByName(userName);
@@ -293,6 +304,7 @@ publicRouter.get('/user/:id', async (ctx, next) => {
   let body = htmlPage(ins);
   ctx.body = body;
 });
+
 
 // need to serve this route before static files are enabled??
 publicRouter.get('/', async (ctx, next) => {
@@ -536,7 +548,7 @@ router.post('/rpc', async function (ctx: any) {
       */
       case "changeSettings": {
         let req: Rpc.ChangeSettingsRequest = params;
-        let { userName, homePage, info } = req;
+        let { userName, homePage, info, profile_pic } = req;
         let usr = getUser(userId);
         if (!usr) throw new Error("Internal error getting user details");
         if (userName && userName !== usr.userName) {
@@ -545,7 +557,13 @@ router.post('/rpc', async function (ctx: any) {
             return;
           }
         }
-        usr = { ...usr, userName, home_page: homePage, info };
+        if (profile_pic && profile_pic !== usr.profile_pic) {
+          if (!await pg.checkProfilePic(profile_pic, userId)) {
+            ctx.body = { id, error: { message: "Invalid Profile Pic provided" } };
+            return;
+          }
+        }
+        usr = { ...usr, userName, home_page: homePage, info, profile_pic };
         let updts = await pg.upsertUser(usr);
         cache.update(updts);
         let result: Rpc.ChangeSettingsResponse = { ok: true };
@@ -575,8 +593,8 @@ router.post('/rpc', async function (ctx: any) {
         let user = cache.users.get(userId);
         let email = ctx['userId'].email;
         let homePage = user.home_page;
-        let { info, userName } = user;
-        let result: Rpc.GetUserSettingsResponse = { userName, email, homePage, info };
+        let { info, userName, profile_pic } = user;
+        let result: Rpc.GetUserSettingsResponse = { userName, email, homePage, info, profile_pic };
         ctx.body = { id, result };
         break;
       }

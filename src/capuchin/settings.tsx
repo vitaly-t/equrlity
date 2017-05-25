@@ -26,7 +26,7 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
 
   constructor(props: SettingsPageProps) {
     super(props);
-    let settings: Rpc.UserSettings = { userName: props.appState.moniker, email: props.appState.email, homePage: '', info: '' };
+    let settings: Rpc.UserSettings = { userName: props.appState.moniker, email: props.appState.email, homePage: '', info: '', profile_pic: '' };
     this.state = { settings, prevSettings: settings };
   }
 
@@ -58,10 +58,15 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
     this.setState({ settings });
   }
 
+  changeProfilePic(profile_pic) {
+    let settings = { ...this.state.settings, profile_pic }
+    this.setState({ settings });
+  }
+
   isDirty(): boolean {
-    let { userName, email, homePage, info } = this.state.settings;
+    let { userName, email, homePage, info, profile_pic } = this.state.settings;
     let p = this.state.prevSettings;
-    return userName !== p.userName || email !== p.email || homePage !== p.homePage || info !== p.info;
+    return userName !== p.userName || email !== p.email || homePage !== p.homePage || info !== p.info || profile_pic !== p.profile_pic;
   }
 
   saveSettings = () => {
@@ -77,7 +82,7 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
     let vsp = <div style={{ height: 20 }} />;
     let divStyle = { width: '100%', marginTop: 5, marginLeft: 5, padding: 6 };
     let lhcolStyle = { marginBottom: "5px" };
-    let { userName, email, homePage, info } = this.state.settings;
+    let { userName, email, homePage, info, profile_pic } = this.state.settings;
 
     let userp = userNames.length > 0 ? <div><p>You are currently directly connected with another {userNames.length} user{userNames.length > 1 ? "s" : ""}.</p>
       <p>Your social graph currently extends to {st.reachableUserCount} reachable users.</p>
@@ -127,6 +132,11 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
             <div className="pt-text-muted" style={lhcolStyle} >Further Info: </div>
             <MarkdownEditor value={info} onChange={info => this.changeInfo(info)} allowHtml={true} />
           </div>
+          <div style={divStyle}>
+            <div className="pt-text-muted" style={lhcolStyle} >Profile Picture: </div>
+            <input type="text" style={{ width: '60%' }} name="ProfilePic" id="profilePicId" value={profile_pic} onChange={(e) => this.changeProfilePic(e.target.value)} />
+          </div>
+          {profile_pic && <div className="pt-elevation-2" style={divStyle}><img src={`${Utils.serverUrl}/user/${userName}/img`} /></div>}
           <div style={divStyle}>
             <Button className="pt-intent-primary" disabled={!this.isDirty()} onClick={this.saveSettings} text="Save Settings" />
           </div>

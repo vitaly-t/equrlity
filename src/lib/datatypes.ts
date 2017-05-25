@@ -49,6 +49,7 @@ export interface User {
   readonly updated: updated | null,
   readonly home_page: urlString | null,
   readonly info: text | null,
+  readonly profile_pic: db_hash | null,
   readonly credits: integer | null,
   readonly groups: userGroup[] | null
 };

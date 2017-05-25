@@ -146,6 +146,7 @@ export type UserSettings = {
   email: string;
   homePage: Dbt.urlString;
   info: string;
+  profile_pic?: Dbt.db_hash;
 }
 
 export type GetUserSettingsRequest = {}

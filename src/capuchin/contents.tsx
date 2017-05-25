@@ -16,7 +16,7 @@ import { rowStyle, btnStyle, lhcolStyle } from "../lib/contentView";
 import * as Tags from '../lib/tags';
 import * as Hasher from '../lib/contentHasher';
 import { YesNoBox } from '../lib/dialogs';
-import { uploadRequest, signData } from "../lib/axiosClient";
+import { uploadRequest, signData, sendApiRequest } from "../lib/axiosClient";
 
 import { AppState, postDeserialize } from "./AppState";
 import * as Chrome from './chrome';
@@ -120,6 +120,16 @@ export class ContentsPage extends React.Component<ContentsPageProps, ContentsPag
     if (this.state.cancelUpload) this.setState({ cancelUpload: false });
   }
 
+  setImageAsProfilePic = async (cont: Dbt.Content) => {
+    if (cont.contentType !== 'image') throw new Error("not an image");
+    let response = await sendApiRequest("getUserSettings", {});
+    let rsp: Rpc.Response = response.data;
+    if (rsp.error) throw new Error("Server returned error: " + rsp.error.message);
+    let settings: Rpc.UserSettings = rsp.result;
+    settings = { ...settings, profile_pic: cont.db_hash }
+    Chrome.sendMessage({ eventType: "ChangeSettings", settings });
+  }
+
   createPost() {
     let cont = OxiGen.emptyRec<Dbt.Content>("contents");
     cont = { ...cont, contentType: 'post', mime_ext: 'markdown' }
@@ -184,6 +194,10 @@ export class ContentsPage extends React.Component<ContentsPageProps, ContentsPag
 
         let remove = () => { this.setState({ confirmDeleteContent: p }) };
         btns.push(<Button key="remove" onClick={remove} text="Delete" />);
+
+        if (p.contentType === 'image') {
+          btns.push(<Button key="profilepic" onClick={() => this.setImageAsProfilePic(p)} text="Use as Profile Pic" />);
+        }
 
         let btngrp = (
           <div className="pt-button-group pt-vertical pt-align-left pt-large">

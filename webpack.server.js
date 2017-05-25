@@ -1,8 +1,9 @@
+const fs = require('fs');
 const webpack = require('webpack');
 const path = require('path');
-//const tgtdir = process.env.NODE_ENV === 'development' ? 'dist' : 'dist/bundles_rel';
-const tgtdir = 'dist';
+const tgtdir = process.env.NODE_ENV === 'development' ? 'dist' : 'dist/rel';
 let outPath = path.resolve(__dirname, tgtdir);
+if (!fs.existsSync(outPath)) fs.mkdirSync(outPath);
 
 module.exports = function (env) {
   return {

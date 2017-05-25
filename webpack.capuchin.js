@@ -2,15 +2,15 @@ const fs = require('fs');
 const webpack = require('webpack');
 const path = require('path');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
-const isDev = process.env.NODE_ENV === 'development';
-const tgtdir = isDev ? 'dist/capuchin_dev' : 'dist/capuchin_rel';
 const { capuchinVersion } = require('./dist/lib/utils');
 const { TextEncoder, TextDecoder } = require('text-encoding');
-let outPath = path.resolve(__dirname, tgtdir);
 
-if (!fs.existsSync(outPath)) {
-  fs.mkdirSync(outPath);
-}
+const isDev = process.env.NODE_ENV === 'development';
+const tgtdir = isDev ? 'dist' : 'dist/rel';
+let outDir = path.resolve(__dirname, tgtdir);
+let outPath = outDir + '/capuchin';
+if (!fs.existsSync(outDir)) fs.mkdirSync(outDir);
+if (!fs.existsSync(outPath)) fs.mkdirSync(outPath);
 
 function htmlPage(pg) {
   return `

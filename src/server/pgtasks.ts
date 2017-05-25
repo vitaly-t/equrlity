@@ -66,6 +66,11 @@ export async function checkMonikerUsed(t: ITask<any>, name: string): Promise<boo
   return rslt.length > 0;
 };
 
+export async function checkProfilePic(t: ITask<any>, profile_pic: Dbt.db_hash, userId: Dbt.userId): Promise<boolean> {
+  let rslt: Dbt.Blob[] = await t.any(`select "userId" from blobs where db_hash = '${profile_pic}' `);
+  return rslt.length > 0 && rslt[0].userId === userId;
+};
+
 export async function getAllAnonymousMonikers(t: ITask<any>): Promise<Dbt.userName[]> {
   let rslt = await t.any(`select distinct "userName" from users where "userName" like 'anonymous_%' `);
   return rslt.map(u => u.userName);
@@ -426,6 +431,12 @@ export async function retrieveLargeObject(t: ITask<any>, oid: number): Promise<B
   lo_strm.pipe(outstrm);
   await new Promise(resolve => { outstrm.on('finish', resolve); });
   return rslt;
+}
+
+export async function retrieveBlob(t: ITask<any>, db_hash: Dbt.db_hash): Promise<Buffer> {
+  let blob = await retrieveRecord<Dbt.Blob>(t, "blobs", { db_hash });
+  let blobId = blob.blobId;
+  return await retrieveLargeObject(t, blobId);
 }
 
 export async function registerInvitation(t: ITask<any>, ipAddress: string, linkId: Dbt.linkId): Promise<Dbt.Invitation> {
