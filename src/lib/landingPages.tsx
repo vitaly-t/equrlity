@@ -1,6 +1,7 @@
 import * as React from "react";
 import * as ReactDOM from "react-dom";
 import * as Remarkable from 'remarkable';
+import { Row, Col } from 'react-simple-flex-grid';
 
 import { ContentView } from "../lib/contentView";
 import * as Dbt from "../lib/datatypes";
@@ -49,7 +50,7 @@ const pgStyle = { marginLeft: 20, marginRight: 20 };
 
 const extensionClause = <div>
   <p>The chrome extension is an experimental implementation of an <b>Intention Economy</b>.  This is by way of contrast to an <i>Attention</i> economy, because that particular
-  turn of phrase has become debased and derogatory due to the invasion of the space by innumerable hucksters and shysters (such as eg. Synereo - by whom the writer was unfortunate enough to have
+  turn of phrase has been debased to the point of being derogatory due to it&apos;s use by innumerable hucksters and shysters (such as eg. Synereo - by whom the writer was unfortunate enough to have
   been previously employed).</p>
   <p>The software is currently in alpha testing, and is not yet generally available. If you are curious, and would like to discuss participating in our little experiment,
     you are welcome to contact me, Gary Stephenson via email at <a href="mailto:gary@oxide.net.au?Subject=PseudoQURL" />.

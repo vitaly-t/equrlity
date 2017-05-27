@@ -77,6 +77,7 @@ export type InitializeRequest = {
 
 export type InitializeResponse = {
   ok: boolean;
+  profile_pic: Dbt.db_hash;
   allTags: string[];
   redirectUrl?: UrlString;
 }

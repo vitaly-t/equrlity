@@ -1,6 +1,4 @@
 import * as React from 'react';
-//import Wavesurfer from 'react-wavesurfer';
-import { Wavesurfer } from './reactWavesurfer';
 import { PlayButton, PauseButton, ProgressBar, TimeMarker, MuteToggleButton, VolumeSlider } from 'react-player-controls'
 
 const DEFAULT_LISTEN_INTERVAL = 10000;
@@ -24,67 +22,6 @@ export type WavesurferPlayerProps = {
   controls?: boolean;
   style?: Object;
 };
-
-export type WavesurferPlayerState = { playing: boolean, pos: number, volume: number };
-
-export class WavesurferPlayer extends React.Component<WavesurferPlayerProps, WavesurferPlayerState> {
-  constructor(props) {
-    super(props);
-    this.state = { playing: true, pos: 0, volume: 50 };
-  }
-
-  audioSourceEl: HTMLMediaElement = null;
-
-  componentDidMount() {
-    this.forceUpdate();
-  }
-
-
-  handleTogglePlay() {
-    console.log("toggling play from " + this.state.playing);
-    this.setState({ playing: !this.state.playing });
-  }
-
-  handleReady() {
-    this.setState({
-      pos: 5
-    });
-  }
-
-  handleVolumeChange(e) {
-    this.setState({
-      volume: +e.target.value
-    });
-  }
-
-  render() {
-    const waveOptions = {
-      scrollParent: false,
-      height: 140,
-      progressColor: '#6c718c',
-      waveColor: '#c4c8dc',
-      normalize: true,
-      barWidth: 1,
-    };
-    return (
-      <div style={{ width: '100%' }}>
-        <div style={{ width: '100%' }} >
-          <audio id="audioSource" preload="auto" ref={c => { this.audioSourceEl = c; }} >
-            <source src={this.props.src} type={this.props.type} />
-          </audio>
-          {this.audioSourceEl &&
-            <Wavesurfer
-              audioFile={this.props.src}
-              options={waveOptions}
-              pos={this.state.pos}
-              mediaElt="#audioSource"
-              playing={this.state.playing} />
-          }
-        </div>
-      </div>
-    );
-  }
-}
 
 export type AudioPlayerProps = {
   src: string;

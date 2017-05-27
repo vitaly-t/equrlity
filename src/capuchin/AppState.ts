@@ -13,6 +13,7 @@ export interface AppState {
   homePage: Dbt.urlString;
   moniker: string;
   email: string;
+  profile_pic: Dbt.db_hash;
   authprov: string;
   credits: number;
   jwt: string;
@@ -30,7 +31,7 @@ export interface AppState {
 export function initState(): AppState {
   console.log("initState called");
   return {
-    publicKey: null, privateKey: null, links: new Map<string, Dbt.Content>(),
+    publicKey: null, privateKey: null, links: new Map<string, Dbt.Content>(), profile_pic: '',
     activeUrl: null, moniker: 'unknown', authprov: '', email: '', credits: 0, jwt: '', lastErrorMessage: '', homePage: '',
     investments: [], promotions: [], connectedUsers: [], reachableUserCount: 0, contents: [], allTags: [], currentContent: null, currentLink: null
   };

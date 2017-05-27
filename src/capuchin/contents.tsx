@@ -196,7 +196,8 @@ export class ContentsPage extends React.Component<ContentsPageProps, ContentsPag
         btns.push(<Button key="remove" onClick={remove} text="Delete" />);
 
         if (p.contentType === 'image') {
-          btns.push(<Button key="profilepic" onClick={() => this.setImageAsProfilePic(p)} text="Use as Profile Pic" />);
+          let clss = p.db_hash === st.profile_pic ? 'pt-icon-tick' : '';
+          btns.push(<Button key="profilepic" className={clss} onClick={() => this.setImageAsProfilePic(p)} text="Use as Profile Pic" />);
         }
 
         let btngrp = (

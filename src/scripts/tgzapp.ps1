@@ -1,4 +1,4 @@
-$source = "./dist/capuchin_rel"
+$source = "./dist/rel/capuchin"
 $destination = "./assets/pseudoqurl-plugin.tar.gz"
 
 set-alias sz "D:\dev\tools\7za.exe"  

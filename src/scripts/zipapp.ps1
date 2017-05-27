@@ -1,4 +1,4 @@
-$source = "./dist/capuchin_rel"
+$source = "./dist/rel/capuchin"
 
 $destination = "./assets/pseudoqurl-plugin.zip"
 

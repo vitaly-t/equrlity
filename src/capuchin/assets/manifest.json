@@ -21,13 +21,7 @@
     "https://accounts.google.com/*",
     "https://www.googleapis.com/*"
   ],
-  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAm6d6YAsux6DwZwsrlp3e/V+2EdbSLxidSNNn6w4Crrf1WqwR//BeouiWTjdNpKGkEGJ4KltUkIy9hSUxpkhAKSooNlRwu+nOOOrgGezorZ/kL0rv547euZ0g8UpdcnN4Wpf1Fv8TbzODWdZ5kU1wO5sNPZX4uhSjcQSU/vm/6QYJw4m0r4VMEO31mYzx7nXyRB8GLqqwaLw9e4z+RlqKC+42gRlE34NWjUdxOSAa3QIAc/yz652jwhdchowMqmPazIwgUPO+rkkXudHPh99MClER/51O9saFWI+ZKjhyQPefM2iy5vT2dokpuwdJVnr9bqVh2jaerE9Y8Nwi/NK3UQIDAQAB",
-  "oauth2": {
-    "client_id": "23837795632-i1o9fs39uh43132jb10gqcvjl4h006cd.apps.googleusercontent.com",
-    "scopes": [
-      "https://www.googleapis.com/auth/plus.login"
-    ]
-  },
+  "auth_entries": "",
   "background": {
     "persistent": true,
     "scripts": [
@@ -35,7 +29,7 @@
     ]
   },
   "icons": {
-    "128": "images/pseudoq2.png",
-    "32": "images/pseudoq2.png"
+    "128": "images/__ICON_128__",
+    "32": "images/__ICON_32__"
   }
 }

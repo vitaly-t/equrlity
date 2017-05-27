@@ -121,7 +121,7 @@ export class PopupPanel extends React.Component<PopupPanelProps, PopupPanelState
     if (st.lastErrorMessage) toast.show({ message: "Error: " + st.lastErrorMessage });
     return <div>
       <Row style={rowStyle} gutter={gutter} justify="space-between">
-        <Col span={3}><h2><b>PseudoQURL</b></h2></Col>
+        <Col span={3}><h2 style={{ color: "#48AFF0" }}><b><i>PseudoQURL</i></b></h2></Col>
         <Col span={9}>
           <Row style={rowStyle} gutter={gutter} justify="end">{btns}</Row>
         </Col>

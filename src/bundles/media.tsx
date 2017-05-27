@@ -6,7 +6,8 @@ import * as Dbt from '../lib/datatypes';
 import * as Rpc from '../lib/rpc';
 import * as Utils from '../lib/utils';
 import { VideoPlayer } from '../lib/mediaPlayer';
-import { WavesurferPlayer, AudioPlayer } from '../lib/audioPlayer';
+//import { AudioPlayer } from '../lib/audioPlayer';
+import { PeaksPlayer } from '../lib/reactPeaks';
 import * as Comms from '../lib/axiosClient';
 import { CommentsPanel } from '../lib/comments';
 import { ContentView } from '../lib/contentView';
@@ -40,10 +41,11 @@ export class MediaPage extends React.Component<MediaPageProps, MediaPageState> {
   render() {
     let { contentId, mime } = this.props;
     let { content, privKey, comments, owner, moniker } = this.state;
-    let src = '/blob/content/' + contentId;
-    let viewer = mime.startsWith("image") ? <img src={src} />
-      : mime.startsWith("audio") ? <WavesurferPlayer src={src} type={mime} />
-        : mime.startsWith("video") ? <VideoPlayer /*poster='???'*/ src={'/stream/content/' + contentId} mime={mime} />
+    let blobsrc = '/blob/content/' + contentId;
+    let strmsrc = '/stream/content/' + contentId;
+    let viewer = mime.startsWith("image") ? <img src={blobsrc} />
+      : mime.startsWith("audio") ? <PeaksPlayer src={blobsrc} type={mime} />
+        : mime.startsWith("video") ? <VideoPlayer /*poster='???'*/ src={strmsrc} mime={mime} />
           : null; //<p>Invalid mime type</p>;
 
     let gutter = 10;

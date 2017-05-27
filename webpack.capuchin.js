@@ -41,6 +41,18 @@ for (const pg of ['settings', 'contents', 'links']) {
   fs.writeFileSync(outPath + '/' + pg + '.html', htmlPage(pg));
 }
 
+let authEntries = isDev ? '' :
+  `"key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAm6d6YAsux6DwZwsrlp3e/V+2EdbSLxidSNNn6w4Crrf1WqwR//BeouiWTjdNpKGkEGJ4KltUkIy9hSUxpkhAKSooNlRwu+nOOOrgGezorZ/kL0rv547euZ0g8UpdcnN4Wpf1Fv8TbzODWdZ5kU1wO5sNPZX4uhSjcQSU/vm/6QYJw4m0r4VMEO31mYzx7nXyRB8GLqqwaLw9e4z+RlqKC+42gRlE34NWjUdxOSAa3QIAc/yz652jwhdchowMqmPazIwgUPO+rkkXudHPh99MClER/51O9saFWI+ZKjhyQPefM2iy5vT2dokpuwdJVnr9bqVh2jaerE9Y8Nwi/NK3UQIDAQAB",
+  "oauth2": {
+    "client_id": "23837795632-i1o9fs39uh43132jb10gqcvjl4h006cd.apps.googleusercontent.com",
+    "scopes": [
+      "https://www.googleapis.com/auth/plus.login"
+    ]
+  },`;
+
+let icon32 = isDev ? "pseudoq2.png" : "pseudoq_rel_32.png";
+let icon128 = isDev ? "pseudoq2.png" : "pseudoq_rel_128.png";
+
 module.exports = function (env) {
   return {
     entry,
@@ -81,7 +93,9 @@ module.exports = function (env) {
               console.log("transforming: " + path);
               var str = (new TextDecoder('utf-8')).decode(content);
               str = str.replace("__CAPUCHIN_VERSION__", capuchinVersion());
-              //if (!isDev) { str = str.replace(/\"key\".+$/gm, ""); }
+              str = str.replace('"auth_entries": "",', authEntries);
+              str = str.replace('__ICON_32__', icon32);
+              str = str.replace('__ICON_128__', icon128);
               return (new TextEncoder()).encode(str);
             }
             return content;

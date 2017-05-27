@@ -337,19 +337,23 @@ publicRouter.post('/auth', async (ctx, next) => {
 
   let authId = userInfo.id;
   let email = userInfo.email;
-  let authRsp = await axios.create({ responseType: "json" }).get(Utils.chromeAuthUrl + token);
-  if (authRsp.status === 200 && authRsp.data.user_id === authId) {
-    let user = await pg.getUserByAuthId(authId, "chrome");
-    if (!user) {
-      user = await pg.createUser(email);
-      await pg.createAuth(authId, user.userId, "chrome");
+  if (!Utils.isDev()) {
+    let authRsp = await axios.create({ responseType: "json" }).get(Utils.chromeAuthUrl + token);
+    if (authRsp.status !== 200 || authRsp.data.user_id !== authId) {
+      ctx.throw(401, "Authentication failed!");
+      return;
     }
-    let id = user.userId;
-    token = jwt.sign({ id, publicKey, email }, jwt_secret);
-    ctx.body = { jwt: token };
   }
-  else ctx.throw(401, "Authentication failed!");
-});
+  let user = await pg.getUserByAuthId(authId, "chrome");
+  if (!user) {
+    user = await pg.createUser(email);
+    await pg.createAuth(authId, user.userId, "chrome");
+  }
+  let id = user.userId;
+  token = jwt.sign({ id, publicKey, email }, jwt_secret);
+  ctx.body = { jwt: token };
+}
+);
 
 app.use(publicRouter.middleware());
 
@@ -490,7 +494,8 @@ router.post('/rpc', async function (ctx: any) {
         if (!usr) throw new Error("Internal error getting user details");
         let redirectUrl = ctx['redirectUrl'];
         let allTags = await pg.loadTags();
-        let result: Rpc.InitializeResponse = { ok: true, allTags, redirectUrl };
+        let profile_pic = usr.profile_pic
+        let result: Rpc.InitializeResponse = { ok: true, allTags, redirectUrl, profile_pic };
         ctx.body = { id, result };
         break;
       }
@@ -562,7 +567,7 @@ router.post('/rpc', async function (ctx: any) {
             ctx.body = { id, error: { message: "Invalid Profile Pic provided" } };
             return;
           }
-        }
+        } else profile_pic = '';
         usr = { ...usr, userName, home_page: homePage, info, profile_pic };
         let updts = await pg.upsertUser(usr);
         cache.update(updts);
