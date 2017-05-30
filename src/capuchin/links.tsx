@@ -19,21 +19,24 @@ import { AppState, postDeserialize } from "./AppState";
 import * as Chrome from './chrome';
 
 interface LinksPageProps { appState: AppState };
-interface LinksPageState { transferAmount: number, transferTo: string, editingItem: Rpc.UserLinkItem, filters: string[] };
+interface LinksPageState { transferAmount: number, transferTo: string, editingItem: Rpc.UserLinkItem, filters: string[], feedFilters: string[], confirmDismissAll: boolean };
 
 export class LinksPage extends React.Component<LinksPageProps, LinksPageState> {
 
   constructor(props: LinksPageProps) {
     super(props);
-    this.state = { transferAmount: 0, transferTo: '', editingItem: null, filters: [] };
+    this.state = { transferAmount: 0, transferTo: '', editingItem: null, filters: [], feedFilters: [], confirmDismissAll: false };
   }
 
   changeTransferAmount(value: string) { this.setState({ transferAmount: parseInt(value) }); }
   changeTransferTo(value: string) { this.setState({ transferTo: value }); }
 
   addFilter(f: string) {
-    let filters = [...this.state.filters, f];
-    this.setState({ filters });
+    let filters = this.state.filters;
+    if (filters.indexOf(f) < 0) {
+      filters = [...filters, f];
+      this.setState({ filters });
+    }
   }
 
   removeFilter(f: string) {
@@ -43,10 +46,26 @@ export class LinksPage extends React.Component<LinksPageProps, LinksPageState> {
     this.setState({ filters });
   }
 
+  addFeedFilter(f: string) {
+    let feedFilters = this.state.feedFilters;
+    if (feedFilters.indexOf(f) < 0) {
+      feedFilters = [...feedFilters, f];
+      this.setState({ feedFilters });
+    }
+  }
+
+  removeFeedFilter(f: string) {
+    let feedFilters = [...this.state.feedFilters];
+    let i = feedFilters.indexOf(f);
+    if (i >= 0) feedFilters.splice(i, 1);
+    this.setState({ feedFilters });
+  }
+
   render() {
     let st = this.props.appState;
     let invs = st.investments;
-    let invdiv = <p>You have no current investments</p>
+    let invdiv = <p>You have no current squawks.</p>
+    let btnStyle = { marginRight: "5px" };
     if (this.state.editingItem) {
       let onClose = () => this.setState({ editingItem: null });
       invdiv = <LinkEditor info={this.state.editingItem} allTags={this.props.appState.allTags} onClose={onClose} />
@@ -62,7 +81,7 @@ export class LinksPage extends React.Component<LinksPageProps, LinksPageState> {
         let redeemText = l.amount > 0 ? "Redeem" : "Delete";
         let btns = [<Button onClick={redeem} text={redeemText} />];
         let edit = () => { this.setState({ editingItem: item }) };
-        btns.push(<Button onClick={edit} text="Edit" />);
+        btns.push(<Button onClick={edit} text="Details" />);
 
         let btngrp = (
           <div className="pt-button-group pt-vertical pt-align-left pt-large">
@@ -110,19 +129,43 @@ export class LinksPage extends React.Component<LinksPageProps, LinksPageState> {
       );
     }
 
-    let links = st.promotions;
-    let linkdiv = <p>There are no new promoted links for you.</p>
+    let links = st.feed;
+    let linkdiv = <p>There are no current squawks for you.</p>
+    let filteredLinks: Rpc.FeedItem[] = []
     if (links.length > 0) {
-      let linkrows = links.map(url => {
-        let dismiss = () => { Chrome.sendMessage({ eventType: "DismissPromotion", url }); };
+      let tagfilter = (tags: string[], source: string): boolean => {
+        if (!tags) tags = [];
+        let fltrs = this.state.feedFilters;
+        for (let f of fltrs) if (tags.indexOf(f) < 0 && f !== source) return false;
+        return true;
+      }
+      filteredLinks = links.filter(f => tagfilter(f.tags, f.source));
+      let linkrows = filteredLinks.map(f => {
+        let { url, comment, source } = f
+        let dismiss = () => { Chrome.sendMessage({ eventType: "DismissSquawks", urls: [url] }); };
+        let save = () => { Chrome.sendMessage({ eventType: "DismissSquawks", urls: [url], save: true }); };
         let onclick = () => { chrome.tabs.create({ active: true, url }); };
-        let [tgt, desc] = url.split('#');
-        if (desc) desc = desc.replace('_', ' ');
+        let tags = <Tags.TagGroup tags={f.tags} onClick={(s) => this.addFeedFilter(s)} />;
+
+        let btngrp = (
+          <div className="pt-button-group pt-vertical pt-align-left pt-large">
+            <Button onClick={save} text="Bookmark" />
+            <Button onClick={dismiss} text="Dismiss" />
+          </div>
+        );
+        let pop = (<Popover content={btngrp} popoverClassName="pt-minimal" interactionKind={PopoverInteractionKind.HOVER} position={Position.BOTTOM} >
+          <Button iconName="pt-icon-cog" text="" />
+        </Popover>
+        );
+
+
         return (
           <tr key={url} >
-            <td><Button onClick={dismiss} text="Dismiss" /></td>
-            <td><a href="" onClick={onclick} >{tgt}</a></td>
-            <td>{desc}</td>
+            <td><a href="" onClick={onclick} >{url}</a></td>
+            <td><Tags.TagGroup tags={[source]} onClick={(s) => this.addFeedFilter(s)} /></td>
+            <td>{comment}</td>
+            <td>{tags}</td>
+            <td>{pop}</td>
           </tr>
         );
       });
@@ -130,9 +173,11 @@ export class LinksPage extends React.Component<LinksPageProps, LinksPageState> {
         <table className="pt-table pt-striped pt-bordered">
           <thead>
             <tr>
-              <th></th>
               <th>Link</th>
-              <th>Description</th>
+              <th>Squawker</th>
+              <th>Comment</th>
+              <th>Tags</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -142,13 +187,40 @@ export class LinksPage extends React.Component<LinksPageProps, LinksPageState> {
       );
     }
 
-    let vsp = <div style={{ height: 20 }} />;
+    let dismissAll = () => {
+      this.setState({ confirmDismissAll: true, feedFilters: [] });
+    }
+    let saveAll = () => {
+      let urls = filteredLinks.map(r => r.url)
+      Chrome.sendMessage({ eventType: "DismissSquawks", urls, save: true });
+    }
+    let vsp = <div style={{ height: "20px" }} />;
+    let feedFltrDiv;
+    if (this.state.confirmDismissAll) {
+      let msg = `Dismiss all ${filteredLinks.length} squawks?`;
+      let onClose = () => this.setState({ confirmDismissAll: false });
+      let onYes = () => {
+        let urls = filteredLinks.map(r => r.url)
+        Chrome.sendMessage({ eventType: "DismissSquawks", urls });
+      };
+      feedFltrDiv = <YesNoBox message={msg} onYes={onYes} onClose={onClose} />
+    }
+    else {
+      let cols = [];
+      cols.push(<Col key="saveAll" ><Button disabled={filteredLinks.length === 0} className="pt-intent-success" style={btnStyle} onClick={saveAll} text="Bookmark All" /></Col>)
+      cols.push(<Col key="dismissAll" ><Button disabled={filteredLinks.length === 0} className="pt-intent-danger" style={btnStyle} onClick={dismissAll} text="Dismiss All" /></Col>)
+      if (this.state.feedFilters.length > 0) {
+        let feedFltrs = <Tags.TagGroup tags={this.state.feedFilters} onRemove={(s) => this.removeFeedFilter(s)} />;
+        cols.push(<Col key="feedFilters" ><Row>Showing :  {feedFltrs}</Row></Col>);
+      }
+      feedFltrDiv = <Row>{cols}</Row>;
+    }
+
     let fltrDiv = null;
     if (this.state.filters.length > 0) {
       let fltrs = <Tags.TagGroup tags={this.state.filters} onRemove={(s) => this.removeFilter(s)} />;
       fltrDiv = <div>{vsp}<Row>Showing :  {fltrs}</Row></div>;
     }
-
 
     let divStyle = { width: '100%', marginTop: 5, marginLeft: 5, padding: 6 };
     let lhcolStyle = { width: '20%' };
@@ -165,13 +237,13 @@ export class LinksPage extends React.Component<LinksPageProps, LinksPageState> {
     let transferDiv = (
       <div>
         {vsp}
-        <p>If you wish, you can transfer credits to another user.</p>
+        <p>If you wish, you can transfer PseudoQoins to another user.</p>
         <div style={divStyle} >
           <div style={{ display: 'inline' }}>Amount to Transfer: </div>
-          <input type="number" style={{ display: 'inline', height: 24, marginLeft: 20, marginTop: 6, width: '100' }}
+          <input type="number" style={{ display: 'inline', height: 24, marginLeft: 20, marginTop: 6, width: '100px' }}
             value={this.state.transferAmount} onChange={e => this.changeTransferAmount(e.target.value)} />
           <div style={{ display: 'inline', marginLeft: 20 }}>Transfer To: </div>
-          <input type="text" style={{ display: 'inline', height: 24, marginLeft: 20, marginTop: 6, width: '200' }}
+          <input type="text" style={{ display: 'inline', height: 24, marginLeft: 20, marginTop: 6, width: '200px' }}
             value={this.state.transferTo} onChange={e => this.changeTransferTo(e.target.value)} />
           <Button key='transfer' className="pt-intent-primary" style={{ display: 'inline', marginLeft: 20 }} onClick={() => transfer()} text="Transfer" />
         </div>
@@ -179,17 +251,19 @@ export class LinksPage extends React.Component<LinksPageProps, LinksPageState> {
 
     return (
       <div>
-        <h6>Your Current Wallet Balance is : {st.credits}.</h6>
-        {transferDiv}
+        <h4>Squawks Overheard: </h4>
         {vsp}
-        <h4>Your Investments : </h4>
+        {feedFltrDiv}
+        {vsp}
+        {linkdiv}
+        {vsp}
+        <h4>Squawks Emitted: </h4>
         {fltrDiv}
         {vsp}
         {invdiv}
         {vsp}
-        <h4>Promoted Links received : </h4>
-        {vsp}
-        {linkdiv}
+        <h6>Your Current Wallet Balance is : {st.credits} PseudoQoins.</h6>
+        {transferDiv}
         {vsp}
       </div>);
   }

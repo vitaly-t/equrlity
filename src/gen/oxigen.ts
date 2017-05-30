@@ -12,7 +12,8 @@ export interface IScalarType {
   max?: number,
   min?: number,
   maxLen?: number,
-  enum?: string[]
+  enum?: string[],
+  multiValued?: boolean
 }
 
 export interface IColumn {
@@ -66,9 +67,15 @@ export function loadModel(model): IDbSchema {
 
   let als = model.typeAliases;
   Object.keys(als).forEach((k: string) => {
-    let t = dataTypes.get(als[k]);
+    let tv: string = als[k];
+    let multiValued = false
+    if (tv.endsWith("[]")) {
+      multiValued = true;
+      tv = tv.replace("[]", "");
+    }
+    let t = dataTypes.get(tv);
     if (!t) throw new Error("Missing type for alias: " + k);
-    let v: IScalarType = { ...t, name: k };
+    let v: IScalarType = { ...t, name: k, multiValued };
     dataTypes.set(k, v);
   });
 
@@ -122,7 +129,7 @@ export function loadModel(model): IDbSchema {
   return { tables, dataTypes };
 }
 
-function cnm(c: string): string {   // postgres column naming 
+export function cnm(c: string): string {   // postgres column naming 
   return (c.toLowerCase() === c) ? c : '"' + c + '"';
 }
 
@@ -138,7 +145,7 @@ function filterCols(tbl: ITable, data: Object = null): IColumn[] {
 
 function extColRef(c: IColumn): string {
   let ext = '';
-  if (c.multiValued) {
+  if (c.multiValued || c.type.multiValued) {
     let typ = c.type.sqlType;
     if (typ.startsWith('varchar')) typ = 'text';
     ext = '::' + typ + '[]';
@@ -229,19 +236,47 @@ export function genTypescriptType(tbl: ITable): string {
   return "export interface " + tbl.rowType.name + " {" + lns.join() + "\n};";
 }
 
+export function unqName(tbl: ITable, nms: string[]): string {
+  return `${tbl.name}_${nms.join("_")}_key`;
+}
+
+export function genAddUniqueStatement(tbl: ITable, nms: string[]): string {
+  return `ALTER TABLE public.${tbl.name} ADD CONSTRAINT ${cnm(unqName(tbl, nms))} UNIQUE (${nms.map(cnm).join()})`;
+}
+
+export function fkName(tbl: ITable, fk: IForeignKey) {
+  return fk.name || `${tbl.name}_${fk.columns.join("_")}_fkey`;
+}
+
+export function foreignKeyClause(tbl: ITable, fk: IForeignKey) {
+  return "CONSTRAINT " + cnm(fkName(tbl, fk)) + " FOREIGN KEY (" + fk.columns.map(cnm).join(",") + ")"
+    + "\n    REFERENCES " + fk.ref
+    + "\n    ON UPDATE " + (fk.onUpdate || "NO ACTION")
+    + "\n    ON DELETE " + (fk.onDelete || "NO ACTION")
+}
+
+export function genAddForeignKeyStatement(tbl: ITable, fk: IForeignKey) {
+  return `ALTER TABLE public.${tbl.name} ADD ${foreignKeyClause(tbl, fk)}`;
+}
+
+export function pkName(tbl: ITable) {
+  return tbl.name + "_pkey";
+}
+
+export function genAddPrimaryKeyStatement(tbl: ITable) {
+  return `ALTER TABLE public.${tbl.name} ADD CONSTRAINT ${pkName(tbl)} PRIMARY KEY (${tbl.primaryKey.map(cnm).join()})`;
+}
+
 export function genCreateTableStatement(tbl: ITable): string {
   let cols = tbl.rowType.heading.map(c => {
     let dflt = c.default ? c.default : c.type.sqlDefault ? c.type.sqlDefault : null;
-    return colnm(c) + " " + (c.name === tbl.autoIncrement ? 'SERIAL' : c.type.sqlType + (c.multiValued ? '[]' : ''))
+    return colnm(c) + " " + (c.name === tbl.autoIncrement ? 'SERIAL' : c.type.sqlType + ((c.type.multiValued || c.multiValued) ? '[]' : ''))
       + (c.notNull ? ' NOT NULL' : '') + (dflt ? ' DEFAULT ' + dflt : '');
   });
   let stmt = "CREATE TABLE " + tbl.name + " (\n  " + cols.join(",\n  ");
   stmt += ",\n  PRIMARY KEY (" + tbl.primaryKey.map(cnm).join(",") + ")";
   tbl.foreignKeys.forEach(fk => {
-    stmt += ",\n " + (fk.name ? "CONSTRAINT" + fk.name : "") + " FOREIGN KEY (" + fk.columns.map(cnm).join(",") + ")"
-      + "\n    REFERENCES " + fk.ref
-      + "\n    ON UPDATE " + (fk.onUpdate || "NO ACTION")
-      + "\n    ON DELETE " + (fk.onDelete || "NO ACTION")
+    stmt += ",\n " + foreignKeyClause(tbl, fk);
   });
   tbl.uniques.forEach(unq => {
     stmt += ",\n UNIQUE (" + unq.map(cnm).join(",") + ")"

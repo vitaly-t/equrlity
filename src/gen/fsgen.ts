@@ -9,7 +9,7 @@ export function writeTypescriptTypesToFile(fname: string): void {
   db.dataTypes.forEach(t => {
     let typ = t.enum ? t.enum.map(s => '"' + s + '"').join(" | ")
       : (t.tsType || "string")
-    if (t.name !== typ) strm.write("\nexport type " + t.name + " = " + typ + ";");
+    if (t.name !== typ) strm.write("\nexport type " + t.name + " = " + typ + (t.multiValued ? "[]" : "") + ";");
   })
   strm.write("\n\n");
 

@@ -137,8 +137,11 @@ export class ContentsPage extends React.Component<ContentsPageProps, ContentsPag
   }
 
   addFilter(f: string) {
-    let filters = [...this.state.filters, f];
-    this.setState({ filters });
+    let filters = this.state.filters;
+    if (filters.indexOf(f) < 0) {
+      filters = [...filters, f];
+      this.setState({ filters });
+    }
   }
 
   removeFilter(f: string) {
@@ -331,7 +334,7 @@ class PromoteContent extends React.Component<PromoteContentProps, PromoteContent
           </div>
           <div style={rowStyle} >
             <div style={lhcolStyle}>Tags:</div>
-            <Tags.TagGroupEditor tags={this.state.tags} allTags={this.props.allTags} onChange={(tags) => this.changeTags(tags)} />
+            <Tags.TagGroupEditor tags={this.state.tags} creatable={true} allTags={this.props.allTags} onChange={(tags) => this.changeTags(tags)} />
           </div>
           <div style={rowStyle} >
             <div style={{ display: 'inline' }}>Investment amount:</div>

@@ -83,7 +83,7 @@ export class BookmarkPanel extends React.Component<BookmarkPanelProps, BookmarkP
         </Row>
         <Row style={rowStyle} gutter={gutter} align="top">
           <Col span={lspan}> <span className="pt-text-muted" >Tags:</span></Col>
-          <Col span={rspan}><TagGroupEditor tags={this.state.tags} allTags={this.props.appState.allTags} onChange={(tags) => this.changeTags(tags)} /></Col>
+          <Col span={rspan}><TagGroupEditor tags={this.state.tags} creatable={true} allTags={this.props.appState.allTags} onChange={(tags) => this.changeTags(tags)} /></Col>
         </Row>
         <Row style={rowStyle} gutter={gutter} justify="end" align="top">
           {btns}
@@ -112,7 +112,7 @@ export class PopupPanel extends React.Component<PopupPanelProps, PopupPanelState
     let rowStyle = { marginBottom: 10 };
     let btns = [
       <Button key="Settings" style={btnStyle} className="pt-intent-success" onClick={settingsAction} text="Settings" />,
-      <Button key="Investments" style={btnStyle} className="pt-intent-success" onClick={linksAction} text="Investments" />,
+      <Button key="Investments" style={btnStyle} className="pt-intent-success" onClick={linksAction} text="Squawks" />,
       //<Button key="People" style={btnStyle} className="pt-intent-success" onClick={usersAction} text="People" />,
       <Button key="Contents" style={btnStyle} className="pt-intent-success" onClick={contentsAction} text="Contents" />,
     ]

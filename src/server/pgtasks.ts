@@ -481,3 +481,40 @@ export async function handleBookmarkLink(t: ITask<any>, userId: Dbt.userId, req:
   return content;
 }
 
+export async function saveUserFollowings(t: ITask<any>, userId: Dbt.userId, followings: Rpc.UserFollowing[]): Promise<void> {
+  await t.any(`delete from user_follows where "userId" = '${userId}' `);
+  // dedupe for safety ...
+  let seen: Dbt.userName[] = []
+  for (const uf of followings) {
+    if (seen.indexOf(uf.userName) >= 0) continue;
+    seen.push(uf.userName);
+    let usr = await findUserByName(t, uf.userName);
+    let following = usr.userId;
+    if (following === userId) continue;  // narcissists be damned!!!
+    let { subscriptions, blacklist } = uf;
+    let f = OxiGen.emptyRec<Dbt.UserFollow>("user_follows");
+    f = { ...f, userId, following, subscriptions, blacklist };
+    await insertRecord<Dbt.UserFollow>(t, "user_follows", f);
+  }
+}
+
+export async function dismissSquawks(t: ITask<any>, userId: Dbt.userId, urls: Dbt.urlString[], save: boolean): Promise<void> {
+  let ourls = urls.map(u => parse(u));
+  let linkIds = ourls.map(Utils.getLinkIdFromUrl);
+  let s = linkIds.map(l => "'" + l + "'").join();
+  if (save) {
+    let links: Dbt.Link[] = await t.any(`select * from links where "linkId" in (${s})`)
+    for (var i = 0; i < urls.length; ++i) {
+      let url = urls[i];
+      let link = links[i];
+      let cont = OxiGen.emptyRec<Dbt.Content>("contents");
+      let { tags, title, comment } = link;
+      cont = { ...cont, title, tags, url, userId, content: comment, contentType: "bookmark" };
+      await insertRecord(t, "contents", cont);
+    }
+  }
+  let now = new Date();
+  await t.any(`update feeds set dismissed = $1 where "userId" = '${userId}' and "linkId" in (${s})`, [now]);
+}
+
+

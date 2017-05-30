@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { Tag } from "@blueprintjs/core";
-import { Creatable } from 'react-select';
+import * as Select from 'react-select';
 import { Row } from 'react-simple-flex-grid';
 
 export type TagSelectOption = { value: string, label: string }
@@ -9,7 +9,7 @@ export function mergeTags(tags: string[], _allTags: TagSelectOption[]): TagSelec
   //  assumes _allTags is sorted
   let allTags = _allTags;
   let fnd = false;
-  tags.forEach(c => {
+  tags && tags.forEach(c => {
     if (c > allTags[allTags.length - 1].label) {
       if (!fnd) {
         fnd = true;
@@ -33,28 +33,30 @@ export function mergeTags(tags: string[], _allTags: TagSelectOption[]): TagSelec
   return allTags;
 }
 
-interface QtagProps { label: string, style?: any, onClick?: (label: string) => void, onRemove?: (label: string) => void }
+interface QtagProps { label: string, tagClass?: string, style?: any, onClick?: (label: string) => void, onRemove?: (label: string) => void }
 class Qtag extends React.Component<QtagProps, {}> {
   render() {
-    let { label, onClick, onRemove, style } = this.props;
+    let { label, onClick, onRemove, style, tagClass } = this.props;
     if (!style) style = { marginLeft: '3px' };  //TODO merge styles stuff
     let lblStyle = onClick || onRemove ? { cursor: "pointer" } : {};
-    let lbl = <div className="pt-text-muted" style={lblStyle}>{label}</div>
-    if (onRemove) return <Tag className="pt-minimal pt-round" style={style} onClick={() => onRemove(label)} onRemove={() => onRemove(label)} > {lbl}</Tag>;
-    return <Tag className="pt-minimal pt-round" style={style} onClick={() => onClick && onClick(label)} >{lbl}</Tag>;
+    let lblClss = tagClass ? "pt-text" : "pt-text-muted";
+    let lbl = <div className={lblClss} style={lblStyle}>{label}</div>
+    let clss = tagClass || "pt-minimal pt-round";
+    if (onRemove) return <Tag className={clss} style={style} onClick={() => onRemove(label)} onRemove={() => onRemove(label)} > {lbl}</Tag>;
+    return <Tag className={clss} style={style} onClick={() => onClick && onClick(label)} >{lbl}</Tag>;
   }
 }
 
-interface TagGroupProps { tags: string[], onClick?: (label: string) => void, onRemove?: (label: string) => void }
+interface TagGroupProps { tags: string[], tagClass?: string, onClick?: (label: string) => void, onRemove?: (label: string) => void }
 export class TagGroup extends React.Component<TagGroupProps, {}> {
   render() {
     if (!this.props.tags) return null;
-    let tags = this.props.tags.map(label => <Qtag key={'tag:' + label} label={label} onRemove={this.props.onRemove} onClick={this.props.onClick} />);
+    let tags = this.props.tags.map(label => <Qtag key={'tag:' + label} tagClass={this.props.tagClass} label={label} onRemove={this.props.onRemove} onClick={this.props.onClick} />);
     return <div>{tags}</div>
   }
 };
 
-interface TagGroupEditorProps { tags: string[], allTags: TagSelectOption[], onChange: (vals: string[]) => void }
+export interface TagGroupEditorProps { tags: string[], tagClass?: string, allTags: TagSelectOption[], creatable: boolean, onChange: (vals: string[]) => void }
 export class TagGroupEditor extends React.Component<TagGroupEditorProps, {}> {
 
   removeTag(tag: string) {
@@ -68,14 +70,18 @@ export class TagGroupEditor extends React.Component<TagGroupEditorProps, {}> {
   }
 
   addTag(tag: TagSelectOption) {
-    let tags = this.props.tags;
-    tags.push(tag.label);
-    this.props.onChange(tags);
+    let tags = this.props.tags || [];
+    if (tags.indexOf(tag.label) < 0) {
+      tags = [...tags, tag.label];
+      this.props.onChange(tags);
+    }
   }
 
   render() {
-    let tags = this.props.tags.map(label => <Qtag key={'tag:' + label} label={label} style={{ marginLeft: '3px', height: '26px' }} onRemove={() => this.removeTag(label)} />);
-    tags.push(<Creatable key="__new__" style={{ display: 'inline-block', width: '100px', height: '26px', marginLeft: '3px' }} options={this.props.allTags} onChange={(v) => this.addTag(v)} />);
+    let a = this.props.tags || [];
+    let tags = a.map(label => <Qtag key={'tag:' + label} tagClass={this.props.tagClass} label={label} style={{ marginLeft: '3px', height: '26px' }} onRemove={() => this.removeTag(label)} />);
+    if (this.props.creatable) tags.push(<Select.Creatable key="__new__" style={{ display: 'inline-block', width: '100px', height: '26px', marginLeft: '3px' }} options={this.props.allTags} onChange={(v) => this.addTag(v)} />);
+    else tags.push(<Select key="__sel__" style={{ display: 'inline-block', width: '100px', height: '26px', marginLeft: '3px' }} options={this.props.allTags} onChange={(v) => this.addTag(v)} />);
     return <Row>{tags}</Row>;
   }
 };

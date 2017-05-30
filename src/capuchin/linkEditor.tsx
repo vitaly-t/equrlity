@@ -96,7 +96,7 @@ export class LinkEditor extends React.Component<LinkEditorProps, LinkEditorState
           <Row style={rowStyle} gutter={gutter}>
             <Col span={2}>Tags:</Col>
             <Col span={10}>
-              <Tags.TagGroupEditor tags={this.state.tags} allTags={this.props.allTags} onChange={tags => this.changeTags(tags)} />
+              <Tags.TagGroupEditor tags={this.state.tags} creatable={true} allTags={this.props.allTags} onChange={tags => this.changeTags(tags)} />
             </Col>
           </Row>
           <Row style={rowStyle} gutter={gutter}>

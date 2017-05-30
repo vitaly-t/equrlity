@@ -28,6 +28,15 @@ export async function sendInitialize(st: AppState): Promise<AxiosResponse> {
   return await sendApiRequest("initialize", { publicKey: st.publicKey });
 }
 
+export async function sendUpdateFeed(st: AppState): Promise<AxiosResponse> {
+  return await sendApiRequest("updateFeed", {});
+}
+
+export async function sendDismissSquawks(st: AppState, urls: Dbt.urlString[], save?: boolean): Promise<AxiosResponse> {
+  save = save || false;
+  return await sendApiRequest("dismissSquawks", { urls, save });
+}
+
 export async function sendLoadLink(st: AppState, url: string): Promise<AxiosResponse> {
   return await sendApiRequest("loadLink", { url });
 }

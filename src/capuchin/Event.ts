@@ -97,13 +97,23 @@ export interface SaveTags {
   tags: string[];
 }
 
+export interface DismissSquawks {
+  eventType: "DismissSquawks";
+  urls: Dbt.urlString[];
+  save?: boolean;
+}
+
+export interface UpdateFeed {
+  eventType: "UpdateFeed";
+}
+
 export interface Thunk {
   eventType: "Thunk";
   fn: (st: AppState) => AppState;
 }
 
 export type Message = PromoteContent | BookmarkLink | Initialize | Load | ActivateTab | Render | ChangeSettings
-  | LaunchPage | SaveContent | RemoveContent | AddContents
+  | LaunchPage | SaveContent | RemoveContent | AddContents | DismissSquawks | UpdateFeed
   | RedeemLink | GetUserLinks | DismissPromotion | TransferCredits
   | SaveTags | SaveLink | Thunk;
 
@@ -170,9 +180,37 @@ export namespace AsyncHandlers {
       st = extractHeadersToState(st, rsp);
       let rslt: Rpc.InitializeResponse = extractResult(rsp);
       let allTags = loadTags(rslt.allTags);
-      let profile_pic = rslt.profile_pic
+      let { profile_pic, feed } = rslt
       if (rslt.redirectUrl) chrome.tabs.update(activeTab.id, { url: rslt.redirectUrl });
-      return { ...st, allTags, activeTab, profile_pic }
+      chrome.browserAction.setBadgeText({ text: feed.length.toString() });
+      return { ...st, allTags, activeTab, profile_pic, feed }
+    }
+    return thunk;
+  }
+
+  export async function updateFeed(state: AppState): Promise<(st: AppState) => AppState> {
+    const rsp = await Comms.sendUpdateFeed(state)
+    let thunk = (st: AppState) => {
+      st = extractHeadersToState(st, rsp);
+      let rslt: Rpc.UpdateFeedResponse = extractResult(rsp);
+      let { feed } = rslt
+      chrome.browserAction.setBadgeText({ text: feed.length.toString() });
+      return { ...st, feed }
+    }
+    return thunk;
+  }
+
+  export async function dismissSquawks(state: AppState, urls: Dbt.urlString[], save?: boolean): Promise<(st: AppState) => AppState> {
+    const rsp = await Comms.sendDismissSquawks(state, urls, save)
+    let thunk = (st: AppState) => {
+      st = extractHeadersToState(st, rsp);
+      let rslt: Rpc.DismissSquawksResponse = extractResult(rsp);
+      if (rslt.ok) {
+        let feed = st.feed.filter(f => urls.indexOf(f.url) < 0);
+        chrome.browserAction.setBadgeText({ text: feed.length.toString() });
+        st = { ...st, feed }
+      }
+      return st;
     }
     return thunk;
   }
@@ -182,11 +220,7 @@ export namespace AsyncHandlers {
     let thunk = (st: AppState) => {
       st = extractHeadersToState(st, response);
       let rslt: Rpc.PromoteContentResponse = extractResult(response);
-      if (!rslt.link) {
-        //chrome.runtime.sendMessage({ eventType: 'RenderMessage', msg: "Content already registered." });
-        // need to prevent an immediate render from instantaneously wiping out the above message.
-      }
-      else {
+      if (rslt.link) {
         let { investments } = st
         let inv: Rpc.UserLinkItem = { link: rslt.link, linkDepth: 0, viewCount: 0, promotionsCount: 0, deliveriesCount: 0 };
         investments = [inv, ...investments];
@@ -284,7 +318,7 @@ export namespace AsyncHandlers {
         let links = st.links;
         links.set(curl, rslt.content)
         chrome.browserAction.setBadgeBackgroundColor({ color: "#2EE6D6", tabId: activeTab.id });
-        let text = chrome.browserAction.getBadgeText({}, s => { if (!s) chrome.browserAction.setBadgeText({ text: "*", tabId: activeTab.id }); })
+        let text = chrome.browserAction.getBadgeText({}, s => { if (!s) chrome.browserAction.setBadgeText({ text: "0", tabId: activeTab.id }); })
 
         st = { ...st, links };  // not really doing anything but shows correct form ...
       }

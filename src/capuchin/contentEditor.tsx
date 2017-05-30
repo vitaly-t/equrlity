@@ -119,7 +119,7 @@ export class ContentEditor extends React.Component<ContentEditorProps, ContentEd
           <Row style={rowStyle} gutter={gutter}>
             <Col span={lspan}>Tags:</Col>
             <Col span={10}>
-              <Tags.TagGroupEditor tags={this.state.tags} allTags={this.props.allTags} onChange={tags => this.changeTags(tags)} />
+              <Tags.TagGroupEditor tags={this.state.tags} creatable={true} allTags={this.props.allTags} onChange={tags => this.changeTags(tags)} />
             </Col>
           </Row>
           <Row style={rowStyle} gutter={gutter}>

@@ -19,7 +19,7 @@ export type text = string;
 export type timestamp = Date;
 export type title = string;
 export type updated = Date;
-export type userGroup = "admin" | "author" | "member";
+export type userGroup = "admin" | "creator" | "member";
 export type urlString = string;
 export type userName = string;
 export type uuid = string;
@@ -34,7 +34,9 @@ export type linkId = string;
 export type publicKey = Buffer;
 export type published = Date;
 export type userId = string;
+export type userList = string[];
 export type viewId = number;
+export type tags = string[];
 export type varchar_8 = string;
 
 export interface Tag {
@@ -51,13 +53,17 @@ export interface User {
   readonly info: text | null,
   readonly profile_pic: db_hash | null,
   readonly credits: integer | null,
-  readonly groups: userGroup[] | null
+  readonly subscriptions: tags | null,
+  readonly blacklist: tags | null,
+  readonly groups: userGroup[] | null,
+  readonly last_feed: timestamp | null
 };
 
-export interface UserLink {
-  readonly user_A: userId | null,
-  readonly user_B: userId | null,
-  readonly tags: tag[] | null,
+export interface UserFollow {
+  readonly userId: userId | null,
+  readonly following: userId | null,
+  readonly subscriptions: tags | null,
+  readonly blacklist: tags | null,
   readonly created: created | null,
   readonly updated: updated | null
 };
@@ -87,9 +93,9 @@ export interface Content {
   readonly created: created | null,
   readonly updated: updated | null,
   readonly isPublic: isPublic | null,
+  readonly tags: tags | null,
   readonly url: urlString | null,
-  readonly mime_ext: varchar_8 | null,
-  readonly tags: tag[] | null
+  readonly mime_ext: varchar_8 | null
 };
 
 export interface Comment {
@@ -111,8 +117,8 @@ export interface Link {
   readonly updated: updated | null,
   readonly comment: comment | null,
   readonly isPublic: isPublic | null,
+  readonly tags: tags | null,
   readonly prevLink: linkId | null,
-  readonly tags: tag[] | null,
   readonly amount: integer | null
 };
 
@@ -129,6 +135,14 @@ export interface Promotion {
   readonly created: created | null,
   readonly updated: updated | null,
   readonly delivered: timestamp | null
+};
+
+export interface Feed {
+  readonly linkId: linkId | null,
+  readonly userId: userId | null,
+  readonly created: created | null,
+  readonly updated: updated | null,
+  readonly dismissed: timestamp | null
 };
 
 export interface View {

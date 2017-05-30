@@ -75,14 +75,19 @@ async function __init() {
     localForage.config({ name: 'pseudoq-capuchin' });
     const keys: string[] = await localForage.keys();
     const userInfo: chrome.identity.UserInfo = await getProfile();
-    const chromeToken: string = await getChromeAccessToken();
     await createKeyPairIf(keys);
     const publicKey = await localForage.getItem<JsonWebKey>('publicKey');
     const privateKey = await localForage.getItem<JsonWebKey>('privateKey');
+    const chromeToken: string = Utils.isDev() ? '' : await getChromeAccessToken();
     const jwt = await AsyncHandlers.authenticate(userInfo, chromeToken, publicKey);
     if (!jwt) throw new Error("Unable to authenticate");
     await handleMessage({ eventType: "Thunk", fn: ((st: AppState) => { return { ...st, publicKey, privateKey, jwt } }) });
   }
+}
+
+function updateFeed() {
+  handleAsyncMessage({ eventType: "UpdateFeed" });
+  setTimeout(updateFeed, 15000);
 }
 
 let __initialized = false;
@@ -94,6 +99,7 @@ async function initialize() {
   try {
     if (!st.jwt) await __init();
     await handleAsyncMessage({ eventType: "Initialize" });
+    updateFeed();
   }
   catch (e) {
     await handleMessage({ eventType: "Thunk", fn: ((st: AppState) => { throw (e) }) });
@@ -218,6 +224,16 @@ export async function handleAsyncMessage(event: Message) {
         fn = await AsyncHandlers.transferCredits(st, event.req);
         break;
       }
+      case "UpdateFeed": {
+        fn = await AsyncHandlers.updateFeed(st);
+        break;
+      }
+      case "DismissSquawks": {
+        fn = await AsyncHandlers.dismissSquawks(st, event.urls);
+        break;
+      }
+      default:
+        throw new Error("Invalid eventType : " + event.eventType);
     }
     if (fn) handleMessage({ eventType: "Thunk", fn });
   }

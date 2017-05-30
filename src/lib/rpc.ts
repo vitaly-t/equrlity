@@ -63,7 +63,7 @@ import * as Dbt from './datatypes';
 //TODO: rename "getUserLinks" to "loadSettingsPage"
 export type Method = "initialize" | "authenticate" | "promoteContent" | "bookmarkLink" | "loadLink" | "getRedirect" | "changeSettings"
   | "getUserContents" | "loadContent" | "getUserSettings" | "getUserLinks" | "redeemLink" | "saveContent" | "saveLink" | "removeContent" | "transferCredits"
-  | "aditComment";
+  | "aditComment" | "dismissSquawks" | "updateFeed";
 
 /**
  * Informational type tags used to indicate intended usage.
@@ -75,11 +75,25 @@ export type InitializeRequest = {
   publicKey: JsonWebKey;
 }
 
+export type FeedItem = {
+  created: Dbt.timestamp;
+  source: Dbt.userName;
+  url: Dbt.urlString;
+  tags: Dbt.tags;
+  comment: string;
+}
+
 export type InitializeResponse = {
   ok: boolean;
   profile_pic: Dbt.db_hash;
   allTags: string[];
   redirectUrl?: UrlString;
+  feed: FeedItem[];
+}
+
+export type UpdateFeedRequest = {}
+export type UpdateFeedResponse = {
+  feed: FeedItem[];
 }
 
 export type PromoteContentRequest = {
@@ -142,12 +156,22 @@ export type LoadLinkResponse = {
   content: Dbt.Content;
 }
 
+export type UserFollowing = {
+  userName: string;
+  subscriptions: Dbt.tags;
+  blacklist: Dbt.tags;
+}
+
 export type UserSettings = {
   userName: string;
   email: string;
   homePage: Dbt.urlString;
   info: string;
   profile_pic?: Dbt.db_hash;
+  subscriptions: Dbt.tags;
+  blacklist: Dbt.tags;
+  following: Dbt.userName[];
+  allUsers?: Dbt.userName[];
 }
 
 export type GetUserSettingsRequest = {}
@@ -195,30 +219,34 @@ export type RemoveContentRequest = { contentId: Dbt.contentId; }
 
 export type RemoveContentResponse = { ok: boolean; }
 
-export type TransferCreditsRequest = { transferTo: Dbt.userName; amount: Dbt.integer }
+export type TransferCreditsRequest = { transferTo: Dbt.userName; amount: Dbt.integer; }
 
 export type TransferCreditsResponse = { ok: boolean; }
 
-export type AuthenticateRequest = { provider: string }
+export type AuthenticateRequest = { provider: string; }
 
 export type AuthenticateResponse = { ok: boolean; }
 
+export type DismissSquawksRequest = { urls: Dbt.urlString[]; save?: boolean }
+
+export type DismissSquawksResponse = { ok: boolean; }
+
 export type RequestBody = PromoteContentRequest | BookmarkLinkRequest | InitializeRequest | LoadLinkRequest | ChangeSettingsRequest
   | GetUserContentsRequest | GetUserLinksRequest | RedeemLinkRequest | SaveLinkRequest | SaveContentRequest | LoadContentRequest | RemoveContentRequest
-  | TransferCreditsRequest | AuthenticateRequest | AditCommentRequest | GetUserSettingsRequest;
+  | TransferCreditsRequest | AuthenticateRequest | AditCommentRequest | GetUserSettingsRequest | DismissSquawksRequest | UpdateFeedRequest;
 
 export type ResponseBody = PromoteContentResponse & BookmarkLinkResponse & InitializeResponse & LoadLinkResponse & ChangeSettingsResponse
   & GetUserContentsResponse & GetUserLinksResponse & RedeemLinkResponse & SaveLinkResponse & SaveContentResponse & LoadContentResponse & RemoveContentResponse
-  & TransferCreditsResponse & AuthenticateResponse & AditCommentResponse & GetUserSettingsResponse;
+  & TransferCreditsResponse & AuthenticateResponse & AditCommentResponse & GetUserSettingsResponse & DismissSquawksResponse & UpdateFeedResponse;
 
 // internal to server.
 export type RecvRequestBody = PromoteContentRequest & BookmarkLinkRequest & InitializeRequest & LoadLinkRequest & ChangeSettingsRequest
   & GetUserContentsRequest & GetUserLinksRequest & RedeemLinkRequest & SaveLinkRequest & SaveContentRequest & LoadContentRequest & RemoveContentRequest
-  & TransferCreditsRequest & AuthenticateRequest & AditCommentRequest & GetUserSettingsRequest;
+  & TransferCreditsRequest & AuthenticateRequest & AditCommentRequest & GetUserSettingsRequest & DismissSquawksRequest & UpdateFeedRequest;
 
 export type SendResponseBody = PromoteContentResponse | BookmarkLinkResponse | InitializeResponse | LoadLinkResponse | ChangeSettingsResponse
   | GetUserContentsResponse | GetUserLinksResponse | RedeemLinkResponse | SaveLinkResponse | SaveContentResponse | LoadContentResponse | RemoveContentResponse
-  | TransferCreditsResponse | AuthenticateResponse | AditCommentResponse | GetUserSettingsResponse;
+  | TransferCreditsResponse | AuthenticateResponse | AditCommentResponse | GetUserSettingsResponse | DismissSquawksResponse | UpdateFeedResponse;
 
 export type Handler<Request, Response> = (req: Request) => Promise<Response>;
 

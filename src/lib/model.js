@@ -93,7 +93,7 @@ export default {
       sqlType: "varchar(10)",
       enum: [
         "admin",
-        "author",
+        "creator",
         "member"
       ]
     },
@@ -119,27 +119,30 @@ export default {
     publicKey: "binary",
     published: "timestamp",
     userId: "uuid",
+    userList: "userName[]",
     viewId: "integer",
+    tags: "tag[]",
   },
   tupleTypes: {
     Auth: ["authProvider", "authId", "userId", "created", "updated"],
     Blob: ["db_hash", "blobId", "created", "userId"],
-    Content: ["contentId", "contentType", "title", "userId", "db_hash", "content", "created", "updated", "isPublic",
+    Content: ["contentId", "contentType", "title", "userId", "db_hash", "content", "created", "updated", "isPublic", "tags",
       { name: "url", type: "urlString" },
       { name: "mime_ext", type: "varchar(8)" },
-      { name: "tags", type: "tag", multiValued: true },
     ],
     Comment: ["commentId", "contentId", "userId", "comment", "created", "updated",
       { name: "parent", type: "commentId" },
     ],
     Invitation: ["ipAddress", "linkId", "created", "updated"],
-    Link: ["linkId", "userId", "contentId", "title", "created", "updated", "comment", "isPublic",
+    Link: ["linkId", "userId", "contentId", "title", "created", "updated", "comment", "isPublic", "tags",
       { name: "prevLink", type: "linkId" },
-      { name: "tags", type: "tag", multiValued: true },
       { name: "amount", type: "integer" },
     ],
     Promotion: ["linkId", "userId", "created", "updated",
       { name: "delivered", type: "timestamp" }
+    ],
+    Feed: ["linkId", "userId", "created", "updated",
+      { name: "dismissed", type: "timestamp" },
     ],
     Tag: ["tag", "created"],
     User: ["userId", "userName", "created", "updated",
@@ -147,12 +150,16 @@ export default {
       { name: "info", type: "text" },
       { name: "profile_pic", type: "db_hash" },
       { name: "credits", type: "integer" },
-      { name: "groups", type: "userGroup", multiValued: true }
+      { name: "subscriptions", type: "tags" },
+      { name: "blacklist", type: "tags" },
+      { name: "groups", type: "userGroup", multiValued: true },
+      { name: "last_feed", type: "timestamp" },
     ],
-    UserLink: [
-      { name: "user_A", type: "userId" },
-      { name: "user_B", type: "userId" },
-      { name: "tags", type: "tag", multiValued: true },
+    UserFollow: [
+      "userId",
+      { name: "following", type: "userId" },
+      { name: "subscriptions", type: "tags" },
+      { name: "blacklist", type: "tags" },
       "created",
       "updated",
     ],
@@ -170,12 +177,12 @@ export default {
       uniques: [["userName"]],
       updated: "updated",
     },
-    userlinks: {
-      rowType: "UserLink",
-      primaryKey: ["user_A", "user_B"],
+    user_follows: {
+      rowType: "UserFollow",
+      primaryKey: ["userId", "following"],
       foreignKeys: [
-        { ref: "users", columns: ["user_A"] },
-        { ref: "users", columns: ["user_B"] },
+        { ref: "users", columns: ["userId"] },
+        { ref: "users", columns: ["following"] },
       ],
       updated: "updated",
     },
@@ -233,6 +240,15 @@ export default {
     },
     promotions: {
       rowType: "Promotion",
+      primaryKey: ["linkId", "userId"],
+      updated: "updated",
+      foreignKeys: [
+        { ref: "users", columns: ["userId"] },
+        { ref: "links", columns: ["linkId"], onDelete: "CASCADE" },
+      ],
+    },
+    feeds: {
+      rowType: "Feed",
       primaryKey: ["linkId", "userId"],
       updated: "updated",
       foreignKeys: [

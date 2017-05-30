@@ -325,7 +325,7 @@ publicRouter.post('/auth', async (ctx, next) => {
   } catch (e) {
     token = "";
   }
-  if (!userInfo || !publicKey || !authValue || !token) {
+  if (!Utils.isDev() && (!userInfo || !publicKey || !authValue || !token)) {
     ctx.status = 400;
     return;
   }
@@ -374,12 +374,15 @@ app.use(async function (ctx, next) {
     ctx.body = { error: { message: ctx['invalidClientMsg'] } };
     return;
   }
+  let _userId: any;
   if (!ctx['userId']) {
-    ctx.status = 400;
-    ctx.body = { error: { message: 'Unauthorized access' } };
-    return;
+    if (!Utils.isDev()) {
+      ctx.status = 400;
+      ctx.body = { error: { message: 'Unauthorized access' } };
+      return;
+    }
   }
-  let _userId = { ...ctx['userId'] };
+  else _userId = { ...ctx['userId'] };
   await next();
 
   let userId = ctx['userId'];
@@ -495,7 +498,15 @@ router.post('/rpc', async function (ctx: any) {
         let redirectUrl = ctx['redirectUrl'];
         let allTags = await pg.loadTags();
         let profile_pic = usr.profile_pic
-        let result: Rpc.InitializeResponse = { ok: true, allTags, redirectUrl, profile_pic };
+        let feed = await pg.updateUserFeed(userId);
+        let result: Rpc.InitializeResponse = { ok: true, allTags, redirectUrl, profile_pic, feed };
+        ctx.body = { id, result };
+        break;
+      }
+      case "updateFeed": {
+        //let req: Rpc.UpdateFeedRequest = params;
+        let feed = await pg.updateUserFeed(userId);
+        let result: Rpc.UpdateFeedResponse = { feed };
         ctx.body = { id, result };
         break;
       }
@@ -553,7 +564,7 @@ router.post('/rpc', async function (ctx: any) {
       */
       case "changeSettings": {
         let req: Rpc.ChangeSettingsRequest = params;
-        let { userName, homePage, info, profile_pic } = req;
+        let { userName, homePage, info, profile_pic, subscriptions, blacklist, following } = req;
         let usr = getUser(userId);
         if (!usr) throw new Error("Internal error getting user details");
         if (userName && userName !== usr.userName) {
@@ -568,8 +579,10 @@ router.post('/rpc', async function (ctx: any) {
             return;
           }
         } else profile_pic = '';
-        usr = { ...usr, userName, home_page: homePage, info, profile_pic };
+        usr = { ...usr, userName, home_page: homePage, info, profile_pic, subscriptions, blacklist };
         let updts = await pg.upsertUser(usr);
+        let follows: Rpc.UserFollowing[] = following.map(userName => { return { userName, subscriptions: [], blacklist: [] } });
+        await pg.saveUserFollowings(userId, follows);
         cache.update(updts);
         let result: Rpc.ChangeSettingsResponse = { ok: true };
         ctx.body = { id, result };
@@ -598,8 +611,11 @@ router.post('/rpc', async function (ctx: any) {
         let user = cache.users.get(userId);
         let email = ctx['userId'].email;
         let homePage = user.home_page;
-        let { info, userName, profile_pic } = user;
-        let result: Rpc.GetUserSettingsResponse = { userName, email, homePage, info, profile_pic };
+        let { info, userName, profile_pic, subscriptions, blacklist } = user;
+        let follows = await pg.getUserFollowings(userId);
+        let following = follows.map(f => f.userName);
+        let allUsers = Array.from(cache.users.values()).filter(u => u.userId !== userId).map(u => u.userName);
+        let result: Rpc.GetUserSettingsResponse = { userName, email, homePage, info, profile_pic, subscriptions, blacklist, following, allUsers };
         ctx.body = { id, result };
         break;
       }
@@ -669,6 +685,13 @@ router.post('/rpc', async function (ctx: any) {
         ctx.body = { id, result };
         break;
       }
+      case "dismissSquawks": {
+        let req: Rpc.DismissSquawksRequest = params;
+        await pg.dismissSquawks(userId, req.urls, req.save);
+        let result: Rpc.DismissSquawksResponse = { ok: true };
+        ctx.body = { id, result };
+        break;
+      }
       default:
         let error: Rpc.Error = { id, error: { code: -32601, message: "Invalid method: " + method } };
         ctx.body = error;
@@ -732,6 +755,7 @@ app.use(router.get('/auth/twitter', function *() {
 //app.use(router.allowedMethods());
 app.use(router.middleware())
 
+//if (Utils.isDev()) pg.generateSquawks();
 
 const port = parseInt(process.env.PORT, 10) || 8080;
 

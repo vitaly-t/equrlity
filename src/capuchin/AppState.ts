@@ -1,5 +1,5 @@
 import { Url, format, parse } from 'url';
-import { UserLinkItem } from '../lib/rpc';
+import * as Rpc from '../lib/rpc';
 import * as Dbt from '../lib/datatypes';
 import * as Utils from '../lib/utils';
 import { TagSelectOption } from '../lib/tags';
@@ -18,8 +18,9 @@ export interface AppState {
   credits: number;
   jwt: string;
   lastErrorMessage: string;
-  investments: UserLinkItem[];
+  investments: Rpc.UserLinkItem[];
   promotions: Dbt.urlString[];
+  feed: Rpc.FeedItem[];
   connectedUsers: Dbt.userName[];
   reachableUserCount: Dbt.integer;
   contents: Dbt.Content[];
@@ -31,7 +32,7 @@ export interface AppState {
 export function initState(): AppState {
   console.log("initState called");
   return {
-    publicKey: null, privateKey: null, links: new Map<string, Dbt.Content>(), profile_pic: '',
+    publicKey: null, privateKey: null, links: new Map<string, Dbt.Content>(), profile_pic: '', feed: [],
     activeUrl: null, moniker: 'unknown', authprov: '', email: '', credits: 0, jwt: '', lastErrorMessage: '', homePage: '',
     investments: [], promotions: [], connectedUsers: [], reachableUserCount: 0, contents: [], allTags: [], currentContent: null, currentLink: null
   };

@@ -88,6 +88,7 @@ export async function init() {
   else {
     oxb.tables.forEach(async t => {
       if (tbls.findIndex(v => v.table_name === t.name) < 0) {
+        console.log("creating table " + t.name);
         let stmt = OxiGen.genCreateTableStatement(t);
         await db.none(stmt);
       }
@@ -103,6 +104,41 @@ export async function init() {
             await db.none(stmt);
           }
         })
+        let cons: Array<any> = await db.any(`
+          select constraint_name,constraint_type from information_schema.table_constraints 
+          where table_schema = 'public' and table_name = '${OxiGen.cnm(t.name)}'
+          and constraint_type in ('PRIMARY KEY','FOREIGN KEY','UNIQUE')
+        `);
+        let pkName = OxiGen.pkName(t);
+        cons.forEach(async c => {
+          let dropit = (c.constraint_type === 'PRIMARY KEY' && pkName !== c.constraint_name)
+            || (c.constraint_type === 'FOREIGN KEY' && t.foreignKeys.findIndex(fk => OxiGen.fkName(t, fk) === c.constraint_name) < 0)
+            || (c.constraint_type === 'UNIQUE' && t.uniques.findIndex(nms => OxiGen.unqName(t, nms) === c.constraint_name) < 0);
+          if (dropit) {
+            console.log("dropping constraint " + c.constraint_name);
+            await db.none(`ALTER TABLE public.${t.name} DROP CONSTRAINT ${OxiGen.cnm(c.constraint_name)}`)
+          }
+        })
+        if (cons.findIndex(v => v.constraint_type === 'PRIMARY KEY' && v.constraint_name === pkName) < 0) {
+          console.log(`Adding primary key to table ${t.name}`);
+          await db.none(OxiGen.genAddPrimaryKeyStatement(t));
+        }
+        t.foreignKeys.forEach(async fk => {
+          let nm = OxiGen.fkName(t, fk);
+          if (cons.findIndex(v => v.constraint_type === 'FOREIGN KEY' && v.constraint_name === nm) < 0) {
+            console.log(`Adding foreign key ${nm} to table ${t.name}`);
+            let stmt = OxiGen.genAddForeignKeyStatement(t, fk);
+            await db.none(stmt);
+          }
+        });
+        t.uniques.forEach(async nms => {
+          let nm = OxiGen.unqName(t, nms);
+          if (cons.findIndex(v => v.constraint_type === 'UNIQUE' && v.constraint_name === nm) < 0) {
+            console.log(`Adding unique ${nm} to table ${t.name}`);
+            let stmt = OxiGen.genAddUniqueStatement(t, nms);
+            await db.none(stmt);
+          }
+        });
       }
     });
   }
@@ -498,7 +534,7 @@ export async function getCommentsForContent(contentId: Dbt.contentId): Promise<D
 }
 
 export async function saveTags(tags: Dbt.tag[]): Promise<Dbt.tag[]> {  // return list of tags added
-  let newtags = tags.filter(t => !cache.tags.has(t));
+  let newtags = tags ? tags.filter(t => !cache.tags.has(t)) : [];
   if (newtags.length > 0) {
     await db.task(t => tasks.saveTags(t, newtags));
     newtags.forEach(t => cache.tags.add(t));
@@ -510,4 +546,72 @@ export async function registerContentView(userId: Dbt.userId, contentId: Dbt.con
   return await db.task(t => tasks.registerContentView(t, userId, contentId, ipAddress, linkId));
 }
 
+export async function getUserFollowings(userId: Dbt.userId): Promise<Rpc.UserFollowing[]> {
+  return await db.task(async t => {
+    let recs: Dbt.UserFollow[] = await db.any(`select * from user_follows where "userId" = '${userId}' `);
+    return recs.map(r => {
+      let userName = cache.users.get(r.following).userName;
+      let { subscriptions, blacklist } = r;
+      let f: Rpc.UserFollowing = { userName, subscriptions, blacklist };
+      return f;
+    });
+  });
+}
 
+export async function saveUserFollowings(userId: Dbt.userId, followings: Rpc.UserFollowing[]): Promise<void> {
+  return await db.tx(t => tasks.saveUserFollowings(t, userId, followings));
+}
+
+export async function updateUserFeed(userId: Dbt.userId): Promise<Rpc.FeedItem[]> {
+  let usr = cache.users.get(userId)
+  let { last_feed, subscriptions } = usr;
+  let now = new Date();
+  return await db.tx(async t => {
+    let links: Dbt.Link[] = await t.any('select * from links where created > $1', [last_feed]);
+    let follows = await t.any(`select * from user_follows where "userId" = '${userId}' `);
+    let feeds = links.filter(l => {
+      if (follows.findIndex(f => f.following === l.userId) >= 0) return true;
+      if (subscriptions.findIndex(t => l.tags.indexOf(t) >= 0) >= 0) return true;
+      return false;
+    }).map(l => {
+      let f = OxiGen.emptyRec<Dbt.Feed>("feeds");
+      return { ...f, userId, linkId: l.linkId };
+    })
+    for (const f of feeds) await tasks.insertRecord<Dbt.Feed>(t, "feeds", f);
+    usr = { ...usr, last_feed: now };
+    await tasks.updateRecord<Dbt.User>(t, "users", usr);
+
+    let recs: Dbt.Feed[] = await t.any(`select * from feeds where "userId" = '${userId}' and dismissed is null order by created desc`);
+    let rslt: Rpc.FeedItem[] = [];
+    for (const f of recs) {
+      let l: Dbt.Link = await t.one(`select * from links where "linkId" = '${f.linkId}' `);
+      let source = cache.users.get(l.userId).userName;
+      let { tags, created, comment } = l;
+      let url = Utils.linkToUrl(l.linkId, l.title);
+      let itm: Rpc.FeedItem = { source, created, tags, url, comment };
+      rslt.push(itm);
+    };
+    return rslt;
+  });
+}
+
+export async function dismissSquawks(userId: Dbt.userId, urls: Dbt.urlString[], save: boolean): Promise<void> {
+  return await db.tx(t => tasks.dismissSquawks(t, userId, urls, save));
+}
+
+export async function generateSquawks() {
+  let u = await createUser();
+  let i = 0;
+  let uids = (await db.any(`select "userId" from users`)).map(u => u.userId);
+  while (true) {
+    ++i;
+    for (const uid of uids) {
+      let preq: Rpc.BookmarkLinkRequest = { comment: "great comment " + i, tags: [], url: "https://www.example.com/thing/" + i, signature: "", title: "awesome link " + i };
+      try {
+        await bookmarkAndInvestInLink(uid, preq, 10);
+      }
+      catch (e) { }
+      await Utils.sleep(2000);
+    }
+  }
+}

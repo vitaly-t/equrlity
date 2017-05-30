@@ -52,7 +52,7 @@ export class MarkdownEditor extends React.Component<MarkdownEditorProps, Markdow
 
   render() {
     if (this.state.previewing) {
-      return <MarkdownPreview text={this.props.value} onClose={() => this.setState({ previewing: false })} allowHtml={this.props.allowHtml} />
+      return <MarkdownPreview text={this.props.value || ''} onClose={() => this.setState({ previewing: false })} allowHtml={this.props.allowHtml} />
     }
     let gutter = 10;
     let btnStyle = { marginLeft: gutter / 2 };
@@ -63,7 +63,7 @@ export class MarkdownEditor extends React.Component<MarkdownEditorProps, Markdow
     if (this.props.onAbandon) {
       btns.push(<Button key="Abandon" style={btnStyle} disabled={!isDirty && !this.props.enableAbandon} onClick={() => this.props.onAbandon()} text="Abandon" />);
     }
-    btns.push(<Button key="Preview" style={btnStyle} disabled={this.props.value.length === 0} className="pt-intent-success" onClick={() => this.preview()} text="Preview" />);
+    btns.push(<Button key="Preview" style={btnStyle} disabled={!this.props.value} className="pt-intent-success" onClick={() => this.preview()} text="Preview" />);
     if (this.props.onSave) {
       btns.push(<Button key="Save" style={btnStyle} disabled={!isDirty} className="pt-intent-primary" onClick={() => this.props.onSave()} text="Save" />);
     };
@@ -74,7 +74,7 @@ export class MarkdownEditor extends React.Component<MarkdownEditorProps, Markdow
       {ttl}
       <Row gutter={gutter} style={rowStyle} >
         <TextareaAutosize className="pt-elevation-2" style={{ margin: "5px", width: "100%", minHeight: "100px", maxHeight: "600px", backgroundColor: "white" }}
-          value={this.props.value} onChange={e => this.props.onChange(e.target.value)} />
+          value={this.props.value || ''} onChange={e => this.props.onChange(e.target.value)} />
       </Row>
       <Row gutter={gutter} style={rowStyle}  >
         <Col span={3}>

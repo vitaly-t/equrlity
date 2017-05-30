@@ -15,19 +15,21 @@ import { rowStyle, btnStyle, lhcolStyle } from "../lib/contentView";
 import * as Tags from '../lib/tags';
 import { MarkdownEditor } from '../lib/markdownEditor';
 import { YesNoBox } from '../lib/dialogs';
+import { TagGroupEditor, TagSelectOption } from '../lib/tags';
+
 import { AppState, postDeserialize } from "./AppState";
 import { uploadRequest, sendApiRequest } from "../lib/axiosClient";
 import * as Chrome from './chrome';
 
 
 interface SettingsPageProps { appState: AppState };
-interface SettingsPageState { settings: Rpc.UserSettings, prevSettings: Rpc.UserSettings };
+interface SettingsPageState { settings: Rpc.UserSettings, prevSettings: Rpc.UserSettings, allUsers: TagSelectOption[] };
 export class SettingsPage extends React.Component<SettingsPageProps, SettingsPageState> {
 
   constructor(props: SettingsPageProps) {
     super(props);
-    let settings: Rpc.UserSettings = { userName: props.appState.moniker, email: props.appState.email, homePage: '', info: '', profile_pic: '' };
-    this.state = { settings, prevSettings: settings };
+    let settings: Rpc.UserSettings = { userName: props.appState.moniker, email: props.appState.email, homePage: '', info: '', profile_pic: '', subscriptions: [], blacklist: [], following: [] };
+    this.state = { settings, prevSettings: settings, allUsers: [] };
   }
 
   componentDidMount = async () => {
@@ -35,7 +37,8 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
     let rsp: Rpc.Response = response.data;
     if (rsp.error) throw new Error("Server returned error: " + rsp.error.message);
     let settings: Rpc.UserSettings = rsp.result;
-    this.setState({ settings, prevSettings: settings });
+    let allUsers = settings.allUsers.map(u => { return { value: u, label: u }; });
+    this.setState({ settings, prevSettings: settings, allUsers });
   }
 
   changeUserName(userName) {
@@ -63,10 +66,26 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
     this.setState({ settings });
   }
 
+  changeSubscriptions(subscriptions) {
+    let settings = { ...this.state.settings, subscriptions }
+    this.setState({ settings });
+  }
+
+  changeBlacklist(blacklist) {
+    let settings = { ...this.state.settings, blacklist }
+    this.setState({ settings });
+  }
+
+  changeFollowing(following) {
+    let settings = { ...this.state.settings, following }
+    this.setState({ settings });
+  }
+
   isDirty(): boolean {
-    let { userName, email, homePage, info, profile_pic } = this.state.settings;
+    let { userName, email, homePage, info, profile_pic, subscriptions, blacklist, following } = this.state.settings;
     let p = this.state.prevSettings;
-    return userName !== p.userName || email !== p.email || homePage !== p.homePage || info !== p.info || profile_pic !== p.profile_pic;
+    return userName !== p.userName || email !== p.email || homePage !== p.homePage || info !== p.info
+      || profile_pic !== p.profile_pic || subscriptions !== p.subscriptions || blacklist !== p.blacklist || following !== p.following;
   }
 
   saveSettings = () => {
@@ -129,6 +148,14 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
             <input type="text" style={{ width: '60%' }} name="HomePage" id="homePageId" value={homePage} onChange={(e) => this.changeHomePage(e.target.value)} />
           </div>
           <div style={divStyle}>
+            <div className="pt-text-muted" style={lhcolStyle} >Subscriptions: </div>
+            <TagGroupEditor tags={this.state.settings.subscriptions} creatable={false} allTags={this.props.appState.allTags} onChange={(tags) => this.changeSubscriptions(tags)} />
+          </div>
+          <div style={divStyle}>
+            <div className="pt-text-muted" style={lhcolStyle} >Following: </div>
+            <TagGroupEditor tags={this.state.settings.following} tagClass="pt-intent-success pt-round pt-large" creatable={false} allTags={this.state.allUsers} onChange={(tags) => this.changeFollowing(tags)} />
+          </div>
+          <div style={divStyle}>
             <div className="pt-text-muted" style={lhcolStyle} >Further Info: </div>
             <MarkdownEditor value={info} onChange={info => this.changeInfo(info)} allowHtml={true} />
           </div>
@@ -146,7 +173,7 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
         <div style={divStyle}>
           <p>Using server URL: {Utils.serverUrl}.</p>
           <p>Version: {Utils.capuchinVersion()}. </p>
-          {userp}
+          {/*userp*/}
           {/*authdiv*/}
         </div>
         {vsp}
