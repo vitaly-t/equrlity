@@ -755,7 +755,7 @@ app.use(router.get('/auth/twitter', function *() {
 //app.use(router.allowedMethods());
 app.use(router.middleware())
 
-//if (Utils.isDev()) pg.generateSquawks();
+if (Utils.isDev()) pg.generateSquawks();
 
 const port = parseInt(process.env.PORT, 10) || 8080;
 

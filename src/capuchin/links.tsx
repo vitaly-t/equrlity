@@ -191,7 +191,7 @@ export class LinksPage extends React.Component<LinksPageProps, LinksPageState> {
       this.setState({ confirmDismissAll: true, feedFilters: [] });
     }
     let saveAll = () => {
-      let urls = filteredLinks.map(r => r.url)
+      let urls = filteredLinks.map(r => r.url);
       Chrome.sendMessage({ eventType: "DismissSquawks", urls, save: true });
     }
     let vsp = <div style={{ height: "20px" }} />;

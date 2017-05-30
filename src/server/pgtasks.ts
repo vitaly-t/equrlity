@@ -510,7 +510,7 @@ export async function dismissSquawks(t: ITask<any>, userId: Dbt.userId, urls: Db
       let cont = OxiGen.emptyRec<Dbt.Content>("contents");
       let { tags, title, comment } = link;
       cont = { ...cont, title, tags, url, userId, content: comment, contentType: "bookmark" };
-      await insertRecord(t, "contents", cont);
+      await await insertContent(t, cont);
     }
   }
   let now = new Date();

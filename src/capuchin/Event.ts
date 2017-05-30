@@ -201,7 +201,9 @@ export namespace AsyncHandlers {
   }
 
   export async function dismissSquawks(state: AppState, urls: Dbt.urlString[], save?: boolean): Promise<(st: AppState) => AppState> {
-    const rsp = await Comms.sendDismissSquawks(state, urls, save)
+    let rsp = await Comms.sendDismissSquawks(state, urls, save);
+    let rsp2;
+    if (save) rsp2 = await Comms.sendGetUserContents(state);
     let thunk = (st: AppState) => {
       st = extractHeadersToState(st, rsp);
       let rslt: Rpc.DismissSquawksResponse = extractResult(rsp);
@@ -209,6 +211,12 @@ export namespace AsyncHandlers {
         let feed = st.feed.filter(f => urls.indexOf(f.url) < 0);
         chrome.browserAction.setBadgeText({ text: feed.length.toString() });
         st = { ...st, feed }
+        if (save) {
+          st = extractHeadersToState(st, rsp2);
+          let rslt2: Rpc.GetUserContentsResponse = extractResult(rsp2);
+          let contents = rslt2.contents;
+          st = { ...st, contents }
+        }
       }
       return st;
     }
@@ -225,9 +233,6 @@ export namespace AsyncHandlers {
         let inv: Rpc.UserLinkItem = { link: rslt.link, linkDepth: 0, viewCount: 0, promotionsCount: 0, deliveriesCount: 0 };
         investments = [inv, ...investments];
         st = { ...st, investments };
-        //let curl = Utils.linkToUrl(rslt.link.linkId, rslt.link.title);
-        //let src = Utils.contentToUrl(rslt.link.contentId);
-        //st = setLink(st, src, curl, 0, st.moniker);
       }
       return st;
     };

@@ -229,7 +229,7 @@ export async function handleAsyncMessage(event: Message) {
         break;
       }
       case "DismissSquawks": {
-        fn = await AsyncHandlers.dismissSquawks(st, event.urls);
+        fn = await AsyncHandlers.dismissSquawks(st, event.urls, event.save);
         break;
       }
       default:
