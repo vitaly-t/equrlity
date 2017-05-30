@@ -296,6 +296,7 @@ class PromoteContent extends React.Component<PromoteContentProps, PromoteContent
   constructor(props: PromoteContentProps) {
     super(props);
     let tags = props.info.tags || [];
+    tags.unshift(props.info.contentType);
     this.state = { isOpen: true, amount: 10, title: props.info.title, tags, comment: '' };
   }
 

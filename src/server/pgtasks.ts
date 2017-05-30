@@ -188,7 +188,7 @@ export async function deliveriesCount(t: ITask<any>, linkId: Dbt.linkId): Promis
 export async function promoteContent(t: ITask<any>, userId, req: Rpc.PromoteContentRequest): Promise<CacheUpdate[]> {
   let { contentId, amount, tags, comment, title } = req;
   let usr = await retrieveRecord<Dbt.User>(t, "users", { userId });
-  if (amount > usr.credits) throw new Error("Negative balances not allowed");
+  if (amount > usr.credits) amount = usr.credits; //throw new Error("Negative balances not allowed");
   let cont = await retrieveRecord<Dbt.Content>(t, "contents", { contentId });
   if (!cont) throw new Error("Content not found");
   if (userId !== cont.userId) throw new Error("Content owned by different user");
@@ -314,9 +314,10 @@ export async function payForView(t: ITask<any>, links: Dbt.Link[], viewerId: Dbt
     i += 1;
   }
   if (bal == 0) {
-    let link = await retrieveRecord<Dbt.Link>(t, "links", { linkId: viewedLinkId });
-    Array.prototype.push.apply(rslt, await redeemLink(t, { ...link, amount: 0 }));
-    rslt.push({ table: "links" as CachedTable, record: viewedLink, remove: true });
+    // maybe later ...
+    //let link = await retrieveRecord<Dbt.Link>(t, "links", { linkId: viewedLinkId });
+    //Array.prototype.push.apply(rslt, await redeemLink(t, { ...link, amount: 0 }));
+    //rslt.push({ table: "links" as CachedTable, record: viewedLink, remove: true });
   }
   else {
     let r = await updateRecord<Dbt.Link>(t, "links", { ...viewedLink, amount: bal });

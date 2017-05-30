@@ -80,8 +80,8 @@ export class TagGroupEditor extends React.Component<TagGroupEditorProps, {}> {
   render() {
     let a = this.props.tags || [];
     let tags = a.map(label => <Qtag key={'tag:' + label} tagClass={this.props.tagClass} label={label} style={{ marginLeft: '3px', height: '26px' }} onRemove={() => this.removeTag(label)} />);
-    if (this.props.creatable) tags.push(<Select.Creatable key="__new__" style={{ display: 'inline-block', width: '100px', height: '26px', marginLeft: '3px' }} options={this.props.allTags} onChange={(v) => this.addTag(v)} />);
-    else tags.push(<Select key="__sel__" style={{ display: 'inline-block', width: '100px', height: '26px', marginLeft: '3px' }} options={this.props.allTags} onChange={(v) => this.addTag(v)} />);
+    if (this.props.creatable) tags.push(<Select.Creatable key="__new__" style={{ display: 'inline-block', width: '150px', height: '26px', marginLeft: '3px' }} options={this.props.allTags} onChange={(v) => this.addTag(v)} />);
+    else tags.push(<Select key="__sel__" style={{ display: 'inline-block', width: '150px', height: '26px', marginLeft: '3px' }} options={this.props.allTags} onChange={(v) => this.addTag(v)} />);
     return <Row>{tags}</Row>;
   }
 };

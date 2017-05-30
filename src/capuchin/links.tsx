@@ -79,9 +79,9 @@ export class LinksPage extends React.Component<LinksPageProps, LinksPageState> {
 
         let redeem = () => { Chrome.sendMessage({ eventType: "RedeemLink", linkId }); };
         let redeemText = l.amount > 0 ? "Redeem" : "Delete";
-        let btns = [<Button onClick={redeem} text={redeemText} />];
+        let btns = [<Button key="redeem" onClick={redeem} text={redeemText} />];
         let edit = () => { this.setState({ editingItem: item }) };
-        btns.push(<Button onClick={edit} text="Details" />);
+        btns.push(<Button key="details" onClick={edit} text="Details" />);
 
         let btngrp = (
           <div className="pt-button-group pt-vertical pt-align-left pt-large">
@@ -188,10 +188,11 @@ export class LinksPage extends React.Component<LinksPageProps, LinksPageState> {
     }
 
     let dismissAll = () => {
-      this.setState({ confirmDismissAll: true, feedFilters: [] });
+      this.setState({ confirmDismissAll: true });
     }
     let saveAll = () => {
       let urls = filteredLinks.map(r => r.url);
+      this.setState({ feedFilters: [] });
       Chrome.sendMessage({ eventType: "DismissSquawks", urls, save: true });
     }
     let vsp = <div style={{ height: "20px" }} />;
@@ -201,6 +202,7 @@ export class LinksPage extends React.Component<LinksPageProps, LinksPageState> {
       let onClose = () => this.setState({ confirmDismissAll: false });
       let onYes = () => {
         let urls = filteredLinks.map(r => r.url)
+        this.setState({ feedFilters: [] });
         Chrome.sendMessage({ eventType: "DismissSquawks", urls });
       };
       feedFltrDiv = <YesNoBox message={msg} onYes={onYes} onClose={onClose} />
