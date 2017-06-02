@@ -10,7 +10,7 @@ export function mergeTags(tags: string[], _allTags: TagSelectOption[]): TagSelec
   let allTags = _allTags;
   let fnd = false;
   tags && tags.forEach(c => {
-    if (c > allTags[allTags.length - 1].label) {
+    if (allTags.length === 0 || c > allTags[allTags.length - 1].label) {
       if (!fnd) {
         fnd = true;
         allTags = allTags.slice();
@@ -72,6 +72,7 @@ export class TagGroupEditor extends React.Component<TagGroupEditorProps, {}> {
   addTag(tag: TagSelectOption) {
     let tags = this.props.tags || [];
     if (tags.indexOf(tag.label) < 0) {
+      tag.label = tag.label.toLowerCase();
       tags = [...tags, tag.label];
       this.props.onChange(tags);
     }

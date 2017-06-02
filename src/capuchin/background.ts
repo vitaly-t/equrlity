@@ -7,7 +7,7 @@ import * as Crypto from '../lib/Crypto';
 import * as Utils from '../lib/utils';
 import { mergeTags } from '../lib/tags';
 
-import { AppState, initState, isSeen, setLoading, setWaiting, prepareUrl, preSerialize } from './AppState';
+import { AppState, initState, isSeen, setLoading, setWaiting, prepareUrl, preSerialize, postDeserialize } from './AppState';
 
 import { Url, parse, format } from 'url';
 import { Message, AsyncHandlers, getTab } from './Event';
@@ -79,15 +79,19 @@ async function __init() {
     const publicKey = await localForage.getItem<JsonWebKey>('publicKey');
     const privateKey = await localForage.getItem<JsonWebKey>('privateKey');
     const chromeToken: string = Utils.isDev() ? '' : await getChromeAccessToken();
-    const jwt = await AsyncHandlers.authenticate(userInfo, chromeToken, publicKey);
-    if (!jwt) throw new Error("Unable to authenticate");
-    await handleMessage({ eventType: "Thunk", fn: ((st: AppState) => { return { ...st, publicKey, privateKey, jwt } }) });
+    if (keys.indexOf('appState') > 0) st = await localForage.getItem<AppState>('appState');
+    if (st.jwt) await handleMessage({ eventType: "Thunk", fn: (_ => st) });
+    else {
+      const jwt = await AsyncHandlers.authenticate(userInfo, chromeToken, publicKey);
+      if (!jwt) throw new Error("Unable to authenticate");
+      await handleMessage({ eventType: "Thunk", fn: ((st: AppState) => { return { ...st, publicKey, privateKey, jwt } }) });
+    }
   }
 }
 
 function updateFeed() {
   handleAsyncMessage({ eventType: "UpdateFeed" });
-  setTimeout(updateFeed, 15000);
+  setTimeout(updateFeed, 120000);  // configurable somehow?
 }
 
 let __initialized = false;
@@ -106,6 +110,48 @@ async function initialize() {
     __initialized = false;
   }
 }
+
+/*  the following bombs out for some reason.  maybe later...
+let injectJs = `
+function DOMtoString(document_root) {
+    var html = '',
+        node = document_root.firstChild;
+    while (node) {
+        switch (node.nodeType) {
+            case Node.ELEMENT_NODE:
+                html += node.outerHTML;
+            break;
+            case Node.TEXT_NODE:
+                html += node.nodeValue;
+            break;
+            case Node.CDATA_SECTION_NODE:
+                html += '<![CDATA[' + node.nodeValue + ']]>';
+            break;
+            case Node.COMMENT_NODE:
+                html += '<!--' + node.nodeValue + '-->';
+            break;
+            case Node.DOCUMENT_TYPE_NODE:
+                // (X)HTML documents are identified by public identifiers
+                html += "<!DOCTYPE "
+                     + node.name
+                     + (node.publicId ? ' PUBLIC "' + node.publicId + '"' : '')
+                     + (!node.publicId && node.systemId ? ' SYSTEM' : '') 
+                     + (node.systemId ? ' "' + node.systemId + '"' : '')
+                     + '>\n';
+            break;
+        }
+        node = node.nextSibling;
+    }
+    return html;
+}
+
+chrome.extension.onMessage.addListener(function(message, sender, cb) {
+  if (message.eventType === "bodyAsString") cb(DOMtoString(document));
+});
+
+`;
+*/
+
 
 chrome.runtime.onStartup.addListener(initialize);
 
@@ -126,8 +172,48 @@ chrome.runtime.onMessage.addListener(async (message, sender, cb) => {
 });
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  if (changeInfo.status == "loading" && changeInfo.url) {
-    handleAsyncMessage({ eventType: "Load", url: changeInfo.url });
+  if (changeInfo.url && changeInfo.status === "loading") handleAsyncMessage({ eventType: "Load", url: changeInfo.url });
+  else if (changeInfo.status === "complete") {
+    let st = currentState();
+    let url = prepareUrl(tab.url)
+    if (st.allTags && !(url in st.links) && !(url in st)) {
+      console.log("searching for matching tags");
+      let injectJs = `
+chrome.extension.onMessage.addListener(function(message, sender, cb) {
+  if (message.eventType === "getTextContent") cb(document.documentElement.textContent);
+});
+`;
+
+      chrome.tabs.executeScript(tabId, { code: injectJs }, function () {
+        chrome.tabs.sendMessage(tabId, { eventType: "getTextContent" }, function (source: string) {
+          // TODO: Detect injection error using chrome.runtime.lastError
+          if (chrome.runtime.lastError) {
+            handleAsyncMessage({
+              eventType: "Thunk", fn: (st => {
+                st = { ...st, lastErrorMessage: "Injection error: " + chrome.runtime.lastError.message }
+                return st;
+              })
+            });
+          }
+          if (source) {
+            source = source.toLowerCase();
+            let tags = new Set<String>();
+            st.allTags.forEach(t => {
+              if (source.indexOf(t.label) >= 0) tags.add(t.label);
+            })
+            let a = Array.from(tags);
+            if (tags.size > 0) console.log(tags.size.toString() + " tags found");
+            handleMessage({
+              eventType: "Thunk", fn: (st => {
+                let { matchedTags } = st;
+                matchedTags[url] = a;
+                return st;
+              })
+            });
+          }
+        });
+      });
+    }
   }
 });
 
@@ -238,7 +324,8 @@ export async function handleAsyncMessage(event: Message) {
     if (fn) handleMessage({ eventType: "Thunk", fn });
   }
   catch (e) {
-    let fn = (st: AppState) => { return { ...st, lastErrorMessage: e.message }; };
+    let msg = "Error in Async handler : " + event.eventType + ", " + e.message;
+    let fn = (st: AppState) => { return { ...st, lastErrorMessage: msg }; };
     handleMessage({ eventType: "Thunk", fn });
     if (e.message === "Network Error") __initialized = false;
   }
@@ -249,7 +336,9 @@ export function handleMessage(event: Message): AppState {
   function storeState(st: AppState): void {
     if (__state !== st) {
       __state = st;
-      chrome.runtime.sendMessage({ eventType: 'Render', appState: preSerialize(st) });
+      let appState = preSerialize(st);
+      localForage.setItem('appState', appState);
+      chrome.runtime.sendMessage({ eventType: 'Render', appState });
     }
   }
 

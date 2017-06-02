@@ -22,6 +22,7 @@ export interface BookmarkLink {
   title: string;
   comment: string;
   tags?: string[];
+  squawk?: boolean;
 }
 
 export interface Initialize {
@@ -261,13 +262,26 @@ export namespace AsyncHandlers {
   }
 
   export async function bookmarkLink(state: AppState, req: BookmarkLink): Promise<(st: AppState) => AppState> {
-    let { url, title, comment, tags } = req;
-    let response = await Comms.sendBookmarkLink(state, url, title, comment, tags)
+    let { url, title, comment, tags, squawk } = req;
+    let response = await Comms.sendBookmarkLink(state, url, title, comment, tags, squawk)
     let thunk = (st: AppState) => {
       st = extractHeadersToState(st, response);
       let rslt: Rpc.BookmarkLinkResponse = extractResult(response);
+      let contents = st.contents;
+      let i = st.contents.findIndex(c => c.contentId === rslt.content.contentId);
+      if (i >= 0) {
+        contents = contents.slice();
+        contents.splice(i, 1);
+        st = { ...st, contents };
+      }
+      if (rslt.link) {
+        let inv: Rpc.UserLinkItem = { link: rslt.link, linkDepth: 0, promotionsCount: 0, viewCount: 0, deliveriesCount: 0 }
+        let investments = [inv, ...st.investments];
+        st = { ...st, investments };
+      }
       let { links } = st
-      links.set(url, rslt.content)
+      // links.set(url, rslt.content)
+      links[url] = rslt.content;
       return { ...st, links };
     };
     return thunk;
@@ -313,17 +327,23 @@ export namespace AsyncHandlers {
   export async function load(state: AppState, curl_: string): Promise<(st: AppState) => AppState> {
     let curl = prepareUrl(curl_);
     if (!curl) return (st => { return { ...st, activeUrl: null }; });
-    let response = await Comms.sendLoadLink(state, curl);
     let activeTab = await currentTab()
+    //if (state.links.has(curl)) {
+    if (curl in state.links) {
+      chrome.browserAction.setBadgeBackgroundColor({ color: "#2EE6D6", tabId: activeTab.id });
+      return (st => { return { ...st, activeUrl: curl }; });
+    }
+    let response = await Comms.sendLoadLink(state, curl);
     let thunk = (st: AppState) => {
       st = extractHeadersToState(st, response);
       let rslt: Rpc.LoadLinkResponse = extractResult(response);
       st = { ...st, activeUrl: curl };
       if (rslt.content) {
         let links = st.links;
-        links.set(curl, rslt.content)
+        //links.set(curl, rslt.content)
+        links[curl] = rslt.content;
         chrome.browserAction.setBadgeBackgroundColor({ color: "#2EE6D6", tabId: activeTab.id });
-        let text = chrome.browserAction.getBadgeText({}, s => { if (!s) chrome.browserAction.setBadgeText({ text: "0", tabId: activeTab.id }); })
+        //chrome.browserAction.getBadgeText({}, s => { if (!s) chrome.browserAction.setBadgeText({ text: "0", tabId: activeTab.id }); })
 
         st = { ...st, links };  // not really doing anything but shows correct form ...
       }

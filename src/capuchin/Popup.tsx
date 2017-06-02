@@ -9,7 +9,7 @@ import * as Dbt from '../lib/datatypes';
 import { TagGroupEditor, TagSelectOption } from '../lib/tags';
 
 import * as Chrome from './chrome';
-import { AppState, isWaiting, getBookmark } from "./AppState";
+import { AppState, isWaiting, getBookmark, prepareUrl } from "./AppState";
 
 const toast = Toaster.create({
   className: "popup-toaster",
@@ -27,6 +27,10 @@ export class BookmarkPanel extends React.Component<BookmarkPanelProps, BookmarkP
     if (url) {
       let cont = getBookmark(props.appState, url);
       if (cont) st = { url, title: cont.title, comment: cont.content, tags: cont.tags };
+      else {
+        url = prepareUrl(url);
+        if (url in props.appState.matchedTags) st = { ...st, tags: props.appState.matchedTags[url] };
+      }
     }
     this.state = st;
   }
@@ -54,14 +58,15 @@ export class BookmarkPanel extends React.Component<BookmarkPanelProps, BookmarkP
     let rspan = 10;
     let btnStyle = { marginRight: 10 };
     let rowStyle = { marginBottom: 10 };
-    let saveaction = () => {
+    let saveaction = (squawk: boolean) => {
       let { title, comment, tags, url } = this.state;
-      Chrome.sendMessage({ eventType: "BookmarkLink", url, title, comment, tags });
+      Chrome.sendMessage({ eventType: "BookmarkLink", url, title, comment, tags, squawk });
       window.close();
     }
     let btns = [
       <Button key="Close" style={btnStyle} onClick={() => window.close()} text="Close" />,
-      <Button key="Save" style={btnStyle} className="pt-intent-primary" onClick={saveaction} text="Save" />
+      <Button key="Squawk" style={btnStyle} className="pt-intent-success" onClick={() => saveaction(true)} text="Squawk" />,
+      <Button key="Save" style={btnStyle} className="pt-intent-primary" onClick={() => saveaction(false)} text="Save" />
     ]
 
     return (<div className="pt-elevation-0" style={{ width: "100%", height: "100%", backgroundColor: "#F5F8FA" }}>

@@ -3,26 +3,6 @@ import { PlayButton, PauseButton, ProgressBar, TimeMarker, MuteToggleButton, Vol
 
 const DEFAULT_LISTEN_INTERVAL = 10000;
 
-export type WavesurferPlayerProps = {
-  src: string;
-  type: string;
-  autoPlay?: boolean;
-  listenInterval?: number;
-  listenTracker?: any;
-  onAbort?: any;
-  onCanPlay?: any;
-  onCanPlayThrough?: any;
-  onEnded?: any;
-  onError?: any;
-  onListen?: any;
-  onPause?: any;
-  onPlay?: any;
-  onSeeked?: any;
-  preload?: string;
-  controls?: boolean;
-  style?: Object;
-};
-
 export type AudioPlayerProps = {
   src: string;
   type: string;

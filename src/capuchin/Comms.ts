@@ -16,9 +16,9 @@ export async function sendRemoveContent(st: AppState, req: Rpc.RemoveContentRequ
   return await sendApiRequest("removeContent", req);
 }
 
-export async function sendBookmarkLink(st: AppState, url: string, title: string, comment: string, tags: string[]): Promise<AxiosResponse> {
+export async function sendBookmarkLink(st: AppState, url: string, title: string, comment: string, tags: string[], squawk?: boolean): Promise<AxiosResponse> {
   const signature = await signData(st.privateKey, url);
-  let req: Rpc.BookmarkLinkRequest = { url, signature, title, comment, tags };
+  let req: Rpc.BookmarkLinkRequest = { url, signature, title, comment, tags, squawk };
   let cont = getBookmark(st, url);
   if (cont) req = { ...req, contentId: cont.contentId };
   return await sendApiRequest("bookmarkLink", req);

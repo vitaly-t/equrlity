@@ -264,7 +264,7 @@ export async function investInLink(t: ITask<any>, link: Dbt.Link, adj: Dbt.integ
 }
 
 export async function getLinksForUser(t: ITask<any>, userId: Dbt.userId): Promise<Dbt.Link[]> {
-  let links = await t.any(`select * from links where "userId" = '${userId}'`);
+  let links = await t.any(`select * from links where "userId" = '${userId}' order by created desc`);
   return links;
 }
 
@@ -465,11 +465,10 @@ export async function registerContentView(t: ITask<any>, userId: Dbt.userId, con
   return await insertRecord<Dbt.ContentView>(t, "contentviews", rec);
 }
 
-export async function handleBookmarkLink(t: ITask<any>, userId: Dbt.userId, req: Rpc.BookmarkLinkRequest): Promise<Dbt.Content> {
+export async function bookmarkLink(t: ITask<any>, userId: Dbt.userId, contentId: Dbt.contentId, title: string, tags: string[], url: Dbt.urlString, comment: string): Promise<Dbt.Content> {
   let content: Dbt.Content;
-  let { title, tags, url, comment } = req;
-  if (req.contentId) {
-    content = await retrieveRecord<Dbt.Content>(t, "contents", { contentId: req.contentId });
+  if (contentId) {
+    content = await retrieveRecord<Dbt.Content>(t, "contents", { contentId });
     if (content.userId !== userId) throw new Error("Bookmark belongs to different user");
     content = { ...content, title, tags, url, content: comment }
     content = await updateRecord<Dbt.Content>(t, "contents", content);
@@ -480,6 +479,20 @@ export async function handleBookmarkLink(t: ITask<any>, userId: Dbt.userId, req:
     content = await insertContent(t, content);
   }
   return content;
+}
+
+export async function handleBookmarkLink(t: ITask<any>, userId: Dbt.userId, req: Rpc.BookmarkLinkRequest): Promise<Rpc.BookmarkLinkResponse> {
+  let { contentId, title, tags, url, comment } = req;
+  let content = await bookmarkLink(t, userId, contentId, title, tags, url, comment);
+  let link;
+  if (req.squawk) {
+    let { comment, tags, title, signature } = req;
+    let contentId = content.contentId;
+    link = OxiGen.emptyRec<Dbt.Link>("links");
+    link = { ...link, userId, contentId, tags, amount: 0, comment, title }
+    link = await insertLink(t, link);
+  }
+  return { content, link };
 }
 
 export async function saveUserFollowings(t: ITask<any>, userId: Dbt.userId, followings: Rpc.UserFollowing[]): Promise<void> {

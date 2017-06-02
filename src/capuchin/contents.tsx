@@ -182,6 +182,9 @@ export class ContentsPage extends React.Component<ContentsPageProps, ContentsPag
 
         let btns = [];
 
+        let promote = () => { this.setState({ promotingContent: p }) };
+        btns.push(<Button key="promote" onClick={promote} text="Squawk" />);
+
         let edit = () => { this.setState({ editingContent: p }) };
         btns.push(<Button key="edit" onClick={edit} text="Edit" />);
 
@@ -191,9 +194,6 @@ export class ContentsPage extends React.Component<ContentsPageProps, ContentsPag
           Chrome.sendMessage({ eventType: "SaveContent", req });
         };
         btns.push(<Button key="clone" onClick={clone} text="Clone" />);
-
-        let promote = () => { this.setState({ promotingContent: p }) };
-        btns.push(<Button key="promote" onClick={promote} text="Promote" />);
 
         let remove = () => { this.setState({ confirmDeleteContent: p }) };
         btns.push(<Button key="remove" onClick={remove} text="Delete" />);

@@ -9,17 +9,14 @@
   },
   "permissions": [
     "tabs",
-    "https://pseudoqurl.heroku.com/*",
-    "https://*.pseudoq.com/*",
-    "https://pseudoq.com/*",
-    "http://localhost:8080/*",
+    "bookmarks",
     "webNavigation",
     "webRequest",
     "webRequestBlocking",
     "identity",
     "identity.email",
-    "https://accounts.google.com/*",
-    "https://www.googleapis.com/*"
+    "http://*/*",
+    "https://*/*"
   ],
   "auth_entries": "",
   "background": {

@@ -142,10 +142,13 @@ export type BookmarkLinkRequest = {
   comment: string;
   tags: string[];
   signature: string;
+  squawk?: boolean;
+  amount?: number;
 }
 
 export type BookmarkLinkResponse = {
   content: Dbt.Content;
+  link?: Dbt.Link;
 }
 
 export type LoadLinkRequest = {

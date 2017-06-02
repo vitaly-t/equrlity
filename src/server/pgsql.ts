@@ -448,9 +448,9 @@ async function _handlePromoteLink(t: ITask<any>, userId, req: Rpc.PromoteLinkReq
 export async function bookmarkAndInvestInLink(userId, req: Rpc.BookmarkLinkRequest, amount: number): Promise<Rpc.PromoteContentResponse> {
   let cont: Dbt.Content;
   let pr = await db.tx(async t => {
-    cont = await tasks.handleBookmarkLink(t, userId, req);
-    let { comment, tags, title, signature } = req;
-    let contentId = cont.contentId;
+    let { contentId, comment, tags, title, signature, url } = req;
+    cont = await tasks.bookmarkLink(t, userId, contentId, title, tags, url, comment);
+    contentId = cont.contentId;
     let preq: Rpc.PromoteContentRequest = { contentId, comment, tags, title, amount, signature };  //TODO: fixup signature mangling here
     return await _handlePromoteContent(t, userId, preq);
   });
@@ -462,9 +462,10 @@ export async function bookmarkAndInvestInLink(userId, req: Rpc.BookmarkLinkReque
 }
 
 export async function handleBookmarkLink(userId, req: Rpc.BookmarkLinkRequest): Promise<Rpc.BookmarkLinkResponse> {
-  let content: Dbt.Content = await db.task(t => tasks.handleBookmarkLink(t, userId, req));
-  cache.contents.set(content.contentId, content);
-  return { content };
+  let rsp: Rpc.BookmarkLinkResponse = await db.task(t => tasks.handleBookmarkLink(t, userId, req));
+  cache.contents.set(rsp.content.contentId, rsp.content);
+  if (rsp.link) cache.links.set(rsp.link.linkId, rsp.link);
+  return rsp;
 }
 
 async function _getUserLinks(t: ITask<any>, id: Dbt.userId): Promise<Rpc.UserLinkItem[]> {
@@ -571,7 +572,7 @@ export async function updateUserFeed(userId: Dbt.userId): Promise<Rpc.FeedItem[]
     let follows = await t.any(`select * from user_follows where "userId" = '${userId}' `);
     let feeds = links.filter(l => {
       if (follows.findIndex(f => f.following === l.userId) >= 0) return true;
-      if (subscriptions.findIndex(t => l.tags.indexOf(t) >= 0) >= 0) return true;
+      if (subscriptions && subscriptions.findIndex(t => l.tags.indexOf(t) >= 0) >= 0) return true;
       return false;
     }).map(l => {
       let f = OxiGen.emptyRec<Dbt.Feed>("feeds");

@@ -8,7 +8,8 @@ import { TagSelectOption } from '../lib/tags';
 export interface AppState {
   publicKey: JsonWebKey | null;
   privateKey: JsonWebKey | null;
-  links: Map<string, Dbt.Content>;
+  links: any; // Map<string, Dbt.Content>;
+  matchedTags: any // Map<string, Dbt.tags>;
   activeUrl: string | null;
   homePage: Dbt.urlString;
   moniker: string;
@@ -32,33 +33,48 @@ export interface AppState {
 export function initState(): AppState {
   console.log("initState called");
   return {
-    publicKey: null, privateKey: null, links: new Map<string, Dbt.Content>(), profile_pic: '', feed: [],
-    activeUrl: null, moniker: 'unknown', authprov: '', email: '', credits: 0, jwt: '', lastErrorMessage: '', homePage: '',
+    publicKey: null, privateKey: null, links: Object.create(null) /*new Map<string, Dbt.Content>()*/, matchedTags: Object.create(null) /*new Map<string, Dbt.tags>()*/,
+    activeUrl: null, moniker: 'unknown', authprov: '', email: '', credits: 0, jwt: '', lastErrorMessage: '', homePage: '', profile_pic: '', feed: [],
     investments: [], promotions: [], connectedUsers: [], reachableUserCount: 0, contents: [], allTags: [], currentContent: null, currentLink: null
   };
 }
 
 export function getBookmark(state: AppState, curl: string): Dbt.Content {
-  return state.links.get(prepareUrl(curl));
+  //return state.links.get(prepareUrl(curl));
+  return state.links[prepareUrl(curl)];
 }
 
 // serialization occurs by sendMessages between background "page"" and popup panel
 // Maps don't serialize :-(
 export function preSerialize(st: AppState): any {
+  return st;
+  /*
   let links = Object.create(null);
   st.links.forEach((v, k) => {
     links[k] = v;
   });
-  return { ...st, links };
+  let matchedTags = Object.create(null);
+  st.matchedTags.forEach((v, k) => {
+    matchedTags[k] = v;
+  });
+  return { ...st, links, matchedTags };
+  */
 }
 
 export function postDeserialize(st: any): AppState {
   if (!st) return initState();
+  return st;
+  /*
   let links = new Map<string, Url>();
   for (const k in st.links) {
     links.set(k, st.links[k]);
   };
-  return { ...st, links };
+  let matchedTags = new Map<string, Dbt.tags>();
+  for (const k in st.matchedTags) {
+    links.set(k, st.matchedTags[k]);
+  };
+  return { ...st, links, matchedTags };
+  */
 }
 
 export function setLoading(state: AppState, curl_: string): AppState {
@@ -66,29 +82,32 @@ export function setLoading(state: AppState, curl_: string): AppState {
   let st = state;
   if (!isSeen(st, curl)) {
     console.log("setLoading called: " + curl_);
-    let links = new Map(st.links);
-    links.set(curl, null);
+    let links = Object.create(null); //new Map(st.links);
+    links[curl] = null; //links.set(curl, null);
     st = { ...st, links };
   }
   return st;
 }
 
 export function isSeen(state: AppState, curl: string): boolean {
-  return state.links.has(prepareUrl(curl));
+  //return state.links.has(prepareUrl(curl));
+  return (curl in state.links);
 }
 
 export function setWaiting(state: AppState, curl_: string): AppState {
   let curl = prepareUrl(curl_)
-  if (state.links.get(curl)) return state;
+  //if (state.links.get(curl)) return state;
+  if (state.links[curl]) return state;
   let st = state;
-  let links = new Map(st.links);
-  links.set(curl, null);
+  let links = Object.create(null); //new Map(st.links);
+  links[curl] = null; //links.set(curl, null);
   return { ...st, links };
 }
 
 export function isWaiting(state: AppState, curl_: string): boolean {
   let curl = prepareUrl(curl_)
-  return state.links.get(curl) === null;
+  //return state.links.get(curl) === null;
+  return (curl in state.links) && state.links[curl] === null;
 }
 
 function prePrepareUrl(curl: string): Url | null {
