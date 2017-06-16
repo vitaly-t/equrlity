@@ -537,31 +537,6 @@ router.post('/rpc', async function (ctx: any) {
         ctx.body = { id, result };
         break;
       }
-      /*
-      case "getRedirect": {
-          let req: Rpc.GetRedirectRequest = params;
-          let contentUrl = null;
-          let url = parse(req.linkUrl);
-          let result: Rpc.GetRedirectResponse = { found: false };
-          if (Utils.isPseudoQLinkURL(url)) {
-              let linkId = Utils.getLinkIdFromUrl(url);
-              if (!linkId) throw new Error("invalid link");
-              let link = cache.links.get(linkId);
-              let cont = cache.contents.get(link.contentId)
-              console.log("attention gots to get paid for!!!");
-              await pg.payForView(userId, linkId)
-              if (cont.contentType != "link") result = { found: false };
-              else {
-                  let contentUrl = cont.title;
-                  let linkDepth = cache.getLinkDepth(link);
-                  let linkPromoter = cache.users.get(link.userId).userName;
-                  result = { found: true, contentUrl, linkDepth, linkPromoter };
-              }
-          }
-          ctx.body = { id, result };
-          break;
-      }
-      */
       case "changeSettings": {
         let req: Rpc.ChangeSettingsRequest = params;
         let { userName, homePage, info, profile_pic, subscriptions, blacklist, following } = req;

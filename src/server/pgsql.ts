@@ -100,7 +100,7 @@ export async function init() {
         t.rowType.heading.forEach(async c => {
           if (cols.findIndex(v => v.column_name === c.name) < 0) {
             console.log(`Adding column ${c.name} to table ${t.name}`);
-            let stmt = `ALTER TABLE "${t.name}" ADD COLUMN "${c.name}" ${c.type.sqlType} `;
+            let stmt = `ALTER TABLE "${t.name}" ADD COLUMN "${c.name}" ${c.type.sqlType + (c.multiValued || c.type.multiValued ? '[]' : '')} `;
             await db.none(stmt);
           }
         })
@@ -445,13 +445,13 @@ async function _handlePromoteLink(t: ITask<any>, userId, req: Rpc.PromoteLinkReq
 }
 */
 
-export async function bookmarkAndInvestInLink(userId, req: Rpc.BookmarkLinkRequest, amount: number): Promise<Rpc.PromoteContentResponse> {
+export async function bookmarkAndPromoteLink(userId, req: Rpc.BookmarkLinkRequest): Promise<Rpc.PromoteContentResponse> {
   let cont: Dbt.Content;
   let pr = await db.tx(async t => {
     let { contentId, comment, tags, title, signature, url } = req;
     cont = await tasks.bookmarkLink(t, userId, contentId, title, tags, url, comment);
     contentId = cont.contentId;
-    let preq: Rpc.PromoteContentRequest = { contentId, comment, tags, title, amount, signature };  //TODO: fixup signature mangling here
+    let preq: Rpc.PromoteContentRequest = { contentId, comment, tags, title, amount: 0, signature, paymentSchedule: [] };  //TODO: fixup signature mangling here
     return await _handlePromoteContent(t, userId, preq);
   });
   cache.contents.set(cont.contentId, cont);
@@ -565,14 +565,16 @@ export async function saveUserFollowings(userId: Dbt.userId, followings: Rpc.Use
 
 export async function updateUserFeed(userId: Dbt.userId): Promise<Rpc.FeedItem[]> {
   let usr = cache.users.get(userId)
-  let { last_feed, subscriptions } = usr;
+  let { last_feed, subscriptions, blacklist } = usr;
   let now = new Date();
   return await db.tx(async t => {
     let links: Dbt.Link[] = await t.any('select * from links where created > $1', [last_feed]);
     let follows = await t.any(`select * from user_follows where "userId" = '${userId}' `);
     let feeds = links.filter(l => {
-      if (follows.findIndex(f => f.following === l.userId) >= 0) return true;
       if (subscriptions && subscriptions.findIndex(t => l.tags.indexOf(t) >= 0) >= 0) return true;
+      if (follows.findIndex(f => f.following === l.userId) >= 0) {
+        return !(blacklist && blacklist.findIndex(t => l.tags.indexOf(t) >= 0) >= 0);
+      }
       return false;
     }).map(l => {
       let f = OxiGen.emptyRec<Dbt.Feed>("feeds");
@@ -609,7 +611,7 @@ export async function generateSquawks() {
     for (const uid of uids) {
       let preq: Rpc.BookmarkLinkRequest = { comment: "great comment " + i, tags: [], url: "https://www.example.com/thing/" + i, signature: "", title: "awesome link " + i };
       try {
-        await bookmarkAndInvestInLink(uid, preq, 10);
+        await bookmarkAndPromoteLink(uid, preq);
       }
       catch (e) { }
       await Utils.sleep(2000);

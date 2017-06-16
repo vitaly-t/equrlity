@@ -290,20 +290,26 @@ export class ContentsPage extends React.Component<ContentsPageProps, ContentsPag
 }
 
 interface PromoteContentProps { info: Dbt.Content, allTags: Tags.TagSelectOption[], onClose: () => void }
-interface PromoteContentState { title: string, comment: string, tags: string[], isOpen: boolean, amount: number }
+interface PromoteContentState { title: string, comment: string, tags: string[], isOpen: boolean, amount: number, paymentSchedule: Dbt.integer[] }
 class PromoteContent extends React.Component<PromoteContentProps, PromoteContentState> {
 
   constructor(props: PromoteContentProps) {
     super(props);
     let tags = props.info.tags || [];
-    tags.unshift(props.info.contentType);
-    this.state = { isOpen: true, amount: 10, title: props.info.title, tags, comment: '' };
+    let typ = props.info.contentType;
+    tags.unshift(typ);
+    let paymentSchedule = (typ === 'audio' || typ === 'video') ? Utils.defaultPaymentSchedule() : [];
+    this.state = { isOpen: true, amount: 10, title: props.info.title, tags, comment: '', paymentSchedule };
   }
 
   changeTitle(e) { this.setState({ title: e.target.value }); }
   changeTags(e) { this.setState({ tags: e.target.value }); }
   changeComment(e) { this.setState({ comment: e.target.value }); }
   changeInvestment(e) { this.setState({ amount: parseInt(e.target.value) }); }
+  changePaymentSchedule(e) {
+    let paymentSchedule = e.target.value.split(",").map(s => parseInt(s));
+    this.setState({ paymentSchedule });
+  }
 
   close() {
     this.props.onClose();
@@ -311,9 +317,9 @@ class PromoteContent extends React.Component<PromoteContentProps, PromoteContent
   }
 
   save() {
-    let { title, tags, amount, comment } = this.state;
+    let { title, tags, amount, comment, paymentSchedule } = this.state;
     let info = this.props.info;
-    let req: Rpc.PromoteContentRequest = { contentId: info.contentId, title, comment, tags, amount, signature: '' };
+    let req: Rpc.PromoteContentRequest = { contentId: info.contentId, title, comment, tags, amount, signature: '', paymentSchedule };
     Chrome.sendMessage({ eventType: "PromoteContent", req });
     this.close();
   }
@@ -322,6 +328,20 @@ class PromoteContent extends React.Component<PromoteContentProps, PromoteContent
     if (!this.state.isOpen) return null;
     let pubdiv = null;
     let ttl = "Promote Content"
+    let invdiv = null;
+    if (this.props.info.contentType !== 'bookmark') {
+      let schedule = this.state.paymentSchedule.map(i => i.toString()).join();
+      invdiv = (<div>
+        <div style={rowStyle} >
+          <div style={lhcolStyle}>Schedule:</div>
+          <input type="text" style={{ marginTop: 6, height: "30px", width: '100%' }} value={schedule} onChange={e => this.changePaymentSchedule(e)} />
+        </div>
+        <div style={rowStyle} >
+          <div style={{ display: 'inline' }}>Investment amount:</div>
+          <input type="number" style={{ display: 'inline', height: "24px", marginTop: "6px", width: '100px' }} value={this.state.amount} onChange={e => this.changeInvestment(e)} />
+        </div>
+      </div>);
+    }
     return (
       <Dialog iconName="inbox" isOpen={this.state.isOpen} title={ttl} onClose={() => this.close()} >
         <div className="pt-dialog-body">
@@ -337,11 +357,8 @@ class PromoteContent extends React.Component<PromoteContentProps, PromoteContent
             <div style={lhcolStyle}>Tags:</div>
             <Tags.TagGroupEditor tags={this.state.tags} creatable={true} allTags={this.props.allTags} onChange={(tags) => this.changeTags(tags)} />
           </div>
-          <div style={rowStyle} >
-            <div style={{ display: 'inline' }}>Investment amount:</div>
-            <input type="number" style={{ display: 'inline', height: "24px", marginTop: "6px", width: '100px' }} value={this.state.amount} onChange={e => this.changeInvestment(e)} />
-          </div>
         </div>
+        {invdiv}
         <div className="pt-dialog-footer">
           <div className="pt-dialog-footer-actions">
             <Button text="Cancel" onClick={() => this.close()} />

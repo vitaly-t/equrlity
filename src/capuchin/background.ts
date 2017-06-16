@@ -5,6 +5,7 @@ import * as OxiGen from '../gen/oxigen';
 import * as Dbt from '../lib/datatypes';
 import * as Crypto from '../lib/Crypto';
 import * as Utils from '../lib/utils';
+import * as OxiDate from '../lib/oxidate';
 import { mergeTags } from '../lib/tags';
 
 import { AppState, initState, isSeen, setLoading, setWaiting, prepareUrl, preSerialize, postDeserialize } from './AppState';
@@ -69,89 +70,89 @@ async function launchSystemTab(nm: string) {
 }
 
 async function __init() {
-  console.log("__init called");
+  //console.log("__init called");
   let st = currentState();
   if (!st.jwt) {
+    //console.log("no jwt found");
     localForage.config({ name: 'pseudoq-capuchin' });
     const keys: string[] = await localForage.keys();
-    const userInfo: chrome.identity.UserInfo = await getProfile();
-    await createKeyPairIf(keys);
-    const publicKey = await localForage.getItem<JsonWebKey>('publicKey');
-    const privateKey = await localForage.getItem<JsonWebKey>('privateKey');
-    const chromeToken: string = Utils.isDev() ? '' : await getChromeAccessToken();
-    if (keys.indexOf('appState') > 0) st = await localForage.getItem<AppState>('appState');
-    if (st.jwt) await handleMessage({ eventType: "Thunk", fn: (_ => st) });
+    if (keys.indexOf('appState') >= 0) {
+      console.log("loading appState");
+      let newst = await localForage.getItem<AppState>('appState');
+      // allows for possible evolution (eg new properties) of appState structure in code.
+      st = { ...st, ...newst, matchedTags: Object.create(null), links: Object.create(null) };
+    }
+    if (st.jwt) handleMessage({ eventType: "Thunk", fn: (_ => st) });
     else {
+      const userInfo: chrome.identity.UserInfo = await getProfile();
+      await createKeyPairIf(keys);
+      const publicKey = await localForage.getItem<JsonWebKey>('publicKey');
+      const privateKey = await localForage.getItem<JsonWebKey>('privateKey');
+      const chromeToken: string = Utils.isDev() ? '' : await getChromeAccessToken();
       const jwt = await AsyncHandlers.authenticate(userInfo, chromeToken, publicKey);
       if (!jwt) throw new Error("Unable to authenticate");
-      await handleMessage({ eventType: "Thunk", fn: ((st: AppState) => { return { ...st, publicKey, privateKey, jwt } }) });
+      handleMessage({ eventType: "Thunk", fn: ((st: AppState) => { return { ...st, publicKey, privateKey, jwt } }) });
     }
   }
 }
 
-function updateFeed() {
-  handleAsyncMessage({ eventType: "UpdateFeed" });
+async function updateFeed() {
+  await handleAsyncMessage({ eventType: "UpdateFeed" });
   setTimeout(updateFeed, 120000);  // configurable somehow?
 }
 
-let __initialized = false;
 async function initialize() {
-  if (__initialized) return;
   console.log("initializing...");
   let st = currentState();
-  __initialized = true;
   try {
     if (!st.jwt) await __init();
     await handleAsyncMessage({ eventType: "Initialize" });
     updateFeed();
   }
   catch (e) {
-    await handleMessage({ eventType: "Thunk", fn: ((st: AppState) => { throw (e) }) });
-    __initialized = false;
+    console.log("initialize threw : " + e.message)
+    setTimeout(initialize, 5000);
   }
 }
 
-/*  the following bombs out for some reason.  maybe later...
 let injectJs = `
+var html = '';
 function DOMtoString(document_root) {
-    var html = '',
-        node = document_root.firstChild;
-    while (node) {
-        switch (node.nodeType) {
-            case Node.ELEMENT_NODE:
-                html += node.outerHTML;
-            break;
-            case Node.TEXT_NODE:
-                html += node.nodeValue;
-            break;
-            case Node.CDATA_SECTION_NODE:
-                html += '<![CDATA[' + node.nodeValue + ']]>';
-            break;
-            case Node.COMMENT_NODE:
-                html += '<!--' + node.nodeValue + '-->';
-            break;
-            case Node.DOCUMENT_TYPE_NODE:
-                // (X)HTML documents are identified by public identifiers
-                html += "<!DOCTYPE "
-                     + node.name
-                     + (node.publicId ? ' PUBLIC "' + node.publicId + '"' : '')
-                     + (!node.publicId && node.systemId ? ' SYSTEM' : '') 
-                     + (node.systemId ? ' "' + node.systemId + '"' : '')
-                     + '>\n';
-            break;
-        }
-        node = node.nextSibling;
+  var node = document_root.firstChild;
+  while (node) {
+    switch (node.nodeType) {
+      case Node.ELEMENT_NODE:
+        html += node.outerHTML;
+        break;
+      case Node.TEXT_NODE:
+        html += node.nodeValue;
+        break;
+      case Node.CDATA_SECTION_NODE:
+        html += '<![CDATA[' + node.nodeValue + ']]>';
+        break;
+      case Node.COMMENT_NODE:
+        html += '<!--' + node.nodeValue + '-->';
+        break;
+      case Node.DOCUMENT_TYPE_NODE:
+        // (X)HTML documents are identified by public identifiers
+        html += "<!DOCTYPE "
+          + node.name
+          + (node.publicId ? ' PUBLIC "' + node.publicId + '"' : '')
+          + (!node.publicId && node.systemId ? ' SYSTEM' : '')
+          + (node.systemId ? ' "' + node.systemId + '"' : '')
+          + '>';
+        break;
     }
-    return html;
+    node = node.nextSibling;
+  }
 }
 
-chrome.extension.onMessage.addListener(function(message, sender, cb) {
-  if (message.eventType === "bodyAsString") cb(DOMtoString(document));
-});
+try { DOMtoString(document); }
+catch(e) { html += "... ERROR:"+e.message; }
+html ;
 
 `;
-*/
-
+//*/
 
 chrome.runtime.onStartup.addListener(initialize);
 
@@ -163,7 +164,7 @@ chrome.runtime.onMessage.addListener(async (message, sender, cb) => {
     return;
   }
   if (message.eventType == "GetState") {
-    if (!__initialized) await initialize();
+    while (!currentState().jwt) await Utils.sleep(1000); //await initialize();
     let st = preSerialize(currentState());
     cb(st);
   }
@@ -176,42 +177,38 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   else if (changeInfo.status === "complete") {
     let st = currentState();
     let url = prepareUrl(tab.url)
-    if (st.allTags && !(url in st.links) && !(url in st)) {
-      console.log("searching for matching tags");
-      let injectJs = `
-chrome.extension.onMessage.addListener(function(message, sender, cb) {
-  if (message.eventType === "getTextContent") cb(document.documentElement.textContent);
-});
-`;
-
-      chrome.tabs.executeScript(tabId, { code: injectJs }, function () {
-        chrome.tabs.sendMessage(tabId, { eventType: "getTextContent" }, function (source: string) {
-          // TODO: Detect injection error using chrome.runtime.lastError
-          if (chrome.runtime.lastError) {
-            handleAsyncMessage({
-              eventType: "Thunk", fn: (st => {
-                st = { ...st, lastErrorMessage: "Injection error: " + chrome.runtime.lastError.message }
-                return st;
+    if (url && st.allTags && !(url in st.links) && !(url in st.matchedTags)) {
+      console.log("injecting tag search script for url: " + url);
+      //chrome.tabs.executeScript(tabId, { code: injectJs, allFrames: true }, function (rslt: any[]) {
+      chrome.tabs.executeScript(tabId, { code: 'document.body.textContent', allFrames: true }, function (rslt: any[]) {
+        if (chrome.runtime.lastError) {
+          console.log("Tag search injection failed : " + chrome.runtime.lastError.message);
+          return;
+        }
+        if (rslt) {
+          let tags = new Set<String>();
+          rslt.forEach(source => {
+            if (source) {
+              source = source.toLowerCase();
+              st.allTags.forEach(t => {
+                if (t.label.indexOf("-") > 0) {
+                  let a = t.label.split("-");
+                  if (a.every(l => source.indexOf(l) > 0)) tags.add(t.label);
+                }
+                else if (source.indexOf(t.label) >= 0) tags.add(t.label);
               })
-            });
-          }
-          if (source) {
-            source = source.toLowerCase();
-            let tags = new Set<String>();
-            st.allTags.forEach(t => {
-              if (source.indexOf(t.label) >= 0) tags.add(t.label);
-            })
+            }
             let a = Array.from(tags);
-            if (tags.size > 0) console.log(tags.size.toString() + " tags found");
+            //if (tags.size > 0) console.log(tags.size.toString() + " tags found");
             handleMessage({
               eventType: "Thunk", fn: (st => {
                 let { matchedTags } = st;
-                matchedTags[url] = a;
+                matchedTags[url] = a;  // no need to cause a refresh???
                 return st;
               })
             });
-          }
-        });
+          });
+        };
       });
     }
   }
@@ -252,20 +249,30 @@ chrome.webRequest.onHeadersReceived.addListener(addResponseHeaders
 
 
 export async function handleAsyncMessage(event: Message) {
-  if (!__initialized) await initialize();
   let st = currentState();
+  //while (!st.jwt) await Utils.sleep(1000); //await initialize();
+  if (!st.jwt) {
+    setTimeout(() => handleAsyncMessage(event), 1000);
+    return;
+  }
   let fn = null;
   //console.log("Async Handling :" + event.eventType);
   try {
     switch (event.eventType) {
-      case "Initialize":
+      case "Initialize": {
         fn = await AsyncHandlers.initialize(st);
         break;
-      case "ChangeSettings":
+      }
+      case "ChangeSettings": {
         fn = await AsyncHandlers.changeSettings(st, event.settings);
         break;
+      }
       case "BookmarkLink": {
         fn = await AsyncHandlers.bookmarkLink(st, event);
+        break;
+      }
+      case "SaveContent": {
+        fn = await AsyncHandlers.saveContent(st, event.req);
         break;
       }
       case "PromoteContent": {
@@ -284,11 +291,12 @@ export async function handleAsyncMessage(event: Message) {
         fn = await AsyncHandlers.redeemLink(st, event.linkId);
         break;
       }
-      case "LaunchPage":
+      case "LaunchPage": {
         launchSystemTab(event.page);
         if (event.page === 'contents') fn = await AsyncHandlers.getUserContents(st);
         else if (event.page === 'links') fn = await AsyncHandlers.getUserLinks(st);
         break;
+      }
       case "GetUserLinks": {
         fn = await AsyncHandlers.getUserLinks(st);
         break;
@@ -296,10 +304,6 @@ export async function handleAsyncMessage(event: Message) {
       case "ActivateTab": {
         let t = await getTab(event.tabId);
         fn = await AsyncHandlers.load(st, t.url);
-        break;
-      }
-      case "SaveContent": {
-        fn = await AsyncHandlers.saveContent(st, event.req);
         break;
       }
       case "SaveLink": {
@@ -327,7 +331,6 @@ export async function handleAsyncMessage(event: Message) {
     let msg = "Error in Async handler : " + event.eventType + ", " + e.message;
     let fn = (st: AppState) => { return { ...st, lastErrorMessage: msg }; };
     handleMessage({ eventType: "Thunk", fn });
-    if (e.message === "Network Error") __initialized = false;
   }
 
 }
@@ -336,7 +339,7 @@ export function handleMessage(event: Message): AppState {
   function storeState(st: AppState): void {
     if (__state !== st) {
       __state = st;
-      let appState = preSerialize(st);
+      let appState = preSerialize({ ...st, matchedTags: null, links: null });
       localForage.setItem('appState', appState);
       chrome.runtime.sendMessage({ eventType: 'Render', appState });
     }
@@ -374,7 +377,7 @@ export function handleMessage(event: Message): AppState {
     console.log("error in handler :" + e.message);
     st = { ...st, lastErrorMessage: e.message };
     storeState(st);
-    if (e.message === "Network Error") __initialized = false;
   }
   return st;
 }
+

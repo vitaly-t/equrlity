@@ -171,3 +171,7 @@ export function binaryIndexOf(searchElement, arr) {
   return -1;
 }
 
+export function defaultPaymentSchedule(): Dbt.integer[] {
+  return [2, 4, 8, 16, 32, 64, 128, 256, 512];   // res(o)nate schedule
+}
+

@@ -29,7 +29,7 @@
  *
  *   - Authorization:  Used to implement JWT (see https://jwt.io). If no Authorization Header is provided, the user is assumed to be a
  *                     new user. A new account will be created, and a new token will be generated and returned in the response 'x-psq-token' header.
- *                     The client should from then on supply the generated token using the Authorizatio header value "Bearer " followed by the token string.
+ *                     The client should from then on supply the generated token using the Authorization header value "Bearer " followed by the token string.
  * 
  *   - x-psq-client-version: Used to identify the requesting client software. If not supplied the request is rejected (400).
  *                           If supplied it must be of the form {client-name}-{client-version}.
@@ -65,9 +65,6 @@ export type Method = "initialize" | "authenticate" | "promoteContent" | "bookmar
   | "getUserContents" | "loadContent" | "getUserSettings" | "getUserLinks" | "redeemLink" | "saveContent" | "saveLink" | "removeContent" | "transferCredits"
   | "aditComment" | "dismissSquawks" | "updateFeed";
 
-/**
- * Informational type tags used to indicate intended usage.
- */
 export type UrlString = string;
 export type Integer = number;
 
@@ -103,6 +100,7 @@ export type PromoteContentRequest = {
   tags: string[];
   amount: Integer;
   signature: string;
+  paymentSchedule: Integer[];
 }
 
 export type PromoteContentResponse = {

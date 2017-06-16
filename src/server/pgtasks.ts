@@ -186,7 +186,7 @@ export async function deliveriesCount(t: ITask<any>, linkId: Dbt.linkId): Promis
 }
 
 export async function promoteContent(t: ITask<any>, userId, req: Rpc.PromoteContentRequest): Promise<CacheUpdate[]> {
-  let { contentId, amount, tags, comment, title } = req;
+  let { contentId, amount, tags, comment, title, paymentSchedule } = req;
   let usr = await retrieveRecord<Dbt.User>(t, "users", { userId });
   if (amount > usr.credits) amount = usr.credits; //throw new Error("Negative balances not allowed");
   let cont = await retrieveRecord<Dbt.Content>(t, "contents", { contentId });
@@ -195,11 +195,17 @@ export async function promoteContent(t: ITask<any>, userId, req: Rpc.PromoteCont
   let prevLink: Dbt.linkId;
   if (cont.contentType === "bookmark") {
     let url = parse(cont.url);
-    if (Utils.isPseudoQLinkURL(url)) prevLink = Utils.getLinkIdFromUrl(url);
+    if (Utils.isPseudoQLinkURL(url)) {
+      if (paymentSchedule && paymentSchedule.length > 0) throw new Error("Payment schedule not applicable to PseudoQURL bookmark");
+      prevLink = Utils.getLinkIdFromUrl(url);
+    }
+  }
+  if (amount > 0) {
+    if (!paymentSchedule || paymentSchedule.length === 0 || paymentSchedule.findIndex(i => i < 0) < 0) throw new Error("Payment schedule permits no use for investment");
   }
   let rslt: CacheUpdate[] = [];
   let link = OxiGen.emptyRec<Dbt.Link>("links");
-  link = { ...link, userId, contentId, tags, amount, comment, title, prevLink }
+  link = { ...link, userId, contentId, tags, amount, comment, title, prevLink, paymentSchedule }
   link = await insertLink(t, link);
   rslt.push({ table: "links" as CachedTable, record: link });
   Array.prototype.push.apply(rslt, await adjustUserBalance(t, usr, -amount));
@@ -231,6 +237,8 @@ export async function promoteLink(t: ITask<any>, userId: Dbt.userId, url: string
 }
 
 export async function redeemLink(t: ITask<any>, link: Dbt.Link): Promise<CacheUpdate[]> {
+  return investInLink(t, link, -link.amount);
+  /*
   let conts = await t.any(`select url from contents where "contentId" = '${link.contentId}'`);
   let url = conts[0].url;
   let linksToReParent = await t.any(`select * from links where "prevLink" = '${link.linkId}'`)
@@ -246,14 +254,15 @@ export async function redeemLink(t: ITask<any>, link: Dbt.Link): Promise<CacheUp
   if (link.amount > 0) Array.prototype.push.apply(rslt, await adjustUserBalance(t, user, link.amount));
   for (const l of linksToReParent) rslt.push({ table: "links" as CachedTable, record: { ...l, prevLink: link.prevLink } });
   return rslt;
+  */
 }
 
 export async function investInLink(t: ITask<any>, link: Dbt.Link, adj: Dbt.integer): Promise<CacheUpdate[]> {
   let amount = link.amount + adj;
   if (amount < 0) throw new Error("Negative investments not allowed");
-  if (amount == 0) {
-    return await redeemLink(t, link);
-  }
+  //if (amount == 0) {
+  //  return await redeemLink(t, link);
+  //}
   let rslt: CacheUpdate[] = [];
   let user = await retrieveRecord<Dbt.User>(t, "users", { userId: link.userId });
   Array.prototype.push.apply(rslt, await adjustUserBalance(t, user, -adj));
@@ -286,44 +295,39 @@ export async function getLinkAlreadyInvestedIn(t: ITask<any>, userId: Dbt.userId
 
 export async function payForView(t: ITask<any>, links: Dbt.Link[], viewerId: Dbt.userId, viewedLinkId: Dbt.linkId): Promise<CacheUpdate[]> {
   let rslt: CacheUpdate[] = [];
-  let viewedLink = links[0];
-  let bal = viewedLink.amount;
-  if (bal == 0) return rslt;
 
-  // is viewer already in links?
-  if (links.findIndex(l => l.userId === viewerId) >= 0) return rslt;
-
-  await insertRecord(t, "views", { userId: viewerId, linkId: viewedLinkId });
-
-  // viewer gets paid 1
   let viewer = await retrieveRecord<Dbt.User>(t, "users", { userId: viewerId });
-  let credits = viewer.credits + 1;
-  viewer = { ...viewer, credits }
-  viewer = await updateRecord<Dbt.User>(t, "users", viewer);
-  rslt.push({ table: "users" as CachedTable, record: viewer });
-  bal -= 1
-
-  // each link in the parent chain gets paid 1
-  let i = 1;
-  while (bal > 0 && i < links.length) {
-    let link = links[i];
-    let amount = link.amount + 1;
-    let r = await updateRecord<Dbt.Link>(t, "links", { ...link, amount });
-    rslt.push({ table: "links" as CachedTable, record: r });
-    bal -= 1;
-    i += 1;
+  let l = links.length - 1;
+  for (let i = 0; i < l; ++i) await insertRecord(t, "views", { userId: viewerId, linkId: links[i].linkId });
+  let link = links[l];
+  let sched = link.paymentSchedule;
+  if (sched && sched.length > 0) {
+    let views: Dbt.View[] = await t.any(`select * from views where "userId" = '${viewerId}' and "linkId" = '${link.linkId}' order by "viewCount" `);
+    if (views.length < sched.length) {
+      let amt = sched[views.length];
+      let totalPayment = amt
+      if (views.length > 0) {
+        let lastView = views[views.length - 1];
+        if (lastView.viewCount !== views.length) throw new Error("corruption in previous views");
+        totalPayment += lastView.totalPayment;
+      }
+      if (amt < 0) { //link pays viewer
+        if (link.amount + amt < 0) throw new Error("link has insufficient credits to pay viewer");  //nqr - viewer is denied access as well as not getting paid
+      }
+      else if (viewer.credits < amt) throw new Error("viewer has insufficient credits to pay link");
+      await insertRecord(t, "views", { userId: viewerId, linkId: link.linkId, viewCount: views.length + 1, payment: amt, totalPayment });
+      let credits = viewer.credits - amt;
+      viewer = { ...viewer, credits }
+      viewer = await updateRecord<Dbt.User>(t, "users", viewer);
+      rslt.push({ table: "users" as CachedTable, record: viewer });
+      let amount = link.amount + amt;
+      let r = await updateRecord<Dbt.Link>(t, "links", { ...link, amount });
+      rslt.push({ table: "links" as CachedTable, record: r });
+      return rslt;
+    }
   }
-  if (bal == 0) {
-    // maybe later ...
-    //let link = await retrieveRecord<Dbt.Link>(t, "links", { linkId: viewedLinkId });
-    //Array.prototype.push.apply(rslt, await redeemLink(t, { ...link, amount: 0 }));
-    //rslt.push({ table: "links" as CachedTable, record: viewedLink, remove: true });
-  }
-  else {
-    let r = await updateRecord<Dbt.Link>(t, "links", { ...viewedLink, amount: bal });
-    rslt.push({ table: "links" as CachedTable, record: r });
-  }
-  return rslt;
+  await insertRecord(t, "views", { userId: viewerId, linkId: link.linkId });
+  return [];
 }
 
 export async function createUser(t: ITask<any>, email?: string): Promise<Dbt.User> {
@@ -524,7 +528,7 @@ export async function dismissSquawks(t: ITask<any>, userId: Dbt.userId, urls: Db
       let cont = OxiGen.emptyRec<Dbt.Content>("contents");
       let { tags, title, comment } = link;
       cont = { ...cont, title, tags, url, userId, content: comment, contentType: "bookmark" };
-      await await insertContent(t, cont);
+      await insertContent(t, cont);
     }
   }
   let now = new Date();

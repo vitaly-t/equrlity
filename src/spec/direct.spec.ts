@@ -52,19 +52,19 @@ it("should work using direct calls", async () => {
   //let publicKey = await Crypto.getPublicKeyJWK(pr);
 
   let preq1: Rpc.BookmarkLinkRequest = { comment: "great comment", tags: [], url: "https://www.example.com/anydamnthing", signature: "", title: "wow awesome link" };
-  let rsp1 = await pg.bookmarkAndInvestInLink(u1.userId, preq1, 10);
+  let rsp1 = await pg.bookmarkAndPromoteLink(u1.userId, preq1);
   expect(rsp1.link).toBeDefined("promote link call failed");
-  expect(cache.users.get(u1.userId).credits).toEqual(990);
+  expect(cache.users.get(u1.userId).credits).toEqual(1000);
   expect(await countLinks()).toEqual(1);
 
   let link1 = cache.links.get(rsp1.link.linkId);
   expect(link1).toBeDefined("cache error on link1");
 
   let preq2: Rpc.BookmarkLinkRequest = { comment: "another great comment", tags: [], url: Utils.linkToUrl(rsp1.link.linkId, ''), signature: "", title: "promote me baby" };
-  let rsp2 = await pg.bookmarkAndInvestInLink(u2.userId, preq2, 10);
+  let rsp2 = await pg.bookmarkAndPromoteLink(u2.userId, preq2);
   expect(await countLinks()).toEqual(2);
   expect(rsp2.link).toBeDefined("promote call failed");
-  expect(cache.users.get(u2.userId).credits).toEqual(990);
+  expect(cache.users.get(u2.userId).credits).toEqual(1000);
   expect(cache.getChainFromLinkId(rsp2.link.linkId).length).toEqual(2, "link not chained");
 
   // test social graph updated
@@ -76,16 +76,16 @@ it("should work using direct calls", async () => {
 
   {  // new let namespace
     let preq3: Rpc.BookmarkLinkRequest = { comment: "groovy", tags: [], url: "https://www.example.com/somethingelse", signature: "", title: "yaa!!" };
-    let rsp = await pg.bookmarkAndInvestInLink(u1.userId, preq3, 10);
+    let rsp = await pg.bookmarkAndPromoteLink(u1.userId, preq3);
     expect(await countLinks()).toEqual(3);
 
-    expect(rsp.link).toBeDefined("add handlePomoteLink call failed");
+    expect(rsp.link).toBeDefined("add handlePromoteLink call failed");
     let url = parse(Utils.linkToUrl(rsp.link.linkId, rsp.link.title));
     expect(Utils.isPseudoQURL(url)).toEqual(true);
     expect(Utils.isPseudoQLinkURL(url)).toEqual(true);
     let linkId = Utils.getLinkIdFromUrl(url);
     let prom = await pg.promotionsCount(linkId);
-    expect(prom).toEqual(1, "promotions not working");
+    expect(prom).toEqual(0, "promotions not working");
     let viewed = await pg.hasViewed(u2.userId, linkId);
     expect(viewed).toEqual(false);
     let bal = cache.users.get(u2.userId).credits;
@@ -94,12 +94,12 @@ it("should work using direct calls", async () => {
     // user2 views link
     await pg.payForView(u2.userId, linkId)
     let newbal = cache.users.get(u2.userId).credits;
-    expect(newbal).toEqual(bal + 1, "payment for view not recorded");
-    expect(cache.links.get(linkId).amount).toEqual(linkbal - 1, "link amount not adjusted for view");
+    expect(newbal).toEqual(bal, "payment for view not recorded");
+    expect(cache.links.get(linkId).amount).toEqual(linkbal, "link amount not adjusted for view");
 
     expect(cache.userlinks.get(u1.userId).length).toEqual(1, "social graph not correct");
     let preq4: Rpc.BookmarkLinkRequest = { comment: "groovy baby", tags: [], url: format(url), signature: "", title: "yaa2  !!" };
-    let rsp2 = await pg.bookmarkAndInvestInLink(u3.userId, preq4, 10);
+    let rsp2 = await pg.bookmarkAndPromoteLink(u3.userId, preq4);
     expect(rsp2.link).toBeDefined("Promote call failed");
     expect(cache.userlinks.get(u1.userId).length).toEqual(2, "social graph not extended");
     {
@@ -109,12 +109,12 @@ it("should work using direct calls", async () => {
       // user4 views promoted link
       await pg.payForView(u4.userId, rsp2.link.linkId);
       let newbal = cache.links.get(linkId).amount;
-      expect(newbal).toEqual(bal + 1, "incorrect payment for chained view");
+      expect(newbal).toEqual(bal, "incorrect payment for chained view");
     }
 
-    // redeem link  testing - particularly re-grafting..
+    // redeem link  testing - re-grafting now removed.  just move balance out of link.
     let preq5: Rpc.BookmarkLinkRequest = { comment: "groovy baby", tags: [], url: Utils.linkToUrl(rsp.link.linkId, ''), signature: "", title: "yaal3!!" };
-    let rsp3 = await pg.bookmarkAndInvestInLink(u4.userId, preq5, 10);
+    let rsp3 = await pg.bookmarkAndPromoteLink(u4.userId, preq5);
     expect(rsp3.link).toBeDefined("promote call failed");
     expect(rsp3.link.prevLink).toEqual(rsp.link.linkId);
 
@@ -125,10 +125,6 @@ it("should work using direct calls", async () => {
       await pg.redeemLink(link);
       let newbal = cache.users.get(u1.userId).credits;
       expect(bal + linkbal).toEqual(newbal, "link balance not redeemed");
-      let url = cache.contents.get(link.contentId).url;
-      let links = await pg.getLinksForUrl(url);
-      let rootLinks = links.filter(l => !l.prevLink);
-      expect(rootLinks.length).toEqual(2);
     }
 
   }
@@ -147,4 +143,46 @@ it("should work for blobs", async () => {
   let s1 = pg.pgp.as.buffer(content);
   let s2 = pg.pgp.as.buffer(cont2);
   expect(s1).toEqual(s2, "blob cactus");
+  let sched = [-10, -5, 100];
+  let req: Rpc.PromoteContentRequest = { contentId: rsp.contentId, title: '', comment: '', tags: [], amount: 100, signature: '', paymentSchedule: sched };
+  let rsp2 = await pg.handlePromoteContent(u.userId, req);
+
+  let u2 = await pg.createUser();
+  {
+    let bal = cache.users.get(u2.userId).credits;
+    let link = rsp2.link;
+    let linkbal = link.amount;
+    await pg.payForView(u2.userId, link.linkId);
+    let newbal = cache.users.get(u2.userId).credits;
+    expect(bal - sched[0]).toEqual(newbal, "link balance not redeemed");
+  }
+
+  {
+    let bal = cache.users.get(u2.userId).credits;
+    let link = cache.links.get(rsp2.link.linkId);
+    let linkbal = link.amount;
+    await pg.payForView(u2.userId, link.linkId);
+    let newbal = cache.users.get(u2.userId).credits;
+    expect(bal - sched[1]).toEqual(newbal, "link balance not redeemed");
+  }
+
+  {
+    let bal = cache.users.get(u2.userId).credits;
+    let link = cache.links.get(rsp2.link.linkId);
+    let linkbal = link.amount;
+    await pg.payForView(u2.userId, link.linkId);
+    let newbal = cache.users.get(u2.userId).credits;
+    expect(bal - sched[2]).toEqual(newbal, "link balance not redeemed");
+  }
+
+  {
+    let bal = cache.users.get(u2.userId).credits;
+    let link = cache.links.get(rsp2.link.linkId);
+    let linkbal = link.amount;
+    await pg.payForView(u2.userId, link.linkId);
+    let newbal = cache.users.get(u2.userId).credits;
+    expect(bal).toEqual(newbal, "link balance not redeemed");
+  }
+
+
 }, 60000);

@@ -28,7 +28,10 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
 
   constructor(props: SettingsPageProps) {
     super(props);
-    let settings: Rpc.UserSettings = { userName: props.appState.moniker, email: props.appState.email, homePage: '', info: '', profile_pic: '', subscriptions: [], blacklist: [], following: [] };
+    let settings: Rpc.UserSettings = {
+      userName: props.appState.moniker, email: props.appState.email, homePage: '', info: '', profile_pic: '',
+      subscriptions: [], blacklist: [], following: []
+    };
     this.state = { settings, prevSettings: settings, allUsers: [] };
   }
 
@@ -148,12 +151,16 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
             <input type="text" style={{ width: '60%' }} name="HomePage" id="homePageId" value={homePage} onChange={(e) => this.changeHomePage(e.target.value)} />
           </div>
           <div style={divStyle}>
+            <div className="pt-text-muted" style={lhcolStyle} >Following: </div>
+            <TagGroupEditor tags={this.state.settings.following} tagClass="pt-intent-success pt-round pt-large" creatable={false} allTags={this.state.allUsers} onChange={(tags) => this.changeFollowing(tags)} />
+          </div>
+          <div style={divStyle}>
             <div className="pt-text-muted" style={lhcolStyle} >Subscriptions: </div>
             <TagGroupEditor tags={this.state.settings.subscriptions} creatable={false} allTags={this.props.appState.allTags} onChange={(tags) => this.changeSubscriptions(tags)} />
           </div>
           <div style={divStyle}>
-            <div className="pt-text-muted" style={lhcolStyle} >Following: </div>
-            <TagGroupEditor tags={this.state.settings.following} tagClass="pt-intent-success pt-round pt-large" creatable={false} allTags={this.state.allUsers} onChange={(tags) => this.changeFollowing(tags)} />
+            <div className="pt-text-muted" style={lhcolStyle} >Blacklist: </div>
+            <TagGroupEditor tags={this.state.settings.blacklist} creatable={false} allTags={this.props.appState.allTags} onChange={(tags) => this.changeBlacklist(tags)} />
           </div>
           <div style={divStyle}>
             <div className="pt-text-muted" style={lhcolStyle} >Further Info: </div>

@@ -10,7 +10,6 @@ import * as OxiDate from '../lib/oxidate';
 import * as utils from '../lib/utils';
 import * as uuid from '../lib/uuid.js';
 import * as Tags from '../lib/tags';
-import { TimeSpan } from '../lib/timeSpan';
 import { ContentView, rowStyle, btnStyle, lhcolStyle } from "../lib/contentView";
 import * as Rpc from '../lib/rpc';
 import * as Dbt from '../lib/datatypes';

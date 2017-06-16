@@ -4,8 +4,6 @@ import * as oxiDate from '../lib/oxidate';
 import * as utils from '../lib/utils';
 import * as uuid from '../lib/uuid.js';
 
-import { TimeSpan } from '../lib/timeSpan';
-
 import * as React from 'react';
 import * as ReactDOM from 'react-dom';
 import * as Rpc from '../lib/rpc';

@@ -29,7 +29,8 @@ export class BookmarkPanel extends React.Component<BookmarkPanelProps, BookmarkP
       if (cont) st = { url, title: cont.title, comment: cont.content, tags: cont.tags };
       else {
         url = prepareUrl(url);
-        if (url in props.appState.matchedTags) st = { ...st, tags: props.appState.matchedTags[url] };
+        let { matchedTags } = props.appState;
+        if (matchedTags && url in props.appState.matchedTags) st = { ...st, tags: matchedTags[url] };
       }
     }
     this.state = st;

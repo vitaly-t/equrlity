@@ -31,6 +31,8 @@ export type comment = string;
 export type commentId = number;
 export type isPublic = boolean;
 export type linkId = string;
+export type payment = number;
+export type paymentSchedule = number[];
 export type publicKey = Buffer;
 export type published = Date;
 export type userId = string;
@@ -118,6 +120,7 @@ export interface Link {
   readonly comment: comment | null,
   readonly isPublic: isPublic | null,
   readonly tags: tags | null,
+  readonly paymentSchedule: paymentSchedule | null,
   readonly prevLink: linkId | null,
   readonly amount: integer | null
 };
@@ -149,7 +152,10 @@ export interface View {
   readonly viewId: viewId | null,
   readonly userId: userId | null,
   readonly linkId: linkId | null,
-  readonly created: created | null
+  readonly created: created | null,
+  readonly payment: payment | null,
+  readonly viewCount: integer | null,
+  readonly totalPayment: payment | null
 };
 
 export interface ContentView {

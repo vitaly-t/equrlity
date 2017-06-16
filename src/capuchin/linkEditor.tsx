@@ -10,7 +10,6 @@ import * as OxiDate from '../lib/oxidate';
 import * as utils from '../lib/utils';
 import * as uuid from '../lib/uuid.js';
 import * as Tags from '../lib/tags';
-import { TimeSpan } from '../lib/timeSpan';
 import { rowStyle, btnStyle, lhcolStyle } from "../lib/contentView";
 import * as Rpc from '../lib/rpc';
 import * as Dbt from '../lib/datatypes';
@@ -62,9 +61,11 @@ export class LinkEditor extends React.Component<LinkEditorProps, LinkEditorState
     let l = item.link;
     let created = l.created ? OxiDate.toFormat(new Date(l.created), "DDDD, MMMM D @ HH:MIP") : '';
     let updated = l.updated ? OxiDate.toFormat(new Date(l.updated), "DDDD, MMMM D @ HH:MIP") : '';
+    let schedule;
+    if (l.paymentSchedule && l.paymentSchedule.length > 0) schedule = l.paymentSchedule.join();
 
     return (
-      <Dialog iconName="inbox" style={{ width: '600px' }} isOpen={this.state.isOpen} title={"Edit Investment"} canOutsideClickClose={false} onClose={() => this.close()} >
+      <Dialog iconName="inbox" style={{ width: '600px' }} isOpen={this.state.isOpen} title={"Edit Squawk Details"} canOutsideClickClose={false} onClose={() => this.close()} >
         <div style={{ padding: gutter }}>
           <Row style={rowStyle} gutter={gutter}>
             <Col span={2}>Title:</Col>
@@ -99,6 +100,12 @@ export class LinkEditor extends React.Component<LinkEditorProps, LinkEditorState
               <Tags.TagGroupEditor tags={this.state.tags} creatable={true} allTags={this.props.allTags} onChange={tags => this.changeTags(tags)} />
             </Col>
           </Row>
+          {schedule &&
+            <Row style={rowStyle} gutter={gutter}>
+              <Col span={2}>View Charges:</Col>
+              <Col span={10}>{schedule}</Col>
+            </Row>
+          }
           <Row style={rowStyle} gutter={gutter}>
             <Col span={12}>
               <Button key='save' className="pt-intent-primary" style={btnStyle} onClick={() => this.save()} text="Save" />
