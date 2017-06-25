@@ -348,6 +348,11 @@ export async function redeemLink(link: Dbt.Link): Promise<void> {
   cache.update(await db.task(t => tasks.redeemLink(t, link)));
 }
 
+export async function removeLink(link: Dbt.Link): Promise<void> {
+  await db.task(t => tasks.removeLink(t, link));
+  cache.links.delete(link.linkId);
+}
+
 export async function investInLink(link: Dbt.Link, adj: Dbt.integer): Promise<void> {
   cache.update(await db.task(t => tasks.investInLink(t, link, adj)));
 }
@@ -617,4 +622,17 @@ export async function generateSquawks() {
       await Utils.sleep(2000);
     }
   }
+}
+
+export async function calcChargeForNextStream(viewerId: Dbt.userId, viewedLinkId: Dbt.linkId): Promise<Dbt.integer> {
+  let links = cache.getChainFromLinkId(viewedLinkId);
+  let l = links.length - 1;
+  let link = links[l];
+  let sched = link.paymentSchedule;
+  let rslt = 0;
+  if (sched && sched.length > 0) {
+    let views: Dbt.View[] = await db.any(`select * from views where "userId" = '${viewerId}' and "linkId" = '${link.linkId}' order by "viewCount" `);
+    if (views.length < sched.length) rslt = sched[views.length];
+  }
+  return rslt;
 }

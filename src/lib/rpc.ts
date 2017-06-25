@@ -119,6 +119,7 @@ export type LoadContentResponse = {
   content: Dbt.Content;
   owner: Dbt.userName;
   comments: CommentItem[];
+  streamToOwnCost: number;
 }
 
 export type AditCommentRequest = {

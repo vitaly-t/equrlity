@@ -103,6 +103,11 @@ export interface PopupPanelProps { appState: AppState };
 export interface PopupPanelState { };
 export class PopupPanel extends React.Component<PopupPanelProps, PopupPanelState> {
 
+  // grass skirts afire - see if this fixed the Mac rendering problem.
+  componentDidMount() {
+    this.forceUpdate();
+  }
+
   render() {
     let props = this.props;
     let st = props.appState;

@@ -188,7 +188,7 @@ export class CommentsPanel extends React.Component<CommentsPanelProps, CommentsP
   editComment = async (comment, node: CommentNode) => {
     let { commentId, contentId, parent } = node.item;
     let signature = await Comms.signData(this.props.privKey, comment);
-    let req: Rpc.AditCommentRequest = { contentId, comment, parent, signature };
+    let req: Rpc.AditCommentRequest = { contentId, comment, parent, signature, commentId };
     let _rsp = await Comms.sendApiRequest("aditComment", req);
     let rsp: Rpc.AditCommentResponse = Comms.extractResult(_rsp);
     node.item = rsp.comment;

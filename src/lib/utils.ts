@@ -8,7 +8,7 @@ export const serverUrl = isDev() ? "http://localhost:8080" : "https://www.pseudo
 export const chromeAuthUrl = "https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=";
 
 export function capuchinVersion() {
-  return "0.9.6.2";
+  return "0.9.7.1";
 }
 
 export function sleep(millisecs: number) {

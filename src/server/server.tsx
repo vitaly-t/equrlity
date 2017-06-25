@@ -87,6 +87,10 @@ function htmlPage(body) {
 }
 
 function mediaPage(cont: Dbt.Content): string {
+  return linkMediaPage(cont, '');
+}
+
+function linkMediaPage(cont: Dbt.Content, linkId: Dbt.linkId): string {
   //if (cont.contentType === 'post') return postPage(cont);
   let mime_type = cont.contentType + "/" + cont.mime_ext;
 
@@ -104,7 +108,7 @@ function mediaPage(cont: Dbt.Content): string {
 </head>
 <body>
   <script type="text/javascript" src="/dist/media_bndl.js"></script>
-  <div id="app" data-content-id="${cont.contentId}" data-mime-type="${mime_type}"></div>
+  <div id="app" data-link-id="${linkId}" data-content-id="${cont.contentId}" data-mime-type="${mime_type}"></div>
 </body>
 </html>  
 `;
@@ -203,13 +207,13 @@ publicRouter.get('/link/:id', async (ctx, next) => {
   let viewerId = isClient ? ctx['userId'].id : null;
   if (isClient || link.isPublic) {
     if (cont.contentType === 'bookmark') {
-      if (isClient) await pg.payForView(viewerId, linkId)
+      if (isClient && !link.isPublic) await pg.payForView(viewerId, linkId)
       ctx.status = 303;
       ctx.redirect(cont.url);
       return;
     }
     pg.registerContentView(viewerId, cont.contentId, ip, linkId);
-    ctx.body = await mediaPage(cont);
+    ctx.body = await linkMediaPage(cont, linkId);
     return;
   }
   pg.registerInvitation(ip, linkId);
@@ -226,6 +230,22 @@ publicRouter.get('/stream/content/:id', async (ctx, next) => {
   let cont = cache.contents.get(contentId);
   if (!cont || !cont.db_hash) ctx.throw(404);
   if (!isValidClient(ctx) && !cont.isPublic) ctx.throw(403);
+  let viewerId = cont.isPublic ? null : ctx['userId'].id;
+  let lob = await pg.retrieveBlobContent(contentId);
+  let strm = createReadStream(lob);
+  ctx.body = strm;
+});
+
+publicRouter.get('/stream/link/:id', async (ctx, next) => {
+  let linkId = ctx.params.id;
+  let link = cache.links.get(linkId);
+  if (!link) ctx.throw(404);
+  if (!isValidClient(ctx) && !link.isPublic) ctx.throw(403);
+  let contentId = link.contentId;
+  let cont = cache.contents.get(contentId);
+  if (!cont || !cont.db_hash) ctx.throw(404);
+  let viewerId = link.isPublic ? null : ctx['userId'].id;
+  if (viewerId) await pg.payForView(viewerId, linkId)
   let lob = await pg.retrieveBlobContent(contentId);
   let strm = createReadStream(lob);
   ctx.body = strm;
@@ -236,6 +256,18 @@ publicRouter.get('/blob/content/:id', async (ctx, next) => {
   let cont = cache.contents.get(contentId);
   if (!cont || !cont.db_hash) ctx.throw(404);
   if (!isValidClient(ctx) && !cont.isPublic) ctx.throw(403);
+  let lob = await pg.retrieveBlobContent(contentId);
+  ctx.body = lob;
+});
+
+publicRouter.get('/blob/link/:id', async (ctx, next) => {
+  let linkId = ctx.params.id;
+  let link = cache.links.get(linkId);
+  if (!link) ctx.throw(404);
+  if (!isValidClient(ctx) && !link.isPublic) ctx.throw(403);
+  let contentId = link.contentId;
+  let cont = cache.contents.get(contentId);
+  if (!cont || !cont.db_hash) ctx.throw(404);
   let lob = await pg.retrieveBlobContent(contentId);
   ctx.body = lob;
 });
@@ -257,7 +289,37 @@ publicRouter.get('/load/content/:id', async (ctx, next) => {
     let userName = cache.users.get(c.userId).userName;
     return { ...c, userName }
   })
-  let result: Rpc.LoadContentResponse = { content, owner, comments }
+  let result: Rpc.LoadContentResponse = { content, owner, comments, streamToOwnCost: 0 }
+  ctx.body = { result };
+});
+
+publicRouter.get('/load/link/:id', async (ctx, next) => {
+  let linkId = ctx.params.id;
+  let link = cache.links.get(linkId);
+  if (!link) {
+    ctx.status = 404;
+    ctx.body = { id: -1, error: { message: "Invalid link" } };
+  }
+  if (!isValidClient(ctx) && !link.isPublic) {
+    ctx.status = 403;
+    ctx.body = { id: -1, error: { message: "Unauthorized access" } };
+  }
+  let contentId = link.contentId;
+  let content = cache.contents.get(contentId);
+  if (!content) {
+    ctx.status = 404;
+    ctx.body = { id: -1, error: { message: "Invalid content" } };
+  }
+  let owner = cache.users.get(content.userId).userName;
+  let a = await pg.getCommentsForContent(contentId)
+  let comments: Rpc.CommentItem[] = a.map(c => {
+    let userName = cache.users.get(c.userId).userName;
+    return { ...c, userName }
+  })
+  let streamToOwnCost = 0;
+  let viewerId = link.isPublic ? null : ctx['userId'].id;
+  if (viewerId) streamToOwnCost = await pg.calcChargeForNextStream(viewerId, linkId);
+  let result: Rpc.LoadContentResponse = { content, owner, comments, streamToOwnCost }
   ctx.body = { result };
 });
 
@@ -597,7 +659,8 @@ router.post('/rpc', async function (ctx: any) {
       case "redeemLink": {
         let req: Rpc.RedeemLinkRequest = params;
         let link = cache.links.get(req.linkId);
-        await pg.redeemLink(link);
+        if (link.amount === 0) await pg.removeLink(link);
+        else await pg.redeemLink(link);
         let links = await pg.getUserLinks(userId);
         let result: Rpc.RedeemLinkResponse = { links };
         ctx.body = { id, result };
@@ -645,7 +708,7 @@ router.post('/rpc', async function (ctx: any) {
         parent = parent || null;
         let cmt: Dbt.Comment;
         if (commentId) {
-          let rec = pg.retrieveRecord<Dbt.Comment>("comments", { commentId });
+          let rec = await pg.retrieveRecord<Dbt.Comment>("comments", { commentId });
           rec = { ...rec, comment }
           cmt = await pg.updateRecord<Dbt.Comment>("comments", rec);
         }

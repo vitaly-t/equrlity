@@ -272,6 +272,13 @@ export async function investInLink(t: ITask<any>, link: Dbt.Link, adj: Dbt.integ
   return rslt;
 }
 
+export async function removeLink(t: ITask<any>, link: Dbt.Link): Promise<void> {
+  let { amount, linkId } = link;
+  if (amount !== 0) throw new Error("Link must be redeemed first");
+  let rslt: CacheUpdate[] = [];
+  await deleteRecord<Dbt.Link>(t, "links", { linkId });
+}
+
 export async function getLinksForUser(t: ITask<any>, userId: Dbt.userId): Promise<Dbt.Link[]> {
   let links = await t.any(`select * from links where "userId" = '${userId}' order by created desc`);
   return links;
