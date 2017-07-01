@@ -1,7 +1,7 @@
 import * as React from 'react';
 import * as videojs from 'video.js'
 
-interface PlayerProps { src: string, poster?: string, mime: string }
+interface PlayerProps { src: string, poster?: string, type: string }
 interface PlayerState { player?: videojs.Player }
 
 export class VideoPlayer extends React.Component<PlayerProps, PlayerState> {
@@ -21,7 +21,7 @@ export class VideoPlayer extends React.Component<PlayerProps, PlayerState> {
       poster: this.props.poster,
       sources: [{
         src: this.props.src,
-        type: this.props.mime
+        type: this.props.type
       }]
     }
     this.setState({ player: videojs(this.ctrls.videoNode, opts, function onPlayerReady() { console.log('onPlayerReady', this) }) });
@@ -49,9 +49,7 @@ export class AudioPlayer extends React.Component<PlayerProps, PlayerState> {
     this.state = {};
   }
 
-  ctrls: {
-    audioNode: HTMLAudioElement,
-  } = { audioNode: null };
+  audioNode: HTMLAudioElement = null;
 
   componentDidMount() {
     const opts: any = {
@@ -60,10 +58,10 @@ export class AudioPlayer extends React.Component<PlayerProps, PlayerState> {
       poster: this.props.poster,
       sources: [{
         src: this.props.src,
-        type: this.props.mime
+        type: this.props.type
       }]
     }
-    this.setState({ player: videojs(this.ctrls.audioNode, opts, function onPlayerReady() { console.log('onPlayerReady', this) }) });
+    this.setState({ player: videojs(this.audioNode, opts, function onPlayerReady() { console.log('onPlayerReady', this) }) });
     /*
         const opts: any = {
           autoplay: false,
@@ -95,7 +93,7 @@ export class AudioPlayer extends React.Component<PlayerProps, PlayerState> {
   render() {
     return (
       <div data-vjs-player>
-        <video ref={node => this.ctrls.audioNode = node} className="video-js vjs-default-skin"></video>
+        <audio ref={node => this.audioNode = node} className="video-js vjs-default-skin" data-setup='{}' />
       </div>
     )
   }

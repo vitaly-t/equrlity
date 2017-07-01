@@ -315,7 +315,7 @@ export async function payForView(t: ITask<any>, links: Dbt.Link[], viewerId: Dbt
       let totalPayment = amt
       if (views.length > 0) {
         let lastView = views[views.length - 1];
-        if (lastView.viewCount !== views.length) throw new Error("corruption in previous views");
+        //if (lastView.viewCount !== views.length) throw new Error("corruption in previous views");
         totalPayment += lastView.totalPayment;
       }
       if (amt < 0) { //link pays viewer

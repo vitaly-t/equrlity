@@ -636,3 +636,15 @@ export async function calcChargeForNextStream(viewerId: Dbt.userId, viewedLinkId
   }
   return rslt;
 }
+export async function getNextStreamNumber(viewerId: Dbt.userId, viewedLinkId: Dbt.linkId): Promise<Dbt.integer> {
+  let links = cache.getChainFromLinkId(viewedLinkId);
+  let l = links.length - 1;
+  let link = links[l];
+  let sched = link.paymentSchedule;
+  let rslt = 0;
+  if (sched && sched.length > 0) {
+    let views: Dbt.View[] = await db.any(`select * from views where "userId" = '${viewerId}' and "linkId" = '${link.linkId}' `);
+    rslt = views.length + 1;
+  }
+  return rslt;
+}

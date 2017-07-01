@@ -119,7 +119,8 @@ export type LoadContentResponse = {
   content: Dbt.Content;
   owner: Dbt.userName;
   comments: CommentItem[];
-  streamToOwnCost: number;
+  paymentSchedule: Dbt.paymentSchedule;
+  streamNumber: number;
 }
 
 export type AditCommentRequest = {

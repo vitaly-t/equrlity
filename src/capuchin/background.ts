@@ -180,7 +180,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     if (url && st.allTags && !(url in st.links) && !(url in st.matchedTags)) {
       console.log("injecting tag search script for url: " + url);
       //chrome.tabs.executeScript(tabId, { code: injectJs, allFrames: true }, function (rslt: any[]) {
-      chrome.tabs.executeScript(tabId, { code: 'document.body.textContent', allFrames: true }, function (rslt: any[]) {
+      chrome.tabs.executeScript(tabId, { code: 'document.body.innerText', allFrames: true }, function (rslt: any[]) {
         if (chrome.runtime.lastError) {
           console.log("Tag search injection failed : " + chrome.runtime.lastError.message);
           return;

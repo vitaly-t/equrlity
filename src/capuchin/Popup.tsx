@@ -100,12 +100,16 @@ export class BookmarkPanel extends React.Component<BookmarkPanelProps, BookmarkP
 }
 
 export interface PopupPanelProps { appState: AppState };
-export interface PopupPanelState { };
+export interface PopupPanelState { macfix: boolean };
 export class PopupPanel extends React.Component<PopupPanelProps, PopupPanelState> {
+  constructor(props) {
+    super(props)
+    this.state = { macfix: false };
+  }
 
   // grass skirts afire - see if this fixed the Mac rendering problem.
   componentDidMount() {
-    this.forceUpdate();
+    setTimeout(() => this.setState({ macfix: true }), 50);
   }
 
   render() {
@@ -138,6 +142,7 @@ export class PopupPanel extends React.Component<PopupPanelProps, PopupPanelState
         </Col>
       </Row>
       {curl && <BookmarkPanel appState={this.props.appState} />}
+      {this.state.macfix && <p />}
     </div>
   }
 }

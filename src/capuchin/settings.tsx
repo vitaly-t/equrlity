@@ -35,13 +35,17 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
     this.state = { settings, prevSettings: settings, allUsers: [] };
   }
 
-  componentDidMount = async () => {
+  fetchUserSettings = async () => {
     let response = await sendApiRequest("getUserSettings", {});
     let rsp: Rpc.Response = response.data;
     if (rsp.error) throw new Error("Server returned error: " + rsp.error.message);
     let settings: Rpc.UserSettings = rsp.result;
     let allUsers = settings.allUsers.map(u => { return { value: u, label: u }; });
     this.setState({ settings, prevSettings: settings, allUsers });
+  }
+
+  componentDidMount() {
+    this.fetchUserSettings();
   }
 
   changeUserName(userName) {

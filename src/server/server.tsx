@@ -289,7 +289,7 @@ publicRouter.get('/load/content/:id', async (ctx, next) => {
     let userName = cache.users.get(c.userId).userName;
     return { ...c, userName }
   })
-  let result: Rpc.LoadContentResponse = { content, owner, comments, streamToOwnCost: 0 }
+  let result: Rpc.LoadContentResponse = { content, owner, comments, paymentSchedule: [], streamNumber: 0 }
   ctx.body = { result };
 });
 
@@ -316,10 +316,11 @@ publicRouter.get('/load/link/:id', async (ctx, next) => {
     let userName = cache.users.get(c.userId).userName;
     return { ...c, userName }
   })
-  let streamToOwnCost = 0;
+  let streamNumber = 0;
+  let { paymentSchedule } = link
   let viewerId = link.isPublic ? null : ctx['userId'].id;
-  if (viewerId) streamToOwnCost = await pg.calcChargeForNextStream(viewerId, linkId);
-  let result: Rpc.LoadContentResponse = { content, owner, comments, streamToOwnCost }
+  if (viewerId) streamNumber = await pg.getNextStreamNumber(viewerId, linkId);
+  let result: Rpc.LoadContentResponse = { content, owner, comments, paymentSchedule, streamNumber }
   ctx.body = { result };
 });
 

@@ -226,3 +226,64 @@ export class AudioPlayer extends React.Component<AudioPlayerProps, AudioPlayerSt
   }
 }
 
+/*
+
+
+
+  const fileReader = new FileReader();
+
+      fileReader.onload = progressEvent => {
+        this.get('audioContext').decodeAudioData(progressEvent.currentTarget.result, buffer => {
+ sampleRate: 6000,
+  sampleRatePreview: 6000,
+
+      const peaks = this._getPeaks(sampleRate, buffer);
+      const totalPeaks = peaks.length;        });
+      };
+
+      fileReader.onerror = function() {
+        alert("Couldn't load file");
+      };
+
+      fileReader.readAsArrayBuffer(file);
+
+ _getPeaks(length, buffer) {
+    const sampleSize = buffer.length / length;
+    const sampleStep = ~~(sampleSize / 10) || 1;
+    const numberOfChannels = buffer.numberOfChannels;
+    const mergedPeaks = [];
+
+    for (let channelNumber = 0; channelNumber < numberOfChannels; channelNumber++) {
+      const peaks = [];
+      const channelData = buffer.getChannelData(channelNumber);
+
+      for (let peakNumber = 0; peakNumber < length; peakNumber++) {
+        const start = ~~(peakNumber * sampleSize);
+        const end = ~~(start + sampleSize);
+        let min = channelData[0];
+        let max = channelData[0];
+
+        for (let sampleIndex = start; sampleIndex < end; sampleIndex += sampleStep) {
+          const value = channelData[sampleIndex];
+
+          if (value > max) { max = value; }
+          if (value < min) { min = value; }
+        }
+
+        peaks[2 * peakNumber] = max;
+        peaks[2 * peakNumber + 1] = min;
+
+        if (channelNumber === 0 || max > mergedPeaks[2 * peakNumber]) {
+          mergedPeaks[2 * peakNumber] = max;
+        }
+
+        if (channelNumber === 0 || min < mergedPeaks[2 * peakNumber + 1]) {
+          mergedPeaks[2 * peakNumber + 1] = min;
+        }
+      }
+    }
+
+    return mergedPeaks;
+  },
+});
+*/

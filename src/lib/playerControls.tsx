@@ -7,7 +7,15 @@ let enabledClr = '#72D687';
 let hoverClr = '#3ea454';
 
 
-let SvgIcon = styled.svg`
+interface SvgWrapperProps { disabled: boolean }
+const SvgWrapper: React.StatelessComponent<SvgWrapperProps> = props => (
+  <svg {...props} >
+    {props.children}
+  </svg>
+);
+
+
+let SvgIcon = styled(SvgWrapper) `
   height: 100%;
   width: 100%;
   
@@ -22,7 +30,7 @@ let SvgIcon = styled.svg`
     fill: ${props => props.disabled ? enabledClr : hoverClr};
   }
 
-  opacity: ${props => props.disabled ? 0.3 : 1};
+  opacity: ${(props: any) => props.disabled ? 0.3 : 1};
   
 `;
 
