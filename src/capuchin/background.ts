@@ -88,7 +88,7 @@ async function __init() {
       await createKeyPairIf(keys);
       const publicKey = await localForage.getItem<JsonWebKey>('publicKey');
       const privateKey = await localForage.getItem<JsonWebKey>('privateKey');
-      const chromeToken: string = Utils.isDev() ? '' : await getChromeAccessToken();
+      const chromeToken: string = Utils.isProduction() ? await getChromeAccessToken() : '';
       const jwt = await AsyncHandlers.authenticate(userInfo, chromeToken, publicKey);
       if (!jwt) throw new Error("Unable to authenticate");
       handleMessage({ eventType: "Thunk", fn: ((st: AppState) => { return { ...st, publicKey, privateKey, jwt } }) });

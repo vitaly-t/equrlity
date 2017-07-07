@@ -6,17 +6,12 @@ import * as Dbt from '../lib/datatypes';
 import * as Rpc from '../lib/rpc';
 import * as Utils from '../lib/utils';
 
-interface StreamToOwnProps { paymentSchedule: Dbt.paymentSchedule, streamNumber: Dbt.integer, purchaseCost: Dbt.integer, onPurchase: () => void };
+interface StreamToOwnProps { paymentSchedule: Dbt.paymentSchedule, streamNumber: Dbt.integer, linkDepth: Dbt.integer, purchaseCost: Dbt.integer, onPurchase: () => void };
 interface StreamToOwnState { };
 export class StreamToOwn extends React.Component<StreamToOwnProps, StreamToOwnState> {
 
-  constructor(props) {
-    super(props);
-    this.state = { paymentSchedule: [], streamNumber: 1 };
-  }
-
   render() {
-    let { streamNumber, paymentSchedule, purchaseCost } = this.props;
+    let { streamNumber, paymentSchedule, purchaseCost, linkDepth } = this.props;
     let cost = 0;
 
     let purch = null;
@@ -31,7 +26,7 @@ export class StreamToOwn extends React.Component<StreamToOwnProps, StreamToOwnSt
       }
     }
     let cont = cost === 0 ? <p>This stream is free to play.</p>
-      : cost > 0 ? <p>Playing this stream will cost you {cost} PseudoQoins.</p>
+      : cost > 0 ? <p>Playing this stream will cost you {cost + linkDepth} PseudoQoins.</p>
         : <p>Playing this stream you will credit you with  {-cost} PseudoQoins.</p>
     return <div>
       {cont}

@@ -60,10 +60,9 @@ import * as Dbt from './datatypes';
  * The available json-rpc methods of the PseudoQURL API.  
  */
 
-//TODO: rename "getUserLinks" to "loadSettingsPage"
 export type Method = "initialize" | "authenticate" | "promoteContent" | "bookmarkLink" | "loadLink" | "getRedirect" | "changeSettings"
   | "getUserContents" | "loadContent" | "getUserSettings" | "getUserLinks" | "redeemLink" | "saveContent" | "saveLink" | "removeContent" | "transferCredits"
-  | "aditComment" | "dismissSquawks" | "updateFeed";
+  | "aditComment" | "dismissSquawks" | "updateFeed" | "cachePeaks" | "payForView";
 
 export type UrlString = string;
 export type Integer = number;
@@ -121,6 +120,8 @@ export type LoadContentResponse = {
   comments: CommentItem[];
   paymentSchedule: Dbt.paymentSchedule;
   streamNumber: number;
+  peaks?: boolean;
+  linkDepth: Dbt.integer;
 }
 
 export type AditCommentRequest = {
@@ -230,26 +231,38 @@ export type AuthenticateRequest = { provider: string; }
 
 export type AuthenticateResponse = { ok: boolean; }
 
-export type DismissSquawksRequest = { urls: Dbt.urlString[]; save?: boolean }
+export type DismissSquawksRequest = { urls: Dbt.urlString[]; save?: boolean; }
 
 export type DismissSquawksResponse = { ok: boolean; }
 
+export type CachePeaksRequest = { contentId: Dbt.contentId; peaks: Dbt.text; }
+
+export type CachePeaksResponse = { ok: boolean; }
+
+export type PayForViewRequest = { linkId: Dbt.linkId; purchase?: boolean, amount: Dbt.integer }
+
+export type PayForViewResponse = { ok: boolean; content?: Dbt.Content }
+
 export type RequestBody = PromoteContentRequest | BookmarkLinkRequest | InitializeRequest | LoadLinkRequest | ChangeSettingsRequest
   | GetUserContentsRequest | GetUserLinksRequest | RedeemLinkRequest | SaveLinkRequest | SaveContentRequest | LoadContentRequest | RemoveContentRequest
-  | TransferCreditsRequest | AuthenticateRequest | AditCommentRequest | GetUserSettingsRequest | DismissSquawksRequest | UpdateFeedRequest;
+  | TransferCreditsRequest | AuthenticateRequest | AditCommentRequest | GetUserSettingsRequest | DismissSquawksRequest | UpdateFeedRequest
+  | CachePeaksRequest | PayForViewRequest;
 
 export type ResponseBody = PromoteContentResponse & BookmarkLinkResponse & InitializeResponse & LoadLinkResponse & ChangeSettingsResponse
   & GetUserContentsResponse & GetUserLinksResponse & RedeemLinkResponse & SaveLinkResponse & SaveContentResponse & LoadContentResponse & RemoveContentResponse
-  & TransferCreditsResponse & AuthenticateResponse & AditCommentResponse & GetUserSettingsResponse & DismissSquawksResponse & UpdateFeedResponse;
+  & TransferCreditsResponse & AuthenticateResponse & AditCommentResponse & GetUserSettingsResponse & DismissSquawksResponse & UpdateFeedResponse
+  & CachePeaksResponse & PayForViewResponse;
 
 // internal to server.
 export type RecvRequestBody = PromoteContentRequest & BookmarkLinkRequest & InitializeRequest & LoadLinkRequest & ChangeSettingsRequest
   & GetUserContentsRequest & GetUserLinksRequest & RedeemLinkRequest & SaveLinkRequest & SaveContentRequest & LoadContentRequest & RemoveContentRequest
-  & TransferCreditsRequest & AuthenticateRequest & AditCommentRequest & GetUserSettingsRequest & DismissSquawksRequest & UpdateFeedRequest;
+  & TransferCreditsRequest & AuthenticateRequest & AditCommentRequest & GetUserSettingsRequest & DismissSquawksRequest & UpdateFeedRequest
+  & CachePeaksRequest & PayForViewRequest;
 
 export type SendResponseBody = PromoteContentResponse | BookmarkLinkResponse | InitializeResponse | LoadLinkResponse | ChangeSettingsResponse
   | GetUserContentsResponse | GetUserLinksResponse | RedeemLinkResponse | SaveLinkResponse | SaveContentResponse | LoadContentResponse | RemoveContentResponse
-  | TransferCreditsResponse | AuthenticateResponse | AditCommentResponse | GetUserSettingsResponse | DismissSquawksResponse | UpdateFeedResponse;
+  | TransferCreditsResponse | AuthenticateResponse | AditCommentResponse | GetUserSettingsResponse | DismissSquawksResponse | UpdateFeedResponse
+  | CachePeaksResponse | PayForViewResponse;
 
 export type Handler<Request, Response> = (req: Request) => Promise<Response>;
 

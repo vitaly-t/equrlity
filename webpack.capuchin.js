@@ -5,10 +5,13 @@ const CopyWebpackPlugin = require('copy-webpack-plugin');
 const { capuchinVersion } = require('./dist/lib/utils');
 const { TextEncoder, TextDecoder } = require('text-encoding');
 
-const isDev = process.env.NODE_ENV === 'development';
-const tgtdir = isDev ? 'dist' : 'dist/rel';
-let outDir = path.resolve(__dirname, tgtdir);
-let outPath = outDir + '/capuchin';
+const ndEnv = process.env.NODE_ENV;
+const isProd = ndEnv === 'production';
+const isStaging = ndEnv === 'staging';
+const tgtdir = isProd ? 'dist/rel' : isStaging ? 'dist/staging' : 'dist';
+const outDir = path.resolve(__dirname, tgtdir);
+const outPath = outDir + '/capuchin';
+
 if (!fs.existsSync(outDir)) fs.mkdirSync(outDir);
 if (!fs.existsSync(outPath)) fs.mkdirSync(outPath);
 
@@ -41,7 +44,7 @@ for (const pg of ['settings', 'contents', 'links']) {
   fs.writeFileSync(outPath + '/' + pg + '.html', htmlPage(pg));
 }
 
-let authEntries = isDev ? '' :
+let authEntries = !isProd ? '' :
   `"key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAm6d6YAsux6DwZwsrlp3e/V+2EdbSLxidSNNn6w4Crrf1WqwR//BeouiWTjdNpKGkEGJ4KltUkIy9hSUxpkhAKSooNlRwu+nOOOrgGezorZ/kL0rv547euZ0g8UpdcnN4Wpf1Fv8TbzODWdZ5kU1wO5sNPZX4uhSjcQSU/vm/6QYJw4m0r4VMEO31mYzx7nXyRB8GLqqwaLw9e4z+RlqKC+42gRlE34NWjUdxOSAa3QIAc/yz652jwhdchowMqmPazIwgUPO+rkkXudHPh99MClER/51O9saFWI+ZKjhyQPefM2iy5vT2dokpuwdJVnr9bqVh2jaerE9Y8Nwi/NK3UQIDAQAB",
   "oauth2": {
     "client_id": "23837795632-i1o9fs39uh43132jb10gqcvjl4h006cd.apps.googleusercontent.com",
@@ -50,10 +53,10 @@ let authEntries = isDev ? '' :
     ]
   },`;
 
-let icon32 = isDev ? "pseudoq2.png" : "pseudoq_rel_32.png";
-let icon128 = isDev ? "pseudoq2.png" : "pseudoq_rel_128.png";
+let icon32 = isProd ? "pseudoq_rel_32.png" : isStaging ? "pseudoq_staging_32.png" : "pseudoq2_32.png";
+let icon128 = isProd ? "pseudoq_rel_128.png" : isStaging ? "pseudoq_staging_128.png" : "pseudoq2_128.png";
 
-module.exports = function (env) {
+module.exports = function () {
   return {
     entry,
     output: {
@@ -124,7 +127,7 @@ module.exports = function (env) {
         },
       ], { copyUnmodified: true }),
       new webpack.DefinePlugin({
-        'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development')
+        'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV)
       }),
     ],
     devtool: 'inline-source-map'

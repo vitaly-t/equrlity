@@ -13,11 +13,16 @@ import * as Rpc from '../lib/rpc';
 import * as OxiDate from '../lib/oxidate';
 import * as Dbt from '../lib/datatypes'
 import * as uuid from '../lib/uuid.js';
+//import { buildWaveform } from '../lib/waveform';
 
 import * as cache from './cache';
 import * as tasks from './pgtasks';
 
-export let connectUrl: string = Utils.isTest() ? process.env.DEV_PSEUDOQURL_TEST_URL : Utils.isDev() ? process.env.DEV_PSEUDOQURL_URL : process.env.PSEUDOQURL_URL;
+export let connectUrl: string =
+  Utils.isTest() ? process.env.DEV_PSEUDOQURL_TEST_URL
+    : Utils.isStaging() ? process.env.STAGING_PSEUDOQURL_URL
+      : Utils.isDev() ? process.env.DEV_PSEUDOQURL_URL
+        : process.env.PSEUDOQURL_URL;
 if (!connectUrl.startsWith('postgres:')) connectUrl = 'postgres:' + connectUrl;
 
 // your protocol extensions:
@@ -374,11 +379,24 @@ export async function getLinkAlreadyInvestedIn(userId: Dbt.userId, contentId: Db
   return await db.task(t => tasks.getLinkAlreadyInvestedIn(t, userId, url));
 }
 
-export async function payForView(viewerId: Dbt.userId, viewedLinkId: Dbt.linkId): Promise<void> {
+export async function payForView(viewerId: Dbt.userId, viewedLinkId: Dbt.linkId, amount: Dbt.integer): Promise<void> {
   let links = cache.getChainFromLinkId(viewedLinkId);
   let viewedLink = links[0];
+  if (viewerId !== viewedLink.userId) {
+    cache.connectUsers(viewerId, viewedLink.userId);
+    cache.update(await db.tx(t => tasks.payForView(t, links, viewerId, amount)));
+  }
+}
+
+export async function purchaseContent(viewerId: Dbt.userId, viewedLinkId: Dbt.linkId, amount: Dbt.integer): Promise<Dbt.Content | null> {
+  let links = cache.getChainFromLinkId(viewedLinkId);
+  let viewedLink = links[0];
+  if (viewerId === viewedLink.userId) return null;
   cache.connectUsers(viewerId, viewedLink.userId);
-  cache.update(await db.tx(t => tasks.payForView(t, links, viewerId, viewedLinkId)));
+  let updts = await db.tx(t => tasks.purchaseContent(t, links, viewerId, amount));
+  cache.update(updts);
+  let content: Dbt.Content = updts.find(e => e.table === "contents" as cache.CachedTable).record;
+  return content;
 }
 
 export async function createUser(email?: string): Promise<Dbt.User> {
@@ -508,13 +526,16 @@ export async function insertContent(cont: Dbt.Content): Promise<Dbt.Content> {
   });
 }
 
-export async function deleteContent(cont: Dbt.Content) {
-  return await db.tx(t => tasks.deleteContent(t, cont))
+export async function deleteContent(cont: Dbt.Content): Promise<void> {
+  return await db.tx(t => tasks.deleteContent(t, cont));
 }
 
-export async function insertBlobContent(strm: any, content: string, mime_ext: string, contentType: Dbt.contentType, title: string, userId: Dbt.userId): Promise<Dbt.Content> {
+export async function insertBlobContent(strm: any, content: string, mime_ext: string, contentType: Dbt.contentType, title: string, peaks: Dbt.text, userId: Dbt.userId): Promise<Dbt.Content> {
   return await db.tx(async t => {
     let blob = await tasks.insertLargeObject(t, userId, strm);
+    let buf = await tasks.retrieveLargeObject(t, blob.blobId);
+    //if (!peaks) peaks = await buildWaveform(buf.buffer);
+    if (peaks) await tasks.updateAudioPeaks(t, blob.db_hash, peaks, userId);
     let cont = OxiGen.emptyRec<Dbt.Content>("contents");
     title = await tasks.getUniqueContentTitle(t, userId, title);
     cont = { ...cont, mime_ext, content, contentType, title, userId, db_hash: blob.db_hash };
@@ -534,6 +555,28 @@ export async function retrieveBlob(db_hash: Dbt.db_hash): Promise<Buffer> {
   //NB must use tx when dealing with large objects.
   return await db.tx(t => tasks.retrieveBlob(t, db_hash));
 }
+
+export async function updateAudioPeaks(db_hash: Dbt.db_hash, peaks: Dbt.text, userId: Dbt.userId): Promise<void> {
+  return await db.task(t => tasks.updateAudioPeaks(t, db_hash, peaks, userId));
+}
+
+export async function getAudioPeaks(db_hash: Dbt.db_hash): Promise<Dbt.text> {
+  return await db.task(t => tasks.getAudioPeaks(t, db_hash));
+}
+
+/*
+export async function buildMissingWaveforms(): Promise<void> {
+  let conts: Dbt.Content[] = await db.any(`select * from contents where "contentType" = 'audio'`);
+  for (const o of conts) {
+    let blob = await getAudioPeaks(o.db_hash);
+    //if (!blob) {
+    let buf = await retrieveBlobContent(o.contentId);
+    //let peaks = await buildWaveform(buf.buffer);
+    await updateAudioPeaks(o.db_hash, peaks, o.userId);
+    //}
+  }
+}
+*/
 
 export async function getCommentsForContent(contentId: Dbt.contentId): Promise<Dbt.Comment[]> {
   return await db.task(t => tasks.getCommentsForContent(t, contentId));

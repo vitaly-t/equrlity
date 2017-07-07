@@ -11,30 +11,28 @@ import { PeaksPlayer } from '../lib/reactPeaks';
 import * as Comms from '../lib/axiosClient';
 import { CommentsPanel } from '../lib/comments';
 import { ContentView } from '../lib/contentView';
+import buildWaveform from '../lib/buildWaveform';
 
-import * as webAudioBuilder from 'waveform-data/webaudio';
-
-export async function buildWaveform(url: Dbt.urlString, cb: (wf: any) => void) {
-  let req = Comms.clientRequest();
-  let response = await req.get(Utils.serverUrl + url);
-  let buffer: ArrayBuffer = response.data;
-  const audioContext = new AudioContext();
-
-  webAudioBuilder(audioContext, buffer, (error, waveform) => {
-    console.log(waveform.duration);
-    //cb(waveform)
-  });
+async function saveWaveForm(contentId: Dbt.contentId) {
+  let src = '/blob/content/' + contentId;
+  let req = Comms.clientRequest({ responseType: 'arraybuffer' });
+  let response = await req.get(Utils.serverUrl + src);
+  let buf: ArrayBuffer = response.data;
+  let peaks = await buildWaveform(buf);
+  let req2: Rpc.CachePeaksRequest = { contentId, peaks }
+  Comms.sendApiRequest('cachePeaks', req2)
 }
 
-
-
 interface MediaPageProps { mime: string, contentId: Dbt.contentId, linkId: Dbt.linkId };
-interface MediaPageState { privKey: JsonWebKey, owner: Dbt.userName, moniker: Dbt.userName, comments: Rpc.CommentItem[], content: Dbt.Content, paymentSchedule: Dbt.paymentSchedule, streamNumber: Dbt.integer };
+interface MediaPageState {
+  privKey: JsonWebKey, owner: Dbt.userName, moniker: Dbt.userName, comments: Rpc.CommentItem[],
+  content: Dbt.Content, paymentSchedule: Dbt.paymentSchedule, streamNumber: Dbt.integer, peaks: boolean, linkDepth: Dbt.integer
+};
 export class MediaPage extends React.Component<MediaPageProps, MediaPageState> {
 
   constructor(props) {
     super(props);
-    this.state = { privKey: null, comments: [], owner: '', moniker: '', content: null, paymentSchedule: [], streamNumber: 0 };
+    this.state = { privKey: null, comments: [], owner: '', moniker: '', content: null, paymentSchedule: [], streamNumber: 0, peaks: false, linkDepth: 0 };
   }
 
   fetchData = async () => {
@@ -51,29 +49,68 @@ export class MediaPage extends React.Component<MediaPageProps, MediaPageState> {
     let rsp: Rpc.Response = response.data;
     if (rsp.error) throw new Error("Server returned error: " + rsp.error.message);
     let rslt: Rpc.LoadContentResponse = rsp.result;
-    let { content, comments, owner, paymentSchedule, streamNumber } = rslt;
-    this.setState({ content, privKey, comments, owner, moniker, paymentSchedule, streamNumber });
+    let { content, comments, owner, paymentSchedule, streamNumber, peaks, linkDepth } = rslt;
+    this.setState({ content, privKey, comments, owner, moniker, paymentSchedule, streamNumber, peaks });
+    if (!peaks) saveWaveForm(content.contentId);
+
   }
 
   componentDidMount() {
     this.fetchData();
   }
 
+  purchaseCost() {
+    let { paymentSchedule, streamNumber, linkDepth } = this.state;
+    let purchaseCost = linkDepth;
+    if (streamNumber > 0) {
+      let i = streamNumber - 1;
+      while (i < paymentSchedule.length) {
+        purchaseCost += paymentSchedule[i];
+        ++i;
+      }
+    }
+    return purchaseCost;
+  }
+
+  purchaseContent = async () => {
+    let req: Rpc.PayForViewRequest = { linkId: this.props.linkId, purchase: true, amount: this.purchaseCost() };
+    let response = await Comms.sendApiRequest('payForView', req);
+    let rsp: Rpc.Response = response.data;
+    if (rsp.error) throw new Error("Server returned error: " + rsp.error.message);
+    let rslt: Rpc.PayForViewResponse = rsp.result;
+    if (rslt.ok) this.setState({ streamNumber: this.state.paymentSchedule.length + 1 });
+  }
+
+  onFirstPlay = async () => {
+    let { paymentSchedule, streamNumber, linkDepth } = this.state;
+    let amount = 0;
+    if (paymentSchedule && paymentSchedule.length > 0 && streamNumber && streamNumber <= paymentSchedule.length) amount = paymentSchedule[streamNumber - 1];
+    if (amount >= 0) amount += linkDepth;
+    let req: Rpc.PayForViewRequest = { linkId: this.props.linkId, amount };
+    let response = await Comms.sendApiRequest('payForView', req);
+    let rsp: Rpc.Response = response.data;
+    if (rsp.error) throw new Error("Server returned error: " + rsp.error.message);
+    let rslt: Rpc.PayForViewResponse = rsp.result;
+    if (rslt.ok) this.setState({ streamNumber: this.state.streamNumber + 1 });
+  }
+
   render() {
     let { contentId, mime, linkId } = this.props;
-    let { content, privKey, comments, owner, moniker, paymentSchedule, streamNumber } = this.state;
+    let { content, privKey, comments, owner, moniker, paymentSchedule, streamNumber, peaks } = this.state;
+    if (!content) return null;
     let blobsrc = linkId ? '/blob/link/' + linkId : '/blob/content/' + contentId;
-    //buildWaveform(blobsrc, null);
     let strmsrc = linkId ? '/stream/link/' + linkId : '/stream/content/' + contentId;
+    let peaksUri;
+    if (peaks) peaksUri = Utils.serverUrl + (linkId ? '/blob/link/peaks/' + linkId : '/blob/content/peaks/' + contentId);
+    let gutter = 10;
+    let cont = <ContentView info={content} owner={owner} />;
     let viewer = mime.startsWith("image") ? <img src={blobsrc} />
       //: mime.startsWith("audio") ? <AudioPlayer src={strmsrc} type={mime} streamToOwnCost={streamToOwnCost} /> // audioplayer.tsx
-      : mime.startsWith("audio") ? <PeaksPlayer src={blobsrc} type={mime} paymentSchedule={paymentSchedule} streamNumber={streamNumber} />
+      : mime.startsWith("audio") ? <PeaksPlayer src={blobsrc} type={mime} paymentSchedule={paymentSchedule} streamNumber={streamNumber} peaksUri={peaksUri}
+        purchaseCost={this.purchaseCost()} onPurchase={this.purchaseContent} onFirstPlay={this.onFirstPlay} />
         : mime.startsWith("video") ? <VideoPlayer /*poster='???'*/ src={strmsrc} type={mime} />
           : null; //<p>Invalid mime type</p>;
 
-    let gutter = 10;
-    let cont;
-    if (content) cont = <ContentView info={content} owner={owner} />;
     return <div>
       <Row gutter={gutter}>
         <Col span={3}>{viewer}</Col>

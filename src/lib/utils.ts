@@ -4,11 +4,20 @@ import * as crypto from 'crypto';
 
 import * as Dbt from './datatypes';
 
-export const serverUrl = isDev() ? "http://localhost:8080" : "https://www.pseudoq.com";
+const nodeEnv = process.env.NODE_ENV;
+export function getNodeEnv() {
+  return nodeEnv;
+}
+
+export const serverUrl =
+  isDev() ? "http://localhost:8080"
+    : isStaging() ? "https://pseudoqurl-staging.herokuapp.com"
+      : "https://www.pseudoq.com";
+
 export const chromeAuthUrl = "https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=";
 
 export function capuchinVersion() {
-  return "0.9.7.3";
+  return "0.9.8.1";
 }
 
 export function sleep(millisecs: number) {
@@ -32,7 +41,15 @@ export function isMember(grp) {
 }
 
 export function isDev() {
-  return process.env.NODE_ENV === 'development'
+  return nodeEnv === 'development'
+}
+
+export function isStaging() {
+  return nodeEnv === 'staging'
+}
+
+export function isProduction() {
+  return nodeEnv === 'production'
 }
 
 let _isTest = false;

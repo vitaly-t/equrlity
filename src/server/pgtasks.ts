@@ -300,41 +300,107 @@ export async function getLinkAlreadyInvestedIn(t: ITask<any>, userId: Dbt.userId
   return null;
 }
 
-export async function payForView(t: ITask<any>, links: Dbt.Link[], viewerId: Dbt.userId, viewedLinkId: Dbt.linkId): Promise<CacheUpdate[]> {
+async function payTransitLinks(t: ITask<any>, links: Dbt.Link[], viewerId: Dbt.userId, amountSent: Dbt.integer): Promise<[Dbt.integer, CacheUpdate[]]> {
+  if (amountSent <= 0) return [amountSent, []];
   let rslt: CacheUpdate[] = [];
+  let l = links.length - 1;
+  let amount = amountSent;
+  for (let i = 0; i < l; ++i) {
+    if (amount <= 0) return
+    let link = links[i];
+    await insertRecord(t, "views", { userId: viewerId, linkId: link.linkId, payment: 1 });
+    link = await updateRecord<Dbt.Link>(t, "links", { ...link, amount: link.amount + 1 });
+    rslt.push({ table: "links" as CachedTable, record: link });
+    --amount;
+  }
+  return [amount, rslt];
+}
+
+export async function payForView(t: ITask<any>, links: Dbt.Link[], viewerId: Dbt.userId, amountSent: Dbt.integer): Promise<CacheUpdate[]> {
+  let [amountRemaining, rslt] = await payTransitLinks(t, links, viewerId, amountSent);
 
   let viewer = await retrieveRecord<Dbt.User>(t, "users", { userId: viewerId });
   let l = links.length - 1;
-  for (let i = 0; i < l; ++i) await insertRecord(t, "views", { userId: viewerId, linkId: links[i].linkId });
+  let link = links[l];
+  let sched = link.paymentSchedule;
+  let views: Dbt.integer = sched ? sched.length : 0;
+  if (sched && sched.length > 0) {
+    let r = await t.one(`select count(*) as cnt from views where "userId" = '${viewerId}' and "linkId" = '${link.linkId}' `);
+    views = parseInt(r.cnt);
+  }
+  if (sched && views < sched.length) {
+    let amt = sched[views];
+    if (amt > amountRemaining) throw new Error(`Expecting payment of ${amt}, but received only ${amountRemaining}.`)
+    amountRemaining -= amt;
+    if (amt < 0) { //link pays viewer
+      if (link.amount + amt < 0) throw new Error("link has insufficient credits to pay viewer");  //nqr - viewer is denied access as well as not getting paid
+    }
+    else if (viewer.credits < amt) throw new Error("viewer has insufficient credits to pay link");
+    await insertRecord(t, "views", { userId: viewerId, linkId: link.linkId, payment: amt });
+    let amount = link.amount + amt;
+    let r = await updateRecord<Dbt.Link>(t, "links", { ...link, amount });
+    rslt.push({ table: "links" as CachedTable, record: r });
+
+    if (views === sched.length - 1) {  // schedule completed
+      let contentId = link.contentId;
+      let cont = await retrieveRecord<Dbt.Content>(t, "contents", { contentId });
+      cont = { ...cont, userId: viewerId, contentId: '' };
+      cont = await insertContent(t, cont);
+      rslt.push({ table: "contents" as CachedTable, record: cont });
+    }
+  }
+  else {
+    await insertRecord(t, "views", { userId: viewerId, linkId: link.linkId });
+    link = await updateRecord<Dbt.Link>(t, "links", { ...link, amount: link.amount + 1 });
+    rslt.push({ table: "links" as CachedTable, record: link });
+    --amountRemaining;
+  }
+  if (amountRemaining < 0) throw new Error("Insufficient amount for payforView");
+  if (amountRemaining !== 0) {
+    console.log(`Warning: Incorrect amount for payforView. Sent ${amountSent}, remainder: ${amountRemaining}`);
+  }
+  let credits = viewer.credits - (amountSent - amountRemaining);
+  viewer = { ...viewer, credits }
+  viewer = await updateRecord<Dbt.User>(t, "users", viewer);
+  rslt.push({ table: "users" as CachedTable, record: viewer });
+  return rslt;
+}
+
+export async function purchaseContent(t: ITask<any>, links: Dbt.Link[], viewerId: Dbt.userId, amountSent: Dbt.integer): Promise<CacheUpdate[]> {
+  let [amountRemaining, rslt] = await payTransitLinks(t, links, viewerId, amountSent);
+
+  let viewer = await retrieveRecord<Dbt.User>(t, "users", { userId: viewerId });
+  let l = links.length - 1;
   let link = links[l];
   let sched = link.paymentSchedule;
   if (sched && sched.length > 0) {
-    let views: Dbt.View[] = await t.any(`select * from views where "userId" = '${viewerId}' and "linkId" = '${link.linkId}' order by "viewCount" `);
-    if (views.length < sched.length) {
-      let amt = sched[views.length];
-      let totalPayment = amt
-      if (views.length > 0) {
-        let lastView = views[views.length - 1];
-        //if (lastView.viewCount !== views.length) throw new Error("corruption in previous views");
-        totalPayment += lastView.totalPayment;
-      }
-      if (amt < 0) { //link pays viewer
-        if (link.amount + amt < 0) throw new Error("link has insufficient credits to pay viewer");  //nqr - viewer is denied access as well as not getting paid
-      }
-      else if (viewer.credits < amt) throw new Error("viewer has insufficient credits to pay link");
-      await insertRecord(t, "views", { userId: viewerId, linkId: link.linkId, viewCount: views.length + 1, payment: amt, totalPayment });
-      let credits = viewer.credits - amt;
-      viewer = { ...viewer, credits }
-      viewer = await updateRecord<Dbt.User>(t, "users", viewer);
-      rslt.push({ table: "users" as CachedTable, record: viewer });
-      let amount = link.amount + amt;
-      let r = await updateRecord<Dbt.Link>(t, "links", { ...link, amount });
-      rslt.push({ table: "links" as CachedTable, record: r });
-      return rslt;
+    let l: Dbt.integer = parseInt((await t.one(`select count(*) as cnt from views where "userId" = '${viewerId}' and "linkId" = '${link.linkId}' `)).cnt);
+    let acc = 0;
+    while (l < sched.length) {
+      let amt = sched[l];
+      acc += amt;
+      await insertRecord<Dbt.View>(t, "views", { userId: viewerId, linkId: link.linkId, payment: amt });
+      ++l
     }
+    if (acc !== amountRemaining) throw new Error(`Expecting payment of ${acc}, but received ${amountRemaining} instead.`)
+    //link pays viewer
+    if (acc < 0 && link.amount + acc < 0) throw new Error("link has insufficient credits to pay viewer");  //nqr - viewer is denied access as well as not getting paid
+    let credits = viewer.credits - amountSent;
+    viewer = { ...viewer, credits }
+    viewer = await updateRecord<Dbt.User>(t, "users", viewer);
+    rslt.push({ table: "users" as CachedTable, record: viewer });
+
+    let amount = link.amount + acc;
+    let r = await updateRecord<Dbt.Link>(t, "links", { ...link, amount });
+    rslt.push({ table: "links" as CachedTable, record: r });
+
+    let contentId = link.contentId;
+    let cont = await retrieveRecord<Dbt.Content>(t, "contents", { contentId });
+    cont = { ...cont, userId: viewerId, contentId: '' };
+    cont = await insertContent(t, cont);
+    rslt.push({ table: "contents" as CachedTable, record: cont });
   }
-  await insertRecord(t, "views", { userId: viewerId, linkId: link.linkId });
-  return [];
+  return rslt;
 }
 
 export async function createUser(t: ITask<any>, email?: string): Promise<Dbt.User> {
@@ -371,19 +437,19 @@ export async function insertContent(t: ITask<any>, cont: Dbt.Content): Promise<D
   return await insertRecord<Dbt.Content>(t, "contents", cont);
 }
 
-export async function deleteContent(t: ITask<any>, cont: Dbt.Content) {
+export async function deleteContent(t: ITask<any>, cont: Dbt.Content): Promise<void> {
   let { contentId, db_hash } = cont;
+  await deleteRecord<Dbt.Content>(t, "contents", { contentId });
   if (db_hash) {
     let chk = await t.any(`select "contentId" from contents where db_hash = '${db_hash}'`);
-    if (chk.length === 1) { // don't delete blob if any other refs
+    if (chk.length === 0) { // don't delete blob if any other refs
       // assert chk[0].contentId === contentId?
-      let blob: Dbt.Blob = await t.one(`select "blobId" from blobs where db_hash = '${db_hash}`);
+      let blob: Dbt.Blob = await t.one(`select "blobId" from blobs where db_hash = '${db_hash}'`);
       const man = new LargeObjectManager({ pgPromise: t });
       await man.unlinkAsync(blob.blobId)
       await deleteRecord<Dbt.Blob>(t, "blobs", { db_hash });
     }
   }
-  await deleteRecord<Dbt.Content>(t, "contents", { contentId });
 }
 
 export async function insertLink(t: ITask<any>, link: Dbt.Link): Promise<Dbt.Link> {
@@ -449,6 +515,18 @@ export async function retrieveBlob(t: ITask<any>, db_hash: Dbt.db_hash): Promise
   let blob = await retrieveRecord<Dbt.Blob>(t, "blobs", { db_hash });
   let blobId = blob.blobId;
   return await retrieveLargeObject(t, blobId);
+}
+
+export async function updateAudioPeaks(t: ITask<any>, db_hash: Dbt.db_hash, peaks: Dbt.text, userId: Dbt.userId): Promise<void> {
+  let blob = await retrieveRecord<Dbt.Blob>(t, "blobs", { db_hash });
+  if (blob.userId !== userId) throw new Error("incorrect owner for peaks data");
+  blob = { ...blob, peaks }
+  await updateRecord(t, "blobs", blob);
+}
+
+export async function getAudioPeaks(t: ITask<any>, db_hash: Dbt.db_hash): Promise<Dbt.text> {
+  let blob = await retrieveRecord<Dbt.Blob>(t, "blobs", { db_hash });
+  return blob.peaks;
 }
 
 export async function registerInvitation(t: ITask<any>, ipAddress: string, linkId: Dbt.linkId): Promise<Dbt.Invitation> {

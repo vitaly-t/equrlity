@@ -82,7 +82,8 @@ export interface Blob {
   readonly db_hash: db_hash | null,
   readonly blobId: blobId | null,
   readonly created: created | null,
-  readonly userId: userId | null
+  readonly userId: userId | null,
+  readonly peaks: text | null
 };
 
 export interface Content {
@@ -153,9 +154,7 @@ export interface View {
   readonly userId: userId | null,
   readonly linkId: linkId | null,
   readonly created: created | null,
-  readonly payment: payment | null,
-  readonly viewCount: integer | null,
-  readonly totalPayment: payment | null
+  readonly payment: payment | null
 };
 
 export interface ContentView {

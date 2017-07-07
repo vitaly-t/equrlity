@@ -7,7 +7,7 @@ let enabledClr = '#72D687';
 let hoverClr = '#3ea454';
 
 
-interface SvgWrapperProps { disabled: boolean }
+interface SvgWrapperProps { disabled: boolean, viewBox: string, preserveAspectRatio: string }
 const SvgWrapper: React.StatelessComponent<SvgWrapperProps> = props => (
   <svg {...props} >
     {props.children}
@@ -251,17 +251,17 @@ export interface PlayBackControlsProps {
   height: number, isPlaying: boolean, isMuted: boolean, volume: number, onVolumeChange: (v: number) => void,
   showPrevious: boolean, hasPrevious: boolean, onPrevious?: () => void,
   showNext: boolean, hasNext: boolean, onNext?: () => void,
-  onTogglePause: () => void, onToggleMute: () => void
+  onPlay: () => void, onPause: () => void, onToggleMute: () => void
 }
 export class PlayBackControls extends React.Component<PlayBackControlsProps, {}> {
   render() {
     let btnSize = this.props.height;
-    let { height, isPlaying, isMuted, showPrevious, hasPrevious, onPrevious, showNext, hasNext, onNext, onTogglePause, onToggleMute, volume, onVolumeChange } = this.props
+    let { height, isPlaying, isMuted, showPrevious, hasPrevious, onPrevious, showNext, hasNext, onNext, onPlay, onPause, onToggleMute, volume, onVolumeChange } = this.props
     return <Row align="middle" >
       <Col>
-        {showPrevious && <PreviousButton size={btnSize} disabled={!hasPrevious} onClick={onPrevious} />}
-        {!isPlaying && <PlayButton size={btnSize} disabled={false} onClick={onTogglePause} />}
-        {isPlaying && <PauseButton size={btnSize} disabled={false} onClick={onTogglePause} />}
+        {showPrevious && <PreviousButton size={btnSize} disabled={false} onClick={onPrevious} />}
+        {!isPlaying && <PlayButton size={btnSize} disabled={false} onClick={onPlay} />}
+        {isPlaying && <PauseButton size={btnSize} disabled={false} onClick={onPause} />}
         {showNext && <NextButton size={btnSize} disabled={!hasNext} onClick={onNext} />}
         {!isMuted && <SoundOffButton size={btnSize} disabled={false} onClick={onToggleMute} />}
         {isMuted && <SoundOnButton size={btnSize} disabled={false} onClick={onToggleMute} />}

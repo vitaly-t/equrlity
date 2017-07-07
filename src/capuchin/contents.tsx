@@ -17,6 +17,7 @@ import * as Tags from '../lib/tags';
 import * as Hasher from '../lib/contentHasher';
 import { YesNoBox } from '../lib/dialogs';
 import { uploadRequest, signData, sendApiRequest } from "../lib/axiosClient";
+import buildWaveform from '../lib/buildWaveform';
 
 import { AppState, postDeserialize } from "./AppState";
 import * as Chrome from './chrome';
@@ -66,7 +67,6 @@ export class ContentsPage extends React.Component<ContentsPageProps, ContentsPag
     function calcDigest(a: ArrayBuffer): string {
       let buf = new Buffer(new Uint8Array(a));
       return Hasher.calcHashBuffer(buf)
-
     }
 
     let uploadFile = async (f: any) => {
@@ -75,10 +75,13 @@ export class ContentsPage extends React.Component<ContentsPageProps, ContentsPag
       while (rdr.readyState != 2) await Utils.sleep(2);
       let digest = calcDigest(rdr.result);
       let sig = await signData(this.props.appState.privateKey, digest);
+      let peaks = await buildWaveform(rdr.result);
+
       //console.log("digest: " + digest);
       var data = new FormData();
       data.append("hash", digest);
       data.append("sig", sig);
+      data.append("peaks", peaks);
       data.append(f.name, f);
       let CancelToken = axios.CancelToken;
       let source = CancelToken.source();
@@ -257,16 +260,22 @@ export class ContentsPage extends React.Component<ContentsPageProps, ContentsPag
         <div>
           <h4>Uploading : </h4>
           {uplds}
+          {vsp}
           <Button className="pt-intent-primary" onClick={() => this.setState({ cancelUpload: true })} text="Cancel" />
         </div>
     }
     else {
+      let formats = '.flac, .ogv, .ogm, .ogg, .oga, .webm, .weba, .wav, .mp4, .m4v, .m4a, .mp3'
       uploadDiv =
         <div>
           <h4>Upload new Content(s) : </h4>
           {vsp}
-          <Dropzone onDrop={this.onDropMedia}>
-            <div> Drop some audio/ video / image files here, or click to select files to upload.</div>
+          <Dropzone style={{ width: '400px', height: '200px', border: '3px dashed', }} accept={formats} onDrop={this.onDropMedia}>
+            <div>
+              <p>Drop some audio/ video / image files here, or click to select files to upload</p>
+              <p>Supported formats are:</p>
+              <p>{formats}</p>
+            </div>
           </Dropzone>
           {vsp}
         </div>

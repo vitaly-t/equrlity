@@ -1,11 +1,14 @@
 const fs = require('fs');
-const webpack = require('webpack');
 const path = require('path');
-const tgtdir = process.env.NODE_ENV === 'development' ? 'dist' : 'dist/rel';
+const webpack = require('webpack');
+const CopyWebpackPlugin = require('copy-webpack-plugin');
+
+let nodeEnv = process.env.NODE_ENV;
+const tgtdir = nodeEnv === 'development' ? 'dist' : nodeEnv === 'staging' ? 'dist/staging' : 'dist/rel';
 let outPath = path.resolve(__dirname, tgtdir);
 if (!fs.existsSync(outPath)) fs.mkdirSync(outPath);
 
-module.exports = function (env) {
+module.exports = function () {
   return {
     entry: {
       media: './src/bundles/media.tsx',
@@ -31,12 +34,9 @@ module.exports = function (env) {
         }
       ]
     },
-    performance: {
-      hints: false
-    },
     plugins: [
       new webpack.DefinePlugin({
-        'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development')
+        'process.env.NODE_ENV': `"${nodeEnv}"`
       }),
     ],
     devtool: 'inline-source-map'

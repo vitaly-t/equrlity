@@ -127,7 +127,9 @@ export default {
   },
   tupleTypes: {
     Auth: ["authProvider", "authId", "userId", "created", "updated"],
-    Blob: ["db_hash", "blobId", "created", "userId"],
+    Blob: ["db_hash", "blobId", "created", "userId",
+      { name: "peaks", type: "text" },
+    ],
     Content: ["contentId", "contentType", "title", "userId", "db_hash", "content", "created", "updated", "isPublic", "tags",
       { name: "url", type: "urlString" },
       { name: "mime_ext", type: "varchar(8)" },
@@ -168,10 +170,7 @@ export default {
       "created",
       "updated",
     ],
-    View: ["viewId", "userId", "linkId", "created", "payment",
-      { name: "viewCount", type: "integer" },
-      { name: "totalPayment", type: "payment" },
-    ],
+    View: ["viewId", "userId", "linkId", "created", "payment"],
     ContentView: ["viewId", "userId", "contentId", "linkId", "ipAddress", "created"],
   },
   tables: {   // the order of entries here is significant.  foreign keys can only reference preceding entries

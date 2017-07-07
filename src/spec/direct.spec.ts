@@ -10,6 +10,7 @@ import * as Dbt from '../lib/datatypes'
 import * as Rpc from '../lib/rpc';
 import * as Utils from '../lib/utils';
 import * as Hasher from '../lib/contentHasher';
+//import { buildWaveform } from '../lib/waveform';
 
 Utils.setTest(true);  // Not sure this is kosher ...
 
@@ -92,10 +93,10 @@ it("should work using direct calls", async () => {
     let linkbal = cache.links.get(linkId).amount;
 
     // user2 views link
-    await pg.payForView(u2.userId, linkId)
+    await pg.payForView(u2.userId, linkId, 1)
     let newbal = cache.users.get(u2.userId).credits;
-    expect(newbal).toEqual(bal, "payment for view not recorded");
-    expect(cache.links.get(linkId).amount).toEqual(linkbal, "link amount not adjusted for view");
+    expect(newbal).toEqual(bal - 1, "payment for view not recorded");
+    expect(cache.links.get(linkId).amount).toEqual(linkbal + 1, "link amount not adjusted for view");
 
     expect(cache.userlinks.get(u1.userId).length).toEqual(1, "social graph not correct");
     let preq4: Rpc.BookmarkLinkRequest = { comment: "groovy baby", tags: [], url: format(url), signature: "", title: "yaa2  !!" };
@@ -107,9 +108,11 @@ it("should work using direct calls", async () => {
       expect(cache.getChainFromLinkId(rsp2.link.linkId).length).toEqual(2, "link not chained");
 
       // user4 views promoted link
-      await pg.payForView(u4.userId, rsp2.link.linkId);
+      let ubal = cache.users.get(u4.userId).credits;
+      await pg.payForView(u4.userId, rsp2.link.linkId, 2);
       let newbal = cache.links.get(linkId).amount;
-      expect(newbal).toEqual(bal, "incorrect payment for chained view");
+      expect(newbal).toEqual(bal + 1, "incorrect payment for chained view");
+      expect(cache.users.get(u4.userId).credits).toEqual(ubal - 2, "user balance not properly debited for view");
     }
 
     // redeem link  testing - re-grafting now removed.  just move balance out of link.
@@ -134,15 +137,17 @@ it("should work for blobs", async () => {
   let u = await pg.createUser();
   let fname = "/dev/pseudoqurl/spec/EarlyThisMorning.wav";
   let strm = fs.createReadStream(fname);
-  let rsp = await pg.insertBlobContent(strm, "testing", "wav", "audio", "Early This Morning", u.userId);
+  let content = fs.readFileSync("/dev/pseudoqurl/spec/EarlyThisMorning.wav");
+  //let peaks = await buildWaveform(content.buffer);
+  let rsp = await pg.insertBlobContent(strm, "testing", "wav", "audio", "Early This Morning", null, u.userId);
   let digest = await Hasher.calcHash(fs.createReadStream(fname));
   expect(digest).toEqual(rsp.db_hash, "hashing cactus");
-  console.log(rsp.contentId);
   let cont2 = await pg.retrieveBlobContent(rsp.contentId)
-  let content = fs.readFileSync("/dev/pseudoqurl/spec/EarlyThisMorning.wav");
   let s1 = pg.pgp.as.buffer(content);
   let s2 = pg.pgp.as.buffer(cont2);
   expect(s1).toEqual(s2, "blob cactus");
+
+
   let sched = [-10, -5, 100];
   let req: Rpc.PromoteContentRequest = { contentId: rsp.contentId, title: '', comment: '', tags: [], amount: 100, signature: '', paymentSchedule: sched };
   let rsp2 = await pg.handlePromoteContent(u.userId, req);
@@ -152,36 +157,46 @@ it("should work for blobs", async () => {
     let bal = cache.users.get(u2.userId).credits;
     let link = rsp2.link;
     let linkbal = link.amount;
-    await pg.payForView(u2.userId, link.linkId);
+    await pg.payForView(u2.userId, link.linkId, -10);
     let newbal = cache.users.get(u2.userId).credits;
-    expect(bal - sched[0]).toEqual(newbal, "link balance not redeemed");
+    expect(bal - sched[0]).toEqual(newbal, "pay for first view not working");
   }
 
   {
     let bal = cache.users.get(u2.userId).credits;
     let link = cache.links.get(rsp2.link.linkId);
     let linkbal = link.amount;
-    await pg.payForView(u2.userId, link.linkId);
+    await pg.payForView(u2.userId, link.linkId, -5);
     let newbal = cache.users.get(u2.userId).credits;
-    expect(bal - sched[1]).toEqual(newbal, "link balance not redeemed");
+    expect(bal - sched[1]).toEqual(newbal, "pay for second view not working");
   }
 
   {
     let bal = cache.users.get(u2.userId).credits;
     let link = cache.links.get(rsp2.link.linkId);
     let linkbal = link.amount;
-    await pg.payForView(u2.userId, link.linkId);
+    await pg.payForView(u2.userId, link.linkId, 100);
     let newbal = cache.users.get(u2.userId).credits;
-    expect(bal - sched[2]).toEqual(newbal, "link balance not redeemed");
+    expect(bal - sched[2]).toEqual(newbal, "pay for third view not working");
   }
 
   {
     let bal = cache.users.get(u2.userId).credits;
     let link = cache.links.get(rsp2.link.linkId);
     let linkbal = link.amount;
-    await pg.payForView(u2.userId, link.linkId);
+    await pg.payForView(u2.userId, link.linkId, 1);
     let newbal = cache.users.get(u2.userId).credits;
-    expect(bal).toEqual(newbal, "link balance not redeemed");
+    expect(bal - 1).toEqual(newbal, "extra views should now cost 1 each");
+  }
+
+  let u3 = await pg.createUser();
+  {
+    let bal = cache.users.get(u3.userId).credits;
+    let link = rsp2.link;
+    let linkbal = link.amount;
+    await pg.purchaseContent(u3.userId, link.linkId, 85);
+    let newbal = cache.users.get(u3.userId).credits;
+    expect(bal - 85).toEqual(newbal, "purchase content not working");
   }
 
 

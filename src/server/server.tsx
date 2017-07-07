@@ -11,10 +11,7 @@ import { Url, parse } from 'url';
 import * as React from 'react';
 import * as ReactDOMServer from 'react-dom/server'
 import axios from 'axios';
-
 import * as Koa from "koa";
-//import * as bodyParser from 'koa-bodyparser';
-//import * as Router from 'koa-router';
 import * as Router from 'koa-joi-router';
 import * as send from 'koa-send';
 import * as cors from 'kcors';
@@ -207,7 +204,7 @@ publicRouter.get('/link/:id', async (ctx, next) => {
   let viewerId = isClient ? ctx['userId'].id : null;
   if (isClient || link.isPublic) {
     if (cont.contentType === 'bookmark') {
-      if (isClient && !link.isPublic) await pg.payForView(viewerId, linkId)
+      if (isClient && !link.isPublic) await pg.payForView(viewerId, linkId, 0)
       ctx.status = 303;
       ctx.redirect(cont.url);
       return;
@@ -245,10 +242,30 @@ publicRouter.get('/stream/link/:id', async (ctx, next) => {
   let cont = cache.contents.get(contentId);
   if (!cont || !cont.db_hash) ctx.throw(404);
   let viewerId = link.isPublic ? null : ctx['userId'].id;
-  if (viewerId) await pg.payForView(viewerId, linkId)
   let lob = await pg.retrieveBlobContent(contentId);
   let strm = createReadStream(lob);
   ctx.body = strm;
+});
+
+publicRouter.get('/blob/content/peaks/:id', async (ctx, next) => {
+  let contentId = ctx.params.id;
+  let cont = cache.contents.get(contentId);
+  if (!cont || !cont.db_hash) ctx.throw(404);
+  let lob = await pg.getAudioPeaks(cont.db_hash);
+  let json = JSON.parse(lob);
+  ctx.body = json;
+});
+
+publicRouter.get('/blob/link/peaks/:id', async (ctx, next) => {
+  let linkId = ctx.params.id;
+  let link = cache.links.get(linkId);
+  if (!link) ctx.throw(404);
+  let contentId = link.contentId;
+  let cont = cache.contents.get(contentId);
+  if (!cont || !cont.db_hash) ctx.throw(404);
+  let lob = await pg.getAudioPeaks(cont.db_hash);
+  let json = JSON.parse(lob);
+  ctx.body = json;
 });
 
 publicRouter.get('/blob/content/:id', async (ctx, next) => {
@@ -289,7 +306,11 @@ publicRouter.get('/load/content/:id', async (ctx, next) => {
     let userName = cache.users.get(c.userId).userName;
     return { ...c, userName }
   })
-  let result: Rpc.LoadContentResponse = { content, owner, comments, paymentSchedule: [], streamNumber: 0 }
+
+  let peaks = false;
+  if (content.contentType === 'audio' && await pg.getAudioPeaks(content.db_hash)) peaks = true;
+
+  let result: Rpc.LoadContentResponse = { content, owner, comments, paymentSchedule: [], streamNumber: 0, peaks, linkDepth: 0 }
   ctx.body = { result };
 });
 
@@ -320,7 +341,11 @@ publicRouter.get('/load/link/:id', async (ctx, next) => {
   let { paymentSchedule } = link
   let viewerId = link.isPublic ? null : ctx['userId'].id;
   if (viewerId) streamNumber = await pg.getNextStreamNumber(viewerId, linkId);
-  let result: Rpc.LoadContentResponse = { content, owner, comments, paymentSchedule, streamNumber }
+
+  let peaks = false;
+  if (content.contentType === 'audio' && await pg.getAudioPeaks(content.db_hash)) peaks = true;
+  let linkDepth = cache.getChainFromLinkId(linkId).length - 1;
+  let result: Rpc.LoadContentResponse = { content, owner, comments, paymentSchedule, streamNumber, peaks, linkDepth }
   ctx.body = { result };
 });
 
@@ -388,7 +413,7 @@ publicRouter.post('/auth', async (ctx, next) => {
   } catch (e) {
     token = "";
   }
-  if (!Utils.isDev() && (!userInfo || !publicKey || !authValue || !token)) {
+  if (Utils.isProduction() && (!userInfo || !publicKey || !authValue || !token)) {
     ctx.status = 400;
     return;
   }
@@ -400,7 +425,7 @@ publicRouter.post('/auth', async (ctx, next) => {
 
   let authId = userInfo.id;
   let email = userInfo.email;
-  if (!Utils.isDev()) {
+  if (Utils.isProduction()) {
     let authRsp = await axios.create({ responseType: "json" }).get(Utils.chromeAuthUrl + token);
     if (authRsp.status !== 200 || authRsp.data.user_id !== authId) {
       ctx.throw(401, "Authentication failed!");
@@ -439,7 +464,7 @@ app.use(async function (ctx, next) {
   }
   let _userId: any;
   if (!ctx['userId']) {
-    if (!Utils.isDev()) {
+    if (Utils.isProduction()) {
       ctx.status = 400;
       ctx.body = { error: { message: 'Unauthorized access' } };
       return;
@@ -525,7 +550,9 @@ router.route({
         let pth = path.parse(part.filename);
         let mime_ext = pth.ext.replace(".", "");
         let contentType: Dbt.contentType = part.mime.substring(0, part.mime.indexOf("/"));
-        cont = await pg.insertBlobContent(part, '', mime_ext, contentType, part.filename, userId);
+        let peaks;
+        if (contentType === 'audio') peaks = parts.field.peaks;
+        cont = await pg.insertBlobContent(part, '', mime_ext, contentType, part.filename, peaks, userId);
       }
       let hash = parts.field.hash;
       if (hash !== cont.db_hash || !validateContentSignature(pk, hash, parts.field.sig)) {
@@ -690,8 +717,8 @@ router.post('/rpc', async function (ctx: any) {
         if (content.userId !== userId) {
           if (content.userId) throw new Error("incorrect user for content");
         }
-        let ok = await pg.deleteRecord<Dbt.Content>("contents", content);
-        let result: Rpc.RemoveContentResponse = { ok };
+        await pg.deleteContent(content);
+        let result: Rpc.RemoveContentResponse = { ok: true };
         ctx.body = { id, result };
         break;
       }
@@ -728,6 +755,24 @@ router.post('/rpc', async function (ctx: any) {
         let req: Rpc.DismissSquawksRequest = params;
         await pg.dismissSquawks(userId, req.urls, req.save);
         let result: Rpc.DismissSquawksResponse = { ok: true };
+        ctx.body = { id, result };
+        break;
+      }
+      case "cachePeaks": {
+        let req: Rpc.CachePeaksRequest = params;
+        let cont = cache.contents.get(req.contentId);
+        await pg.updateAudioPeaks(cont.db_hash, req.peaks, userId);
+        let result: Rpc.CachePeaksResponse = { ok: true };
+        ctx.body = { id, result };
+        break;
+      }
+      case "payForView": {
+        let req: Rpc.PayForViewRequest = params;
+        let { linkId, purchase, amount } = req;
+        let content: Dbt.Content | null = null;
+        if (purchase) content = await pg.purchaseContent(userId, linkId, amount);
+        else await pg.payForView(userId, linkId, amount);
+        let result: Rpc.PayForViewResponse = { ok: true, content };
         ctx.body = { id, result };
         break;
       }
@@ -794,7 +839,9 @@ app.use(router.get('/auth/twitter', function *() {
 //app.use(router.allowedMethods());
 app.use(router.middleware())
 
-//if (Utils.isDev()) pg.generateSquawks();
+if (Utils.isStaging()) console.log("Using staging mode");
+
+//pg.buildMissingWaveforms();
 
 const port = parseInt(process.env.PORT, 10) || 8080;
 

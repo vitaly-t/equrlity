@@ -208,19 +208,6 @@ export class AudioPlayer extends React.Component<AudioPlayerProps, AudioPlayerSt
         >
           <source src={this.props.src} type={this.props.type} />
         </audio>
-        {audio && <PlayBackControls
-          height={40}
-          isPlaying={isPlaying}
-          isMuted={audio.muted}
-          volume={audio.volume}
-          onVolumeChange={v => { }}
-          showPrevious={true}
-          hasPrevious={false}
-          showNext={true}
-          hasNext={false}
-          onTogglePause={() => { if (isPlaying) audio.pause(); else audio.play(); }}
-          onToggleMute={() => { audio.muted = !audio.muted }}
-        />}
       </div>
     );
   }
