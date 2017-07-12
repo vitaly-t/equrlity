@@ -160,12 +160,6 @@ export type LoadLinkResponse = {
   content: Dbt.Content;
 }
 
-export type UserFollowing = {
-  userName: string;
-  subscriptions: Dbt.tags;
-  blacklist: Dbt.tags;
-}
-
 export type UserSettings = {
   userName: string;
   email: string;

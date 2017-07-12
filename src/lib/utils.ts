@@ -17,7 +17,7 @@ export const serverUrl =
 export const chromeAuthUrl = "https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=";
 
 export function capuchinVersion() {
-  return "0.9.8.1";
+  return "0.9.8.2";
 }
 
 export function sleep(millisecs: number) {

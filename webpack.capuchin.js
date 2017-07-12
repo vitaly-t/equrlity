@@ -5,12 +5,20 @@ const CopyWebpackPlugin = require('copy-webpack-plugin');
 const { capuchinVersion } = require('./dist/lib/utils');
 const { TextEncoder, TextDecoder } = require('text-encoding');
 
-const ndEnv = process.env.NODE_ENV;
-const isProd = ndEnv === 'production';
-const isStaging = ndEnv === 'staging';
-const tgtdir = isProd ? 'dist/rel' : isStaging ? 'dist/staging' : 'dist';
+const nodeEnv = process.env.NODE_ENV;
+const isProd = nodeEnv === 'production';
+let appName = 'capuchin';
+let manifestName = 'pseudoqurl'
+if (!isProd && process.env.CAPUCHIN_NAME) {
+  appName = process.env.CAPUCHIN_NAME
+  manifestName += '-' + appName
+}
+const isStaging = nodeEnv === 'staging';
+let tgtdir = isProd ? 'dist/rel' : isStaging ? 'dist/staging' : 'dist';
+
 const outDir = path.resolve(__dirname, tgtdir);
-const outPath = outDir + '/capuchin';
+const outPath = outDir + '/' + appName;
+console.log('outputting to: ' + outPath);
 
 if (!fs.existsSync(outDir)) fs.mkdirSync(outDir);
 if (!fs.existsSync(outPath)) fs.mkdirSync(outPath);
@@ -53,8 +61,8 @@ let authEntries = !isProd ? '' :
     ]
   },`;
 
-let icon32 = isProd ? "pseudoq_rel_32.png" : isStaging ? "pseudoq_staging_32.png" : "pseudoq2_32.png";
-let icon128 = isProd ? "pseudoq_rel_128.png" : isStaging ? "pseudoq_staging_128.png" : "pseudoq2_128.png";
+let icon32 = isProd ? "pseudoq_rel_32.png" : isStaging ? "pseudoq_staging_32.png" : "pseudoq_32.png";
+let icon128 = isProd ? "pseudoq_rel_128.png" : isStaging ? "pseudoq_staging_128.png" : "pseudoq_128.png";
 
 module.exports = function () {
   return {
@@ -96,6 +104,7 @@ module.exports = function () {
               console.log("transforming: " + path);
               var str = (new TextDecoder('utf-8')).decode(content);
               str = str.replace("__CAPUCHIN_VERSION__", capuchinVersion());
+              str = str.split("__CAPUCHIN_NAME__").join(manifestName);
               str = str.replace('"auth_entries": "",', authEntries);
               str = str.replace('__ICON_32__', icon32);
               str = str.replace('__ICON_128__', icon128);
@@ -127,7 +136,8 @@ module.exports = function () {
         },
       ], { copyUnmodified: true }),
       new webpack.DefinePlugin({
-        'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV)
+        'process.env.NODE_ENV': `"${nodeEnv}"`,
+        'process.env.CAPUCHIN_NAME': `"pseudoq-${appName}"`
       }),
     ],
     devtool: 'inline-source-map'

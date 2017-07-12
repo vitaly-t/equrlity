@@ -58,16 +58,8 @@ export interface User {
   readonly subscriptions: tags | null,
   readonly blacklist: tags | null,
   readonly groups: userGroup[] | null,
+  readonly following: userId[] | null,
   readonly last_feed: timestamp | null
-};
-
-export interface UserFollow {
-  readonly userId: userId | null,
-  readonly following: userId | null,
-  readonly subscriptions: tags | null,
-  readonly blacklist: tags | null,
-  readonly created: created | null,
-  readonly updated: updated | null
 };
 
 export interface Auth {

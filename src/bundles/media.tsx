@@ -9,7 +9,7 @@ import { VideoPlayer, AudioPlayer } from '../lib/mediaPlayer';
 //import { AudioPlayer } from '../lib/audioPlayer';
 import { PeaksPlayer } from '../lib/reactPeaks';
 import * as Comms from '../lib/axiosClient';
-import { CommentsPanel } from '../lib/comments';
+import { CommentsPanel, CommentEditor } from '../lib/comments';
 import { ContentView } from '../lib/contentView';
 import buildWaveform from '../lib/buildWaveform';
 
@@ -50,7 +50,7 @@ export class MediaPage extends React.Component<MediaPageProps, MediaPageState> {
     if (rsp.error) throw new Error("Server returned error: " + rsp.error.message);
     let rslt: Rpc.LoadContentResponse = rsp.result;
     let { content, comments, owner, paymentSchedule, streamNumber, peaks, linkDepth } = rslt;
-    this.setState({ content, privKey, comments, owner, moniker, paymentSchedule, streamNumber, peaks });
+    this.setState({ content, privKey, comments, owner, moniker, paymentSchedule, streamNumber, peaks, linkDepth });
     if (!peaks) saveWaveForm(content.contentId);
 
   }
@@ -96,30 +96,43 @@ export class MediaPage extends React.Component<MediaPageProps, MediaPageState> {
 
   render() {
     let { contentId, mime, linkId } = this.props;
-    let { content, privKey, comments, owner, moniker, paymentSchedule, streamNumber, peaks } = this.state;
+    let { content, privKey, comments, owner, moniker, paymentSchedule, streamNumber, peaks, linkDepth } = this.state;
     if (!content) return null;
     let blobsrc = linkId ? '/blob/link/' + linkId : '/blob/content/' + contentId;
     let strmsrc = linkId ? '/stream/link/' + linkId : '/stream/content/' + contentId;
     let peaksUri;
+    let isAnonymous = linkId && streamNumber > 0 && paymentSchedule && streamNumber < paymentSchedule.length;
     if (peaks) peaksUri = Utils.serverUrl + (linkId ? '/blob/link/peaks/' + linkId : '/blob/content/peaks/' + contentId);
     let gutter = 10;
     let cont = <ContentView info={content} owner={owner} />;
+    if (isAnonymous) {
+      comments = [];
+      cont = <div style={{ marginLeft: "20px" }}>
+        <p />
+        <h4>Anonymous {mime.startsWith("audio") ? "listening" : "viewing"}.</h4>
+        <p>The details associated with this content, including comments made by others, remain hidden unless and until you have completed the &quot;Stream to Own&quot; schedule.</p>
+        <p>The idea is for you to experience and evaluate the content as directly as possible, with the least possibility of being influenced by prior conceptions, opinions of others,
+        and so on.</p>
+        <p>During this period, we encourage you to make whatever comments you wish, as we hope and trust that such comments will be of maximum value and authenticity
+          given the lack of biasing information and context.</p>
+      </div>
+    }
     let viewer = mime.startsWith("image") ? <img src={blobsrc} />
       //: mime.startsWith("audio") ? <AudioPlayer src={strmsrc} type={mime} streamToOwnCost={streamToOwnCost} /> // audioplayer.tsx
       : mime.startsWith("audio") ? <PeaksPlayer src={blobsrc} type={mime} paymentSchedule={paymentSchedule} streamNumber={streamNumber} peaksUri={peaksUri}
-        purchaseCost={this.purchaseCost()} onPurchase={this.purchaseContent} onFirstPlay={this.onFirstPlay} />
+        purchaseCost={this.purchaseCost()} onPurchase={this.purchaseContent} onFirstPlay={this.onFirstPlay} linkDepth={linkDepth} />
         : mime.startsWith("video") ? <VideoPlayer /*poster='???'*/ src={strmsrc} type={mime} />
           : null; //<p>Invalid mime type</p>;
 
     return <div>
       <Row gutter={gutter}>
         <Col span={3}>{viewer}</Col>
-        <Col>{cont}</Col>
+        <Col span={8}>{cont}</Col>
       </Row>
       <Row gutter={gutter}><h5 style={{ marginTop: "10px" }} >Comments:</h5></Row>
       <Row gutter={gutter}>
         <Col span={12}>
-          <CommentsPanel contentId={contentId} comments={this.state.comments} privKey={privKey} canCensor={moniker === owner} userName={moniker} />
+          <CommentsPanel contentId={contentId} comments={comments} privKey={privKey} canCensor={moniker === owner} userName={moniker} />
         </Col>
       </Row>
     </div>

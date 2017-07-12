@@ -4,7 +4,7 @@ import * as ReactDOM from "react-dom";
 
 import { Button, Dialog } from "@blueprintjs/core";
 import { Row, Col } from 'react-simple-flex-grid';
-import TextareaAutosize from 'react-autosize-textarea';
+import TextareaAutosize from 'react-textarea-autosize';
 
 import * as Remarkable from 'remarkable';
 

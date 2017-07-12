@@ -72,3 +72,25 @@ export async function sendSaveLink(st: AppState, req: Rpc.SaveLinkRequest): Prom
 export async function sendTransferCredits(st: AppState, req: Rpc.TransferCreditsRequest): Promise<AxiosResponse> {
   return await sendApiRequest("transferCredits", req);
 }
+
+export function openWebSocket(st: AppState, messageHandler: (msg: any) => void) {
+  if (!st.jwt) throw new Error("missing jwt");
+  let url = Utils.serverUrl.replace('http', 'ws');
+  var ws = new WebSocket(url);
+  ws.onopen = (event) => {
+    ws.send(JSON.stringify({ jwt: st.jwt }));
+  };
+  ws.onmessage = (event) => {
+    if (event.data instanceof ArrayBuffer) {
+      console.log("arraybuffer received")
+    }
+    else if (event.data instanceof Blob) {
+      console.log("arraybuffer received")
+    }
+    else if (typeof event.data === 'string') {
+      console.log("string received")
+      let msg = JSON.parse(event.data);
+      messageHandler(msg);
+    }
+  }
+}

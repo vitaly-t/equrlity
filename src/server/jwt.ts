@@ -4,7 +4,7 @@ import * as Koa from 'koa';
 
 export { sign, verify, decode } from 'jsonwebtoken';
 
-export function jwt(opts): (cxt: any, next: () => Promise<any>) => any {
+export function jwt(opts): (ctx: any, next: () => Promise<any>) => any {
 
   return async function (ctx: any, next: () => Promise<any>) {
     ctx[opts.key] = null;
@@ -23,4 +23,5 @@ export function jwt(opts): (cxt: any, next: () => Promise<any>) => any {
     await next();
   };
 };
+
 

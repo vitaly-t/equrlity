@@ -1,4 +1,2 @@
-$source = "./dist/capuchin_dev/*"
-$destination = "/devtmp/capuchin_dev"
-
-Copy-Item $source $destination -Recurse -Force
+$env:CAPUCHIN_NAME = $args[0]
+npm run mkapp

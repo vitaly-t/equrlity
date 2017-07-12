@@ -1,10 +1,10 @@
 {
-  "name": "pseudoqurl",
+  "name": "__CAPUCHIN_NAME__",
   "version": "__CAPUCHIN_VERSION__",
   "manifest_version": 2,
   "description": "Bookmarks, Content Management and more.",
   "browser_action": {
-    "default_title": "PseudoQURL",
+    "default_title": "__CAPUCHIN_NAME__",
     "default_popup": "popup.html"
   },
   "permissions": [

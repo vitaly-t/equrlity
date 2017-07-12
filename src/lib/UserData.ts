@@ -7,7 +7,6 @@ import { TagSelectOption } from '../lib/tags';
 
 export interface UserData {
   user: Dbt.User;
-  following: Dbt.UserFollow[];
   contents: Dbt.Content[];
   //auths: Dbt.Auth[];
   squawks: Dbt.Link[];

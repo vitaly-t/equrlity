@@ -29,6 +29,17 @@ export function insertRecord<T>(t: ITask<any>, tblnm: string, rec: Object): Prom
   return t.one(stmt, rec);
 }
 
+export async function insertRecords<T>(t: ITask<any>, tblnm: string, recs: Object[]): Promise<T[]> {
+  let tbl = oxb.tables.get(tblnm);
+  let rslt: T[] = []
+  for (const rec of recs) {
+    let stmt = OxiGen.genInsertStatement(tbl, rec);
+    let r: T = await t.one(stmt, rec);
+    rslt.push(r);
+  }
+  return rslt;
+}
+
 export function upsertRecord<T>(t: ITask<any>, tblnm: string, rec: Object): Promise<T> {
   let tbl = oxb.tables.get(tblnm);
   let stmt = OxiGen.genUpsertStatement(tbl, rec);
@@ -582,23 +593,6 @@ export async function handleBookmarkLink(t: ITask<any>, userId: Dbt.userId, req:
     link = await insertLink(t, link);
   }
   return { content, link };
-}
-
-export async function saveUserFollowings(t: ITask<any>, userId: Dbt.userId, followings: Rpc.UserFollowing[]): Promise<void> {
-  await t.any(`delete from user_follows where "userId" = '${userId}' `);
-  // dedupe for safety ...
-  let seen: Dbt.userName[] = []
-  for (const uf of followings) {
-    if (seen.indexOf(uf.userName) >= 0) continue;
-    seen.push(uf.userName);
-    let usr = await findUserByName(t, uf.userName);
-    let following = usr.userId;
-    if (following === userId) continue;  // narcissists be damned!!!
-    let { subscriptions, blacklist } = uf;
-    let f = OxiGen.emptyRec<Dbt.UserFollow>("user_follows");
-    f = { ...f, userId, following, subscriptions, blacklist };
-    await insertRecord<Dbt.UserFollow>(t, "user_follows", f);
-  }
 }
 
 export async function dismissSquawks(t: ITask<any>, userId: Dbt.userId, urls: Dbt.urlString[], save: boolean): Promise<void> {

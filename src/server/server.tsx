@@ -18,6 +18,7 @@ import * as cors from 'kcors';
 import * as koaBody from 'koa-body';
 import * as range from 'koa-range';
 import { createReadStream } from 'streamifier';
+import websockify from './koa-ws';
 
 // lib
 import * as OxiDate from '../lib/oxidate';
@@ -29,6 +30,7 @@ import * as Rpc from '../lib/rpc';
 import { ContentView } from '../lib/contentView';
 import { LinkLandingPage, HomePage, ContentLandingPage, UserLandingPage } from '../lib/landingPages';
 import { validateContentSignature } from '../lib/Crypto';
+import * as SrvrMsg from '../lib/serverMessages';
 
 //gen
 import * as OxiGen from '../gen/oxigen';
@@ -112,7 +114,8 @@ function linkMediaPage(cont: Dbt.Content, linkId: Dbt.linkId): string {
   return body;
 }
 
-const app = new Koa();
+const app = websockify(new Koa());
+//const app = new Koa();
 app.keys = ['pseudoqurl'];  //@@GS what does this do again?
 
 //const publicRouter = new Router();
@@ -456,6 +459,74 @@ app.use(async (ctx, next) => {
   }
 });
 
+type CacheSub = { ws: any, sub: cache.Subscription }
+let _socketSubs: CacheSub[] = [];
+
+const interval = setInterval(() => {
+  _socketSubs.forEach(({ ws, sub }) => {
+    if (ws.isAlive === false) {
+      ws.terminate();
+      cache.unSubscribe(sub);
+    }
+  });
+  _socketSubs = _socketSubs.filter(({ ws, sub }) => ws.isAlive);
+  _socketSubs.forEach(({ ws, sub }) => {
+    ws.isAlive = false;
+    ws.ping('', false, true);
+  });
+}, 60000);
+
+app.ws.use(async function (ctx, next) {
+  let ws = ctx.websocket;
+  ws.on('message', (message) => {
+    console.log(message);
+    let msg = JSON.parse(message);
+    let token = msg.jwt;
+    let opts = jwtOptions;
+    let userId = jwt.verify(token, opts.secret, opts);
+    let user: Dbt.User = getUser(userId.id);
+    if (!user) throw new Error("Invalid user id");
+    let sub: cache.Subscription;
+    sub = {
+      filter: u => u.record.userId && u.record.userId === user.userId,
+      send: async updts => {
+        let msgs: SrvrMsg.Message[] = [];
+        updts.forEach(updt => {
+          let msg: SrvrMsg.Message;
+          switch (updt.table) {
+            case "contents": {
+              msg = { type: "Content", message: updt.record };
+              break;
+            }
+            case "links": {
+              msg = { type: "Link", message: updt.record };
+              break;
+            }
+          }
+          if (msg) {
+            if (updt.remove) msg.remove = true;
+            msgs.push(msg);
+          }
+        });
+        let feeds = await pg.liveUserFeed(user.userId, updts)
+        feeds.forEach(message => msgs.push({ type: "Feed", message }));
+        if (msgs.length > 0) {
+          try {
+            ws.send(JSON.stringify(msgs));
+          }
+          catch (e) {
+            ws.isAlive = false;
+            throw (e);
+          }
+        }
+      }
+    };
+    cache.subscribe(sub);
+    _socketSubs.push({ ws, sub });
+  });
+  await next();
+});
+
 app.use(async function (ctx, next) {
   if (ctx['invalidClientMsg']) {
     ctx.status = 400;
@@ -563,7 +634,7 @@ router.route({
       console.log(err);
       ctx.throw(err);
     }
-    cache.contents.set(cont.contentId, cont);
+    cache.setContent(cont);
     ctx.body = JSON.stringify(cont);
   }
 });
@@ -629,7 +700,7 @@ router.post('/rpc', async function (ctx: any) {
       }
       case "changeSettings": {
         let req: Rpc.ChangeSettingsRequest = params;
-        let { userName, homePage, info, profile_pic, subscriptions, blacklist, following } = req;
+        let { userName, homePage, info, profile_pic, subscriptions, blacklist } = req;
         let usr = getUser(userId);
         if (!usr) throw new Error("Internal error getting user details");
         if (userName && userName !== usr.userName) {
@@ -644,10 +715,11 @@ router.post('/rpc', async function (ctx: any) {
             return;
           }
         } else profile_pic = '';
-        usr = { ...usr, userName, home_page: homePage, info, profile_pic, subscriptions, blacklist };
+        let following = req.following.map(nm => cache.getUserByName(nm).userId);
+        let i = following.indexOf(userId);
+        if (i >= 0) following.splice(i, 1);
+        usr = { ...usr, userName, home_page: homePage, info, profile_pic, subscriptions, blacklist, following };
         let updts = await pg.upsertUser(usr);
-        let follows: Rpc.UserFollowing[] = following.map(userName => { return { userName, subscriptions: [], blacklist: [] } });
-        await pg.saveUserFollowings(userId, follows);
         cache.update(updts);
         let result: Rpc.ChangeSettingsResponse = { ok: true };
         ctx.body = { id, result };
@@ -677,9 +749,8 @@ router.post('/rpc', async function (ctx: any) {
         let email = ctx['userId'].email;
         let homePage = user.home_page;
         let { info, userName, profile_pic, subscriptions, blacklist } = user;
-        let follows = await pg.getUserFollowings(userId);
-        let following = follows.map(f => f.userName);
-        let allUsers = Array.from(cache.users.values()).filter(u => u.userId !== userId).map(u => u.userName);
+        let following = cache.getUserFollowings(userId);
+        let allUsers = cache.allUserNames(userId);
         let result: Rpc.GetUserSettingsResponse = { userName, email, homePage, info, profile_pic, subscriptions, blacklist, following, allUsers };
         ctx.body = { id, result };
         break;
@@ -705,7 +776,7 @@ router.post('/rpc', async function (ctx: any) {
         content = { ...content, title };
         if (content.contentId) content = await pg.updateRecord<Dbt.Content>("contents", content);
         else content = await pg.insertContent(content);
-        cache.contents.set(content.contentId, content);
+        cache.setContent(content);
         await pg.saveTags(req.content.tags)
         let result: Rpc.SaveContentResponse = { content };
         ctx.body = { id, result };
@@ -845,7 +916,7 @@ if (Utils.isStaging()) console.log("Using staging mode");
 
 const port = parseInt(process.env.PORT, 10) || 8080;
 
-console.log("Listening at http://localhost:" + port);
+console.log("Listening at " + Utils.serverUrl);
 app.listen(port);
 
 

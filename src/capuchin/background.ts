@@ -3,15 +3,18 @@ import * as localForage from "localforage";
 import * as OxiGen from '../gen/oxigen';
 
 import * as Dbt from '../lib/datatypes';
+import * as Rpc from '../lib/rpc';
 import * as Crypto from '../lib/Crypto';
 import * as Utils from '../lib/utils';
 import * as OxiDate from '../lib/oxidate';
 import { mergeTags } from '../lib/tags';
+import * as SrvrMsg from '../lib/serverMessages';
 
 import { AppState, initState, isSeen, setLoading, setWaiting, prepareUrl, preSerialize, postDeserialize } from './AppState';
 
 import { Url, parse, format } from 'url';
 import { Message, AsyncHandlers, getTab } from './Event';
+import * as Comms from './Comms';
 
 // no touchy!!  only to be set from within handleMessage
 let __state: AppState = initState();
@@ -74,7 +77,7 @@ async function __init() {
   let st = currentState();
   if (!st.jwt) {
     //console.log("no jwt found");
-    localForage.config({ name: 'pseudoq-capuchin' });
+    localForage.config({ name: process.env.CAPUCHIN_NAME });
     const keys: string[] = await localForage.keys();
     if (keys.indexOf('appState') >= 0) {
       console.log("loading appState");
@@ -84,10 +87,10 @@ async function __init() {
     }
     if (st.jwt) handleMessage({ eventType: "Thunk", fn: (_ => st) });
     else {
-      const userInfo: chrome.identity.UserInfo = await getProfile();
       await createKeyPairIf(keys);
       const publicKey = await localForage.getItem<JsonWebKey>('publicKey');
       const privateKey = await localForage.getItem<JsonWebKey>('privateKey');
+      const userInfo: chrome.identity.UserInfo = Utils.isProduction() ? (await getProfile()) : { email: '', id: publicKey.toString() };
       const chromeToken: string = Utils.isProduction() ? await getChromeAccessToken() : '';
       const jwt = await AsyncHandlers.authenticate(userInfo, chromeToken, publicKey);
       if (!jwt) throw new Error("Unable to authenticate");
@@ -105,8 +108,12 @@ async function initialize() {
   console.log("initializing...");
   let st = currentState();
   try {
-    if (!st.jwt) await __init();
+    while (!st.jwt) {
+      await __init();
+      st = currentState();
+    }
     await handleAsyncMessage({ eventType: "Initialize" });
+    Comms.openWebSocket(st, receiveServerMessages);
     updateFeed();
   }
   catch (e) {
@@ -333,6 +340,42 @@ export async function handleAsyncMessage(event: Message) {
     handleMessage({ eventType: "Thunk", fn });
   }
 
+}
+
+export async function receiveServerMessages(msgs: SrvrMsg.Message[]) {
+  let thunk = (st: AppState) => {
+    for (const msg of msgs) {
+      switch (msg.type) {
+        case "Feed": {
+          let f: Rpc.FeedItem = msg.message;
+          let feed = st.feed;
+          feed = [...feed, f];
+          st = { ...st, feed };
+          break;
+        }
+        case "Content": {
+          let cont: Dbt.Content = msg.message;
+          let contents = st.contents
+          let i = contents.findIndex(c => c.contentId === cont.contentId);
+          if (i < 0) contents = [...contents, cont];
+          else contents.splice(i, 1, cont);
+          st = { ...st, contents };
+          break;
+        }
+        case "Tag": {
+          break;
+        }
+        case "Comment": {
+          break;
+        }
+        case "Link": {
+          break;
+        }
+      }
+    }
+    return st;
+  }
+  handleMessage({ eventType: "Thunk", fn: thunk });
 }
 
 export function handleMessage(event: Message): AppState {

@@ -209,6 +209,10 @@ export async function insertRecord<T>(tblnm: string, rec: Object): Promise<T> {
   return await db.task(t => tasks.insertRecord(t, tblnm, rec));
 }
 
+export async function insertRecords<T>(tblnm: string, recs: Object[]): Promise<T[]> {
+  return await db.task(t => tasks.insertRecords(t, tblnm, recs));
+}
+
 export async function upsertRecord<T>(tblnm: string, rec: Object): Promise<T> {
   return await db.task(t => tasks.upsertRecord(t, tblnm, rec));
 }
@@ -271,12 +275,7 @@ export async function getUserByAuthId(authId: string, provider: Dbt.authProvider
 
 export async function touchUser(userId: Dbt.userId) {
   let rslt = await db.task(t => tasks.touchUser(t, userId));
-  cache.users.set(userId, rslt);
-}
-
-export async function touchAuth(prov, authId) {
-  let auth = await db.task(t => tasks.touchAuth(t, prov, authId));
-  cache.auths.set(auth.authProvider + ":" + auth.authId, auth);
+  cache.setUser(rslt);
 }
 
 export async function getLinksForUrl(url: Dbt.urlString): Promise<Dbt.Link[]> {
@@ -299,7 +298,7 @@ export async function deliveriesCount(linkId: Dbt.linkId): Promise<number> {
   return await db.task(t => tasks.deliveriesCount(t, linkId));
 }
 
-async function _getPromotionLinks(t: ITask<any>, link: Dbt.Link, maxLen: Dbt.integer = cache.users.size): Promise<Dbt.userId[]> {
+async function _getPromotionLinks(t: ITask<any>, link: Dbt.Link, maxLen: Dbt.integer = cache.size("users")): Promise<Dbt.userId[]> {
   let grph = cache.userlinks;
   if (!grph.has(link.userId)) return;
   let rem = maxLen;
@@ -328,7 +327,7 @@ async function _getPromotionLinks(t: ITask<any>, link: Dbt.Link, maxLen: Dbt.int
   return rslt;
 }
 
-export async function getPromotionLinks(link: Dbt.Link, maxLen: Dbt.integer = cache.users.size): Promise<Dbt.userId[]> {
+export async function getPromotionLinks(link: Dbt.Link, maxLen: Dbt.integer = cache.size("users")): Promise<Dbt.userId[]> {
   return await db.task(t => _getPromotionLinks(t, link, maxLen));
 }
 
@@ -355,7 +354,7 @@ export async function redeemLink(link: Dbt.Link): Promise<void> {
 
 export async function removeLink(link: Dbt.Link): Promise<void> {
   await db.task(t => tasks.removeLink(t, link));
-  cache.links.delete(link.linkId);
+  cache.deleteLink(link);
 }
 
 export async function investInLink(link: Dbt.Link, adj: Dbt.integer): Promise<void> {
@@ -405,7 +404,7 @@ export async function createUser(email?: string): Promise<Dbt.User> {
   if (cache.users.has(user.userId)) {
     throw new Error("cache is cactus");
   }
-  cache.users.set(user.userId, user);
+  cache.setUser(user);
   return user;
 };
 
@@ -477,17 +476,18 @@ export async function bookmarkAndPromoteLink(userId, req: Rpc.BookmarkLinkReques
     let preq: Rpc.PromoteContentRequest = { contentId, comment, tags, title, amount: 0, signature, paymentSchedule: [] };  //TODO: fixup signature mangling here
     return await _handlePromoteContent(t, userId, preq);
   });
-  cache.contents.set(cont.contentId, cont);
   let updts: cache.CacheUpdate[] = pr[0];
   let rsp: Rpc.PromoteContentResponse = pr[1];
+  updts.unshift({ table: "contents", record: cont });
   cache.update(updts);
   return rsp;
 }
 
 export async function handleBookmarkLink(userId, req: Rpc.BookmarkLinkRequest): Promise<Rpc.BookmarkLinkResponse> {
   let rsp: Rpc.BookmarkLinkResponse = await db.task(t => tasks.handleBookmarkLink(t, userId, req));
-  cache.contents.set(rsp.content.contentId, rsp.content);
-  if (rsp.link) cache.links.set(rsp.link.linkId, rsp.link);
+  let updts: cache.CacheUpdate[] = [{ table: "contents", record: rsp.content }]
+  if (rsp.link) updts.push({ table: "links", record: rsp.link });
+  cache.update(updts);
   return rsp;
 }
 
@@ -521,7 +521,7 @@ export async function registerInvitation(ipAddress: string, linkId: Dbt.linkId):
 export async function insertContent(cont: Dbt.Content): Promise<Dbt.Content> {
   return await db.task(async t => {
     let rslt = await tasks.insertContent(t, cont);
-    cache.contents.set(rslt.contentId, rslt);
+    cache.setContent(rslt);
     return rslt;
   });
 }
@@ -595,20 +595,21 @@ export async function registerContentView(userId: Dbt.userId, contentId: Dbt.con
   return await db.task(t => tasks.registerContentView(t, userId, contentId, ipAddress, linkId));
 }
 
-export async function getUserFollowings(userId: Dbt.userId): Promise<Rpc.UserFollowing[]> {
-  return await db.task(async t => {
-    let recs: Dbt.UserFollow[] = await db.any(`select * from user_follows where "userId" = '${userId}' `);
-    return recs.map(r => {
-      let userName = cache.users.get(r.following).userName;
-      let { subscriptions, blacklist } = r;
-      let f: Rpc.UserFollowing = { userName, subscriptions, blacklist };
-      return f;
-    });
-  });
+export async function saveUserFollowings(userId: Dbt.userId, follows: Dbt.userName[]): Promise<void> {
+  let user = cache.users.get(userId);
+  let following = follows.map(nm => cache.getUserByName(nm).userId);
+  user = { ...user, following }
+  await updateRecord("users", user);
+  cache.setUser(user);
 }
 
-export async function saveUserFollowings(userId: Dbt.userId, followings: Rpc.UserFollowing[]): Promise<void> {
-  return await db.tx(t => tasks.saveUserFollowings(t, userId, followings));
+function _feedFilter(usr: Dbt.User, l: Dbt.Link): boolean {
+  let { subscriptions, blacklist, following } = usr;
+  if (subscriptions && subscriptions.findIndex(t => l.tags.indexOf(t) >= 0) >= 0) return true;
+  if (following.indexOf(l.userId) >= 0) {
+    return !(blacklist && blacklist.findIndex(t => l.tags.indexOf(t) >= 0) >= 0);
+  }
+  return false;
 }
 
 export async function updateUserFeed(userId: Dbt.userId): Promise<Rpc.FeedItem[]> {
@@ -617,17 +618,11 @@ export async function updateUserFeed(userId: Dbt.userId): Promise<Rpc.FeedItem[]
   let now = new Date();
   return await db.tx(async t => {
     let links: Dbt.Link[] = await t.any('select * from links where created > $1', [last_feed]);
-    let follows = await t.any(`select * from user_follows where "userId" = '${userId}' `);
-    let feeds = links.filter(l => {
-      if (subscriptions && subscriptions.findIndex(t => l.tags.indexOf(t) >= 0) >= 0) return true;
-      if (follows.findIndex(f => f.following === l.userId) >= 0) {
-        return !(blacklist && blacklist.findIndex(t => l.tags.indexOf(t) >= 0) >= 0);
-      }
-      return false;
-    }).map(l => {
-      let f = OxiGen.emptyRec<Dbt.Feed>("feeds");
-      return { ...f, userId, linkId: l.linkId };
-    })
+    let feeds = links.filter(l => _feedFilter(usr, l))
+      .map(l => {
+        let f = OxiGen.emptyRec<Dbt.Feed>("feeds");
+        return { ...f, userId, linkId: l.linkId };
+      })
     for (const f of feeds) await tasks.insertRecord<Dbt.Feed>(t, "feeds", f);
     usr = { ...usr, last_feed: now };
     await tasks.updateRecord<Dbt.User>(t, "users", usr);
@@ -645,6 +640,37 @@ export async function updateUserFeed(userId: Dbt.userId): Promise<Rpc.FeedItem[]
     return rslt;
   });
 }
+
+export async function liveUserFeed(userId: Dbt.userId, updts: cache.CacheUpdate[]): Promise<Rpc.FeedItem[]> {
+  let usr = cache.users.get(userId)
+  let now = new Date();
+  let feeds = updts.filter(u => {
+    if (u.table !== "links") return false;
+    let l: Dbt.Link = u.record;
+    return _feedFilter(usr, l);
+  }).map(u => {
+    let f = OxiGen.emptyRec<Dbt.Feed>("feeds");
+    let l: Dbt.Link = u.record;
+    return { ...f, userId, linkId: l.linkId };
+  })
+  let rslt: Rpc.FeedItem[] = [];
+  if (feeds.length > 0) {
+    await insertRecords<Dbt.Feed>("feeds", feeds);
+    usr = { ...usr, last_feed: now };
+    await updateRecord<Dbt.User>("users", usr);
+
+    for (const f of feeds) {
+      let l: Dbt.Link = cache.links.get(f.linkId);
+      let source = cache.users.get(l.userId).userName;
+      let { tags, created, comment } = l;
+      let url = Utils.linkToUrl(l.linkId, l.title);
+      let itm: Rpc.FeedItem = { source, created, tags, url, comment };
+      rslt.push(itm);
+    };
+  }
+  return rslt;
+}
+
 
 export async function dismissSquawks(userId: Dbt.userId, urls: Dbt.urlString[], save: boolean): Promise<void> {
   return await db.tx(t => tasks.dismissSquawks(t, userId, urls, save));
@@ -691,3 +717,5 @@ export async function getNextStreamNumber(viewerId: Dbt.userId, viewedLinkId: Db
   }
   return rslt;
 }
+
+

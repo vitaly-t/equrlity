@@ -160,15 +160,8 @@ export default {
       { name: "subscriptions", type: "tags" },
       { name: "blacklist", type: "tags" },
       { name: "groups", type: "userGroup", multiValued: true },
+      { name: "following", type: "userId", multiValued: true },
       { name: "last_feed", type: "timestamp" },
-    ],
-    UserFollow: [
-      "userId",
-      { name: "following", type: "userId" },
-      { name: "subscriptions", type: "tags" },
-      { name: "blacklist", type: "tags" },
-      "created",
-      "updated",
     ],
     View: ["viewId", "userId", "linkId", "created", "payment"],
     ContentView: ["viewId", "userId", "contentId", "linkId", "ipAddress", "created"],
@@ -182,15 +175,6 @@ export default {
       rowType: "User",
       primaryKey: ["userId"],
       uniques: [["userName"]],
-      updated: "updated",
-    },
-    user_follows: {
-      rowType: "UserFollow",
-      primaryKey: ["userId", "following"],
-      foreignKeys: [
-        { ref: "users", columns: ["userId"] },
-        { ref: "users", columns: ["following"] },
-      ],
       updated: "updated",
     },
     auths: {

@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { Url, format } from 'url';
 import { Row, Col } from 'react-simple-flex-grid';
-import TextareaAutosize from 'react-autosize-textarea';
+import TextareaAutosize from 'react-textarea-autosize';
 import { Button, Intent, Toaster, Position, Popover, PopoverInteractionKind } from "@blueprintjs/core";
 
 import * as Rpc from '../lib/rpc';
