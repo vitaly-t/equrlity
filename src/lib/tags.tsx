@@ -9,7 +9,8 @@ export function mergeTags(tags: string[], _allTags: TagSelectOption[]): TagSelec
   //  assumes _allTags is sorted
   let allTags = _allTags;
   let fnd = false;
-  tags && tags.forEach(c => {
+  tags = tags || [];
+  tags.forEach(c => {
     if (allTags.length === 0 || c > allTags[allTags.length - 1].label) {
       if (!fnd) {
         fnd = true;
@@ -19,7 +20,7 @@ export function mergeTags(tags: string[], _allTags: TagSelectOption[]): TagSelec
       return;
     }
     let i = allTags.findIndex(t => c <= t.label);
-    if (i > 0) {
+    if (i >= 0) {
       let lbl = allTags[i].label;
       if (c < lbl) {
         if (!fnd) {

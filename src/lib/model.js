@@ -151,7 +151,6 @@ export default {
     Feed: ["linkId", "userId", "created", "updated",
       { name: "dismissed", type: "timestamp" },
     ],
-    Tag: ["tag", "created"],
     User: ["userId", "userName", "created", "updated",
       { name: "home_page", type: "urlString" },
       { name: "info", type: "text" },
@@ -167,10 +166,6 @@ export default {
     ContentView: ["viewId", "userId", "contentId", "linkId", "ipAddress", "created"],
   },
   tables: {   // the order of entries here is significant.  foreign keys can only reference preceding entries
-    tags: {
-      rowType: "Tag",
-      primaryKey: ["tag"]
-    },
     users: {  // can't create fk for blob as it would create circular fk refs b/w blobs and users.
       rowType: "User",
       primaryKey: ["userId"],

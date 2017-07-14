@@ -69,19 +69,9 @@ export interface AddContents {
   contents: Dbt.Content[];
 }
 
-export interface SaveLink {
-  eventType: "SaveLink";
-  req: Rpc.SaveLinkRequest;
-}
-
 export interface TransferCredits {
   eventType: "TransferCredits";
   req: Rpc.TransferCreditsRequest;
-}
-
-export interface RedeemLink {
-  eventType: "RedeemLink";
-  linkId: Dbt.linkId;
 }
 
 export interface GetUserLinks {
@@ -115,8 +105,7 @@ export interface Thunk {
 
 export type Message = PromoteContent | BookmarkLink | Initialize | Load | ActivateTab | Render | ChangeSettings
   | LaunchPage | SaveContent | RemoveContent | AddContents | DismissSquawks | UpdateFeed
-  | RedeemLink | GetUserLinks | DismissPromotion | TransferCredits
-  | SaveTags | SaveLink | Thunk;
+  | GetUserLinks | DismissPromotion | TransferCredits | Thunk;
 
 export function getTab(tabId: number): Promise<chrome.tabs.Tab> {
   return new Promise((resolve, reject) => {
@@ -125,11 +114,6 @@ export function getTab(tabId: number): Promise<chrome.tabs.Tab> {
       else resolve(t)
     });
   });
-}
-
-export function loadTags(tags: string[]): TagSelectOption[] {
-  let rslt: TagSelectOption[] = tags.map(t => { return { value: t, label: t }; });
-  return rslt;
 }
 
 function updateTab(tabId: number, props: chrome.tabs.UpdateProperties): Promise<chrome.tabs.Tab> {
@@ -180,11 +164,10 @@ export namespace AsyncHandlers {
     let thunk = (st: AppState) => {
       st = extractHeadersToState(st, rsp);
       let rslt: Rpc.InitializeResponse = extractResult(rsp);
-      let allTags = loadTags(rslt.allTags);
       let { profile_pic, feed } = rslt
       if (rslt.redirectUrl) chrome.tabs.update(activeTab.id, { url: rslt.redirectUrl });
       chrome.browserAction.setBadgeText({ text: feed.length.toString() });
-      return { ...st, allTags, activeTab, profile_pic, feed }
+      return { ...st, activeTab, profile_pic, feed }
     }
     return thunk;
   }
@@ -287,17 +270,6 @@ export namespace AsyncHandlers {
     return thunk;
   }
 
-  export async function redeemLink(state: AppState, linkId: Dbt.linkId): Promise<(st: AppState) => AppState> {
-    let response = await Comms.sendRedeemLink(state, linkId);
-    return (st: AppState) => {
-      st = extractHeadersToState(st, response);
-      let rslt: Rpc.RedeemLinkResponse = extractResult(response);
-      let investments = rslt.links;
-      st = { ...st, investments }
-      return st;
-    };
-  }
-
   export async function getUserLinks(state: AppState): Promise<(st: AppState) => AppState> {
     let response = await Comms.sendGetUserLinks(state);
     return (st: AppState) => {
@@ -307,8 +279,7 @@ export namespace AsyncHandlers {
       let investments = rslt.links;
       let { connectedUsers, reachableUserCount } = rslt;
       if (rslt.promotions.length > 0) promotions = [...promotions, ...rslt.promotions];
-      let allTags = loadTags(rslt.allTags);
-      st = { ...st, investments, promotions, connectedUsers, reachableUserCount, allTags };
+      st = { ...st, investments, promotions, connectedUsers, reachableUserCount };
       return st;
     };
   }
@@ -379,25 +350,6 @@ export namespace AsyncHandlers {
         if (i < 0) contents.unshift(content);
         else contents[i] = content;
         st = { ...st, contents };
-      }
-      return st;
-    }
-    return thunk;
-  }
-
-  export async function saveLink(state: AppState, req: Rpc.SaveLinkRequest): Promise<(st: AppState) => AppState> {
-    const response = await Comms.sendSaveLink(state, req);
-    let thunk = (st: AppState) => {
-      st = extractHeadersToState(state, response);
-      let rslt: Rpc.SaveLinkResponse = extractResult(response);
-      if (rslt.link) {
-        let { investments } = st;
-        let { link } = rslt;
-        let i = investments.findIndex(i => i.link.linkId === link.linkId);
-        let inv = { ...investments[i], link };
-        investments = investments.slice();
-        investments[i] = inv;
-        st = { ...st, investments };
       }
       return st;
     }

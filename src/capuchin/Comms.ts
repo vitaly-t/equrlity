@@ -65,10 +65,6 @@ export async function sendSaveContent(st: AppState, req: Rpc.SaveContentRequest)
   return await sendApiRequest("saveContent", req);
 }
 
-export async function sendSaveLink(st: AppState, req: Rpc.SaveLinkRequest): Promise<AxiosResponse> {
-  return await sendApiRequest("saveLink", req);
-}
-
 export async function sendTransferCredits(st: AppState, req: Rpc.TransferCreditsRequest): Promise<AxiosResponse> {
   return await sendApiRequest("transferCredits", req);
 }

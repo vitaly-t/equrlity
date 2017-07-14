@@ -5,6 +5,7 @@ import { Url, parse } from 'url';
 import * as Rpc from '../lib/rpc';
 import * as Dbt from '../lib/datatypes'
 import * as uuid from '../lib/uuid';
+import { liveUserFeed } from './pgsql';
 
 // ahem ... cache (almost) the whole db in memory 
 
@@ -13,21 +14,25 @@ export interface IReadonlyMap<K, V> { get: (key: K) => V, has: (key: K) => boole
 const _users = new Map<Dbt.userId, Dbt.User>();
 const _contents = new Map<Dbt.contentId, Dbt.Content>();
 const _links = new Map<Dbt.linkId, Dbt.Link>();
+const _comments = new Map<Dbt.commentId, Dbt.Comment>();
 const _userlinks = new Map<Dbt.userId, Dbt.userId[]>();
+const _followers = new Map<Dbt.userId, Set<Dbt.userId>>();
 
 export const users: IReadonlyMap<Dbt.userId, Dbt.User> = _users;
 export const contents: IReadonlyMap<Dbt.contentId, Dbt.Content> = _contents;
 export const links: IReadonlyMap<Dbt.linkId, Dbt.Link> = _links;
+export const comments: IReadonlyMap<Dbt.commentId, Dbt.Comment> = _comments;
 export const userlinks: IReadonlyMap<Dbt.userId, Dbt.userId[]> = _userlinks;
-export const tags = new Set<Dbt.tag>();
+export const followers: IReadonlyMap<Dbt.userId, Set<Dbt.userId>> = _followers;
 
-export type CachedTable = "users" | "contents" | "links" | "tags";
+export type CachedTable = "users" | "contents" | "links" | "comments";
 
-export function size(tbl: CachedTable) {
+export function rowCount(tbl: CachedTable) {
   switch (tbl) {
     case "users": return _users.size;
     case "contents": return _contents.size;
     case "links": return _links.size;
+    case "comments": return _comments.size;
   }
   throw new Error("Invalid table for cache: " + tbl);
 }
@@ -66,13 +71,30 @@ export function deleteContent(v: Dbt.Content) {
   publish([{ table: "contents", record: v, remove: true }]);
 }
 
+export function setComment(v: Dbt.Comment) {
+  _comments.set(v.commentId, v);
+  publish([{ table: "comments", record: v }]);
+}
+
+export function deleteComment(v: Dbt.Comment) {
+  _comments.delete(v.commentId);
+  publish([{ table: "comments", record: v, remove: true }]);
+}
+
 export function deleteUser(v: Dbt.User) {
+  if (v.following) v.following.forEach(id => _followers.get(id).delete(v.userId));
   _users.delete(v.userId);
   publish([{ table: "users", record: v, remove: true }]);
 }
 
 export function setUser(v: Dbt.User) {
+  if (_users.has(v.userId)) {
+    let olds = _users.get(v.userId).following;
+    if (olds) olds.forEach(id => _followers.get(id).delete(v.userId))
+  }
   _users.set(v.userId, v);
+  if (!_followers.has(v.userId)) _followers.set(v.userId, new Set<Dbt.userId>());
+  if (v.following) v.following.forEach(id => _followers.get(id).add(v.userId));
   publish([{ table: "users", record: v }]);
 }
 
@@ -92,22 +114,28 @@ export function allUserNames(userId: Dbt.userId): Dbt.userName[] {
 
 let domain = '';
 
-export function init(userRows, authRows, contentRows, linkRows, tagRows) {
+export function init(userRows: Dbt.User[], contentRows: Dbt.Content[], linkRows: Dbt.Link[], commentRows: Dbt.Comment[]) {
   console.log("cache init called");
   let url = parse(Utils.serverUrl);
   domain = url.host;
 
   _users.clear();
-  userRows.forEach(r => _users.set(r.userId, r));
+  userRows.forEach(r => {
+    _users.set(r.userId, r);
+    _followers.set(r.userId, new Set<Dbt.userId>());
+  });
+  userRows.forEach(r => {
+    if (r.following) r.following.forEach(id => _followers.get(id).add(r.userId));
+  });
 
   _contents.clear();
   contentRows.forEach(r => _contents.set(r.contentId, r));
 
+  _comments.clear();
+  commentRows.forEach(r => _comments.set(r.commentId, r));
+
   _links.clear();
   linkRows.forEach(r => _links.set(r.linkId, r));
-
-  tags.clear();
-  tagRows.forEach(r => tags.add(r.tag));
 
   if (Utils.isDev()) {  // connect all users
     let ids = Array.from(_users.keys());
@@ -133,7 +161,7 @@ export function init(userRows, authRows, contentRows, linkRows, tagRows) {
 
 // all functions in cache (other than init) should be synchronous.  
 
-export function update(entries: CacheUpdate[]) {
+export async function update(entries: CacheUpdate[]) {
   for (const { table, record, remove } of entries) {
     switch (table) {
       case "users": {
@@ -152,6 +180,12 @@ export function update(entries: CacheUpdate[]) {
         let r: Dbt.Link = record;
         if (remove) _links.delete(r.linkId);
         else _links.set(r.linkId, r);
+        break;
+      }
+      case "comments": {
+        let r: Dbt.Comment = record;
+        if (remove) _comments.delete(r.commentId);
+        else _comments.set(r.commentId, r);
         break;
       }
     }

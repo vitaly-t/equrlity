@@ -31,7 +31,7 @@ KoaWebSocketServer.prototype.listen = function (server) {
 };
 
 KoaWebSocketServer.prototype.onConnection = function (socket, req) {
-  console.log('ws Connection received');
+  //console.log('ws Connection received');
   socket.on('error', function (err) {
     debug('Error occurred:', err);
   });
@@ -39,9 +39,7 @@ KoaWebSocketServer.prototype.onConnection = function (socket, req) {
 
   const context = this.app.createContext(req);
   context.websocket = socket;
-  console.log(socket.binaryType);
   socket.binaryType = 'arraybuffer';
-  console.log(socket.binaryType);
   context.path = url.parse(req.url).pathname;
 
   socket.isAlive = true;

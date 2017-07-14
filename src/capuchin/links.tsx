@@ -13,6 +13,7 @@ import * as OxiDate from '../lib/oxidate';
 import { rowStyle, btnStyle, lhcolStyle } from "../lib/contentView";
 import * as Tags from '../lib/tags';
 import { YesNoBox } from '../lib/dialogs';
+import { sendApiRequest } from '../lib/axiosClient';
 
 import { LinkEditor } from './linkEditor';
 import { AppState, postDeserialize } from "./AppState";
@@ -77,11 +78,14 @@ export class LinksPage extends React.Component<LinksPageProps, LinksPageState> {
         let url = Utils.linkToUrl(linkId, l.title);
         let tags = <Tags.TagGroup tags={l.tags} onClick={s => this.addFilter(s)} />;
 
-        let redeem = () => { Chrome.sendMessage({ eventType: "RedeemLink", linkId }); };
-        let redeemText = l.amount > 0 ? "Redeem" : "Delete";
-        let btns = [<Button key="redeem" onClick={redeem} text={redeemText} />];
+        let redeem = () => {
+          let req: Rpc.RedeemLinkRequest = { linkId };
+          sendApiRequest('redeemLink', req);  // fire and forget!!!!
+        };
         let edit = () => { this.setState({ editingItem: item }) };
-        btns.push(<Button key="details" onClick={edit} text="Details" />);
+        let btns = [];
+        btns.push(<Button key="details" onClick={edit} text="Edit" />);
+        btns.push(<Button key="redeem" onClick={redeem} text={l.amount > 0 ? "Redeem" : "Delete"} />);
 
         let btngrp = (
           <div className="pt-button-group pt-vertical pt-align-left pt-large">
@@ -141,7 +145,7 @@ export class LinksPage extends React.Component<LinksPageProps, LinksPageState> {
       }
       filteredLinks = links.filter(f => tagfilter(f.tags, f.source));
       let linkrows = filteredLinks.map(f => {
-        let { url, comment, source } = f
+        let { url, comment, source, type } = f
         let dismiss = () => { Chrome.sendMessage({ eventType: "DismissSquawks", urls: [url] }); };
         let save = () => { Chrome.sendMessage({ eventType: "DismissSquawks", urls: [url], save: true }); };
         let onclick = () => { chrome.tabs.create({ active: true, url }); };
@@ -153,14 +157,15 @@ export class LinksPage extends React.Component<LinksPageProps, LinksPageState> {
             <Button onClick={dismiss} text="Dismiss" />
           </div>
         );
+
         let pop = (<Popover content={btngrp} popoverClassName="pt-minimal" interactionKind={PopoverInteractionKind.HOVER} position={Position.BOTTOM} >
           <Button iconName="pt-icon-cog" text="" />
         </Popover>
         );
 
-
         return (
           <tr key={url} >
+            <td>{type}</td>
             <td><a href="" onClick={onclick} >{url}</a></td>
             <td><Tags.TagGroup tags={[source]} onClick={(s) => this.addFeedFilter(s)} /></td>
             <td>{comment}</td>
@@ -173,8 +178,9 @@ export class LinksPage extends React.Component<LinksPageProps, LinksPageState> {
         <table className="pt-table pt-striped pt-bordered">
           <thead>
             <tr>
+              <th>Type</th>
               <th>Link</th>
-              <th>Squawker</th>
+              <th>Source</th>
               <th>Comment</th>
               <th>Tags</th>
               <th>Actions</th>
@@ -252,14 +258,14 @@ export class LinksPage extends React.Component<LinksPageProps, LinksPageState> {
       </div>);
 
     return (
-      <div>
-        <h4>Squawks Overheard: </h4>
+      <div style={{ margin: "16px" }}>
+        <h4>Feed: </h4>
         {vsp}
         {feedFltrDiv}
         {vsp}
         {linkdiv}
         {vsp}
-        <h4>Squawks Emitted: </h4>
+        <h4>Squawks: </h4>
         {fltrDiv}
         {vsp}
         {invdiv}

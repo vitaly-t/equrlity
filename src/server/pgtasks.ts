@@ -46,6 +46,17 @@ export function upsertRecord<T>(t: ITask<any>, tblnm: string, rec: Object): Prom
   return t.one(stmt, rec);
 }
 
+export async function upsertRecords<T>(t: ITask<any>, tblnm: string, recs: Object[]): Promise<T[]> {
+  let tbl = oxb.tables.get(tblnm);
+  let rslt: T[] = []
+  for (const rec of recs) {
+    let stmt = OxiGen.genUpsertStatement(tbl, rec);
+    let r: T = await t.one(stmt, rec);
+    rslt.push(r);
+  }
+  return rslt;
+}
+
 export async function retrieveRecord<T>(t: ITask<any>, tblnm: string, pk: Object): Promise<T> {
   let tbl = oxb.tables.get(tblnm);
   let stmt = OxiGen.genRetrieveStatement(tbl, pk);
@@ -279,6 +290,19 @@ export async function investInLink(t: ITask<any>, link: Dbt.Link, adj: Dbt.integ
   Array.prototype.push.apply(rslt, await adjustUserBalance(t, user, -adj));
   let newlink = { ...link, amount };
   newlink = await updateRecord<Dbt.Link>(t, "links", newlink);
+  rslt.push({ table: "links" as CachedTable, record: newlink });
+  return rslt;
+}
+
+export async function updateLink(t: ITask<any>, link: Dbt.Link, prv: Dbt.Link): Promise<CacheUpdate[]> {
+  let adj = link.amount - (prv ? prv.amount : 0);
+  let rslt: CacheUpdate[] = [];
+  if (adj !== 0) {
+    let user = await retrieveRecord<Dbt.User>(t, "users", { userId: link.userId });
+    if (user.credits - adj < 0) throw new Error("User has insufficient credits");
+    Array.prototype.push.apply(rslt, await adjustUserBalance(t, user, -adj));
+  }
+  let newlink = await updateRecord<Dbt.Link>(t, "links", link);
   rslt.push({ table: "links" as CachedTable, record: newlink });
   return rslt;
 }
@@ -614,4 +638,19 @@ export async function dismissSquawks(t: ITask<any>, userId: Dbt.userId, urls: Db
   await t.any(`update feeds set dismissed = $1 where "userId" = '${userId}' and "linkId" in (${s})`, [now]);
 }
 
+export async function getCommentsFeed(t: ITask<any>, userId: Dbt.userId, last_feed: Date): Promise<Dbt.Comment[]> {
+  let tbl = oxb.tables.get("comments");
+  let cols = OxiGen.columnNames(tbl);
+  let stmt = `
+with cmts as (
+   select a.*,b."userId" as "ownerId" 
+   from comments a
+   join contents b on a."contentId" = b."contentId"
+   where (a.created > $1 or a.updated > $1)
+)
+select ${cols.join()} from cmts where "ownerId" = '${userId}'
+`
+  let comments: Dbt.Comment[] = await t.any(stmt, [last_feed]);
+  return comments;
+}
 

@@ -150,19 +150,13 @@ export async function init() {
   await initCache();
 }
 
-export async function loadTags(): Promise<string[]> {
-  let tagRows: Dbt.Tag[] = await db.any('select * from tags order by tag');
-  let tags = tagRows.map(r => r.tag);
-  return tags;
-}
-
 export async function initCache() {
   let userRows: Array<Dbt.User> = await db.any("select * from users;");
   let authRows: Array<Dbt.Auth> = await db.any("select * from auths");
   let contentRows: Array<Dbt.Content> = await db.any("select * from contents");
+  let commentRows: Array<Dbt.Comment> = await db.any("select * from comments");
   let linkRows: Dbt.Link[] = await db.any('select * from links order by "linkId" ');
-  let tagRows: Dbt.Tag[] = await db.any('select * from tags order by tag');
-  cache.init(userRows, authRows, contentRows, linkRows, tagRows);
+  cache.init(userRows, contentRows, linkRows, commentRows);
 }
 
 export async function createDataTables() {
@@ -215,6 +209,10 @@ export async function insertRecords<T>(tblnm: string, recs: Object[]): Promise<T
 
 export async function upsertRecord<T>(tblnm: string, rec: Object): Promise<T> {
   return await db.task(t => tasks.upsertRecord(t, tblnm, rec));
+}
+
+export async function upsertRecords<T>(tblnm: string, recs: Object[]): Promise<T[]> {
+  return await db.task(t => tasks.upsertRecords(t, tblnm, recs));
 }
 
 export async function retrieveRecord<T>(tblnm: string, pk: Object): Promise<T> {
@@ -298,7 +296,7 @@ export async function deliveriesCount(linkId: Dbt.linkId): Promise<number> {
   return await db.task(t => tasks.deliveriesCount(t, linkId));
 }
 
-async function _getPromotionLinks(t: ITask<any>, link: Dbt.Link, maxLen: Dbt.integer = cache.size("users")): Promise<Dbt.userId[]> {
+async function _getPromotionLinks(t: ITask<any>, link: Dbt.Link, maxLen: Dbt.integer = cache.rowCount("users")): Promise<Dbt.userId[]> {
   let grph = cache.userlinks;
   if (!grph.has(link.userId)) return;
   let rem = maxLen;
@@ -327,7 +325,7 @@ async function _getPromotionLinks(t: ITask<any>, link: Dbt.Link, maxLen: Dbt.int
   return rslt;
 }
 
-export async function getPromotionLinks(link: Dbt.Link, maxLen: Dbt.integer = cache.size("users")): Promise<Dbt.userId[]> {
+export async function getPromotionLinks(link: Dbt.Link, maxLen: Dbt.integer = cache.rowCount("users")): Promise<Dbt.userId[]> {
   return await db.task(t => _getPromotionLinks(t, link, maxLen));
 }
 
@@ -359,6 +357,11 @@ export async function removeLink(link: Dbt.Link): Promise<void> {
 
 export async function investInLink(link: Dbt.Link, adj: Dbt.integer): Promise<void> {
   cache.update(await db.task(t => tasks.investInLink(t, link, adj)));
+}
+
+export async function updateLink(link: Dbt.Link): Promise<void> {
+  let prv = cache.links.get(link.linkId);
+  cache.update(await db.task(t => tasks.updateLink(t, link, prv)));
 }
 
 export async function getLinksForUser(userId: Dbt.userId): Promise<Dbt.Link[]> {
@@ -491,18 +494,24 @@ export async function handleBookmarkLink(userId, req: Rpc.BookmarkLinkRequest): 
   return rsp;
 }
 
+async function _getUserLinkItem(t: ITask<any>, linkId: Dbt.linkId): Promise<Rpc.UserLinkItem> {
+  let link = cache.links.get(linkId);
+  let linkDepth = cache.getLinkDepth(link);
+  let viewCount = await tasks.viewCount(t, linkId);
+  let promotionsCount = await tasks.promotionsCount(t, linkId);
+  let deliveriesCount = await tasks.deliveriesCount(t, linkId);
+  let rl: Rpc.UserLinkItem = { link, linkDepth, viewCount, promotionsCount, deliveriesCount };
+  return rl;
+}
+
+export async function getUserLinkItem(linkId: Dbt.linkId): Promise<Rpc.UserLinkItem> {
+  return await db.task(t => _getUserLinkItem(t, linkId));
+}
+
 async function _getUserLinks(t: ITask<any>, id: Dbt.userId): Promise<Rpc.UserLinkItem[]> {
   let a = await tasks.getLinksForUser(t, id);
   let rslt: Rpc.UserLinkItem[] = []
-  for (const link of a) {
-    let { linkId } = link;
-    let linkDepth = cache.getLinkDepth(link);
-    let viewCount = await tasks.viewCount(t, linkId);
-    let promotionsCount = await tasks.promotionsCount(t, linkId);
-    let deliveriesCount = await tasks.deliveriesCount(t, linkId);
-    let rl: Rpc.UserLinkItem = { link, linkDepth, viewCount, promotionsCount, deliveriesCount };
-    rslt.push(rl);
-  };
+  for (const link of a) rslt.push(await _getUserLinkItem(t, link.linkId))
   return rslt;
 }
 
@@ -582,15 +591,6 @@ export async function getCommentsForContent(contentId: Dbt.contentId): Promise<D
   return await db.task(t => tasks.getCommentsForContent(t, contentId));
 }
 
-export async function saveTags(tags: Dbt.tag[]): Promise<Dbt.tag[]> {  // return list of tags added
-  let newtags = tags ? tags.filter(t => !cache.tags.has(t)) : [];
-  if (newtags.length > 0) {
-    await db.task(t => tasks.saveTags(t, newtags));
-    newtags.forEach(t => cache.tags.add(t));
-  }
-  return newtags;
-}
-
 export async function registerContentView(userId: Dbt.userId, contentId: Dbt.contentId, ipAddress: Dbt.ipAddress, linkId: Dbt.linkId) {
   return await db.task(t => tasks.registerContentView(t, userId, contentId, ipAddress, linkId));
 }
@@ -605,36 +605,63 @@ export async function saveUserFollowings(userId: Dbt.userId, follows: Dbt.userNa
 
 function _feedFilter(usr: Dbt.User, l: Dbt.Link): boolean {
   let { subscriptions, blacklist, following } = usr;
-  if (subscriptions && subscriptions.findIndex(t => l.tags.indexOf(t) >= 0) >= 0) return true;
-  if (following.indexOf(l.userId) >= 0) {
-    return !(blacklist && blacklist.findIndex(t => l.tags.indexOf(t) >= 0) >= 0);
+  if (subscriptions && subscriptions.findIndex(t => l.tags && l.tags.indexOf(t) >= 0) >= 0) return true;
+  if (following && following.indexOf(l.userId) >= 0) {
+    return !(blacklist && blacklist.findIndex(t => l.tags && l.tags.indexOf(t) >= 0) >= 0);
   }
   return false;
 }
 
-export async function updateUserFeed(userId: Dbt.userId): Promise<Rpc.FeedItem[]> {
+async function _updateUserFeeds(t: ITask<any>, userId: Dbt.userId, links: Dbt.Link[]): Promise<Dbt.Feed[]> {
   let usr = cache.users.get(userId)
-  let { last_feed, subscriptions, blacklist } = usr;
   let now = new Date();
+  let f = OxiGen.emptyRec<Dbt.Feed>("feeds");
+  let feeds = links.filter(l => _feedFilter(usr, l))
+    .map(l => { return { ...f, userId, linkId: l.linkId }; });
+  await tasks.upsertRecords<Dbt.Feed>(t, "feeds", feeds);
+  usr = { ...usr, last_feed: now };
+  usr = await tasks.updateRecord<Dbt.User>(t, "users", usr);
+  cache.setUser(usr);
+  return feeds;
+}
+
+function _convertLinksToFeeds(userId: Dbt.userId, feeds: Dbt.Feed[]) {
+  let rslt: Rpc.FeedItem[] = [];
+  for (const f of feeds) {
+    let l: Dbt.Link = cache.links.get(f.linkId);
+    let { tags, created, comment } = l;
+    let source = cache.users.get(l.userId).userName;
+    let url = Utils.linkToUrl(l.linkId, l.title);
+    let itm: Rpc.FeedItem = { type: "squawk", source, created, tags, url, comment };
+    rslt.push(itm);
+  };
+  return rslt;
+};
+
+export async function updateUserFeed(userId: Dbt.userId, last_feed: Date): Promise<Rpc.FeedItem[]> {
+  let usr = cache.users.get(userId)
   return await db.tx(async t => {
     let links: Dbt.Link[] = await t.any('select * from links where created > $1', [last_feed]);
-    let feeds = links.filter(l => _feedFilter(usr, l))
-      .map(l => {
-        let f = OxiGen.emptyRec<Dbt.Feed>("feeds");
-        return { ...f, userId, linkId: l.linkId };
-      })
-    for (const f of feeds) await tasks.insertRecord<Dbt.Feed>(t, "feeds", f);
-    usr = { ...usr, last_feed: now };
-    await tasks.updateRecord<Dbt.User>(t, "users", usr);
+    await _updateUserFeeds(t, userId, links);
+    let feeds: Dbt.Feed[] = await t.any(`select * from feeds where "userId" = '${userId}' and dismissed is null order by created desc`);
+    let linkItems = _convertLinksToFeeds(userId, feeds);
+    let commentItems = await getCommentsFeed(userId, last_feed);
+    return [...linkItems, commentItems];
+  });
+}
 
-    let recs: Dbt.Feed[] = await t.any(`select * from feeds where "userId" = '${userId}' and dismissed is null order by created desc`);
+export async function getCommentsFeed(userId: Dbt.userId, last_feed: Date): Promise<Rpc.FeedItem[]> {
+  let usr = cache.users.get(userId)
+  return await db.tx(async t => {
+    let comments: Dbt.Comment[] = await tasks.getCommentsFeed(t, userId, last_feed);
     let rslt: Rpc.FeedItem[] = [];
-    for (const f of recs) {
-      let l: Dbt.Link = await t.one(`select * from links where "linkId" = '${f.linkId}' `);
-      let source = cache.users.get(l.userId).userName;
-      let { tags, created, comment } = l;
-      let url = Utils.linkToUrl(l.linkId, l.title);
-      let itm: Rpc.FeedItem = { source, created, tags, url, comment };
+    for (const c of comments) {
+      let { updated, created, comment } = c;
+      let cont = cache.contents.get(c.contentId);
+      let { tags } = cont;
+      let source = cache.users.get(c.userId).userName;
+      let url = Utils.contentToUrl(c.contentId);
+      let itm: Rpc.FeedItem = { type: "comment", source, created, tags, url, comment };
       rslt.push(itm);
     };
     return rslt;
@@ -644,33 +671,13 @@ export async function updateUserFeed(userId: Dbt.userId): Promise<Rpc.FeedItem[]
 export async function liveUserFeed(userId: Dbt.userId, updts: cache.CacheUpdate[]): Promise<Rpc.FeedItem[]> {
   let usr = cache.users.get(userId)
   let now = new Date();
-  let feeds = updts.filter(u => {
-    if (u.table !== "links") return false;
-    let l: Dbt.Link = u.record;
-    return _feedFilter(usr, l);
-  }).map(u => {
-    let f = OxiGen.emptyRec<Dbt.Feed>("feeds");
-    let l: Dbt.Link = u.record;
-    return { ...f, userId, linkId: l.linkId };
-  })
-  let rslt: Rpc.FeedItem[] = [];
-  if (feeds.length > 0) {
-    await insertRecords<Dbt.Feed>("feeds", feeds);
-    usr = { ...usr, last_feed: now };
-    await updateRecord<Dbt.User>("users", usr);
-
-    for (const f of feeds) {
-      let l: Dbt.Link = cache.links.get(f.linkId);
-      let source = cache.users.get(l.userId).userName;
-      let { tags, created, comment } = l;
-      let url = Utils.linkToUrl(l.linkId, l.title);
-      let itm: Rpc.FeedItem = { source, created, tags, url, comment };
-      rslt.push(itm);
-    };
-  }
-  return rslt;
+  let links = updts.filter(u => u.table === "links").map(u => u.record as Dbt.Link);
+  if (links.length === 0) return [];
+  return await db.tx(async t => {
+    let feeds = await _updateUserFeeds(t, userId, links);
+    return _convertLinksToFeeds(userId, feeds);
+  });
 }
-
 
 export async function dismissSquawks(userId: Dbt.userId, urls: Dbt.urlString[], save: boolean): Promise<void> {
   return await db.tx(t => tasks.dismissSquawks(t, userId, urls, save));

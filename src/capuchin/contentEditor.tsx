@@ -59,7 +59,6 @@ export class ContentEditor extends React.Component<ContentEditorProps, ContentEd
   }
   changeTags(tags: string[]) {
     this.setState({ tags });
-    Chrome.sendSyncMessage({ eventType: "SaveTags", tags })
   }
 
   render() {

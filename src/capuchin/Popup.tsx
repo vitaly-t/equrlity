@@ -6,7 +6,7 @@ import { Button, Intent, Toaster, Position, Popover, PopoverInteractionKind } fr
 
 import * as Rpc from '../lib/rpc';
 import * as Dbt from '../lib/datatypes';
-import { TagGroupEditor, TagSelectOption } from '../lib/tags';
+import * as Tags from '../lib/tags';
 
 import * as Chrome from './chrome';
 import { AppState, isWaiting, getBookmark, prepareUrl } from "./AppState";
@@ -46,7 +46,6 @@ export class BookmarkPanel extends React.Component<BookmarkPanelProps, BookmarkP
 
   changeTags(tags: string[]) {
     this.setState({ tags });
-    Chrome.sendSyncMessage({ eventType: "SaveTags", tags })
   }
 
   render() {
@@ -89,7 +88,7 @@ export class BookmarkPanel extends React.Component<BookmarkPanelProps, BookmarkP
         </Row>
         <Row style={rowStyle} gutter={gutter} align="top">
           <Col span={lspan}> <span className="pt-text-muted" >Tags:</span></Col>
-          <Col span={rspan}><TagGroupEditor tags={this.state.tags} creatable={true} allTags={this.props.appState.allTags} onChange={(tags) => this.changeTags(tags)} /></Col>
+          <Col span={rspan}><Tags.TagGroupEditor tags={this.state.tags} creatable={true} allTags={this.props.appState.allTags} onChange={(tags) => this.changeTags(tags)} /></Col>
         </Row>
         <Row style={rowStyle} gutter={gutter} justify="end" align="top">
           {btns}

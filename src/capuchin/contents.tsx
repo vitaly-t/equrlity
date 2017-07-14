@@ -299,7 +299,7 @@ export class ContentsPage extends React.Component<ContentsPageProps, ContentsPag
 }
 
 interface PromoteContentProps { info: Dbt.Content, allTags: Tags.TagSelectOption[], onClose: () => void }
-interface PromoteContentState { title: string, comment: string, tags: string[], isOpen: boolean, amount: number, paymentSchedule: Dbt.integer[] }
+interface PromoteContentState { title: string, comment: string, tags: string[], isOpen: boolean, amount: number, stringSchedule: string }
 class PromoteContent extends React.Component<PromoteContentProps, PromoteContentState> {
 
   constructor(props: PromoteContentProps) {
@@ -308,17 +308,19 @@ class PromoteContent extends React.Component<PromoteContentProps, PromoteContent
     let typ = props.info.contentType;
     tags.unshift(typ);
     let paymentSchedule = (typ === 'audio' || typ === 'video') ? Utils.defaultPaymentSchedule() : [];
-    this.state = { isOpen: true, amount: 10, title: props.info.title, tags, comment: '', paymentSchedule };
+    let stringSchedule = paymentSchedule.map(i => i.toString()).join();
+    this.state = { isOpen: true, amount: 0, title: props.info.title, tags, comment: '', stringSchedule };
   }
 
   changeTitle(e) { this.setState({ title: e.target.value }); }
   changeTags(e) { this.setState({ tags: e.target.value }); }
   changeComment(e) { this.setState({ comment: e.target.value }); }
-  changeInvestment(e) { this.setState({ amount: parseInt(e.target.value) }); }
-  changePaymentSchedule(e) {
-    let paymentSchedule = e.target.value.split(",").map(s => parseInt(s));
-    this.setState({ paymentSchedule });
+  changeInvestment(e) {
+    let amount = parseInt(e.target.value);
+    if (!isNaN(amount) && amount >= 0) this.setState({ amount });
   }
+
+  changePaymentSchedule(e) { this.setState({ stringSchedule: e.target.value }) }
 
   close() {
     this.props.onClose();
@@ -326,8 +328,25 @@ class PromoteContent extends React.Component<PromoteContentProps, PromoteContent
   }
 
   save() {
-    let { title, tags, amount, comment, paymentSchedule } = this.state;
+    let { title, tags, amount, comment, stringSchedule } = this.state;
+    let validSched = true
+    let paymentSchedule = stringSchedule.split(",").map(s => {
+      let i = parseInt(s);
+      if (isNaN(i)) {
+        i = 0;
+        validSched = false
+      }
+      return i;
+    });
+    if (!validSched) {
+      toast.show({ message: "Schedule contains invalid values which need to be corrected before proceeding." });
+      return;
+    }
     let info = this.props.info;
+    if (amount === 0 && paymentSchedule.findIndex(i => i < 0) >= 0) {
+      toast.show({ message: "You need to specify an investment amount, as the schedule contains negative elements." });
+      return;
+    }
     let req: Rpc.PromoteContentRequest = { contentId: info.contentId, title, comment, tags, amount, signature: '', paymentSchedule };
     Chrome.sendMessage({ eventType: "PromoteContent", req });
     this.close();
@@ -339,7 +358,7 @@ class PromoteContent extends React.Component<PromoteContentProps, PromoteContent
     let ttl = "Promote Content"
     let invdiv = null;
     if (this.props.info.contentType !== 'bookmark') {
-      let schedule = this.state.paymentSchedule.map(i => i.toString()).join();
+      let schedule = this.state.stringSchedule;
       invdiv = (<div>
         <div style={rowStyle} >
           <div style={lhcolStyle}>Schedule:</div>

@@ -72,6 +72,7 @@ export type InitializeRequest = {
 }
 
 export type FeedItem = {
+  type: "squawk" | "comment";
   created: Dbt.timestamp;
   source: Dbt.userName;
   url: Dbt.urlString;
@@ -82,7 +83,6 @@ export type FeedItem = {
 export type InitializeResponse = {
   ok: boolean;
   profile_pic: Dbt.db_hash;
-  allTags: string[];
   redirectUrl?: UrlString;
   feed: FeedItem[];
 }
@@ -190,7 +190,6 @@ export type GetUserLinksResponse = {
   promotions: Dbt.urlString[];
   connectedUsers: Dbt.userName[];
   reachableUserCount: Dbt.integer;
-  allTags: string[];
 }
 
 export type UserLinkItem = {
@@ -207,11 +206,11 @@ export type SaveContentResponse = { content: Dbt.Content; }
 
 export type SaveLinkRequest = { link: Dbt.Link; }
 
-export type SaveLinkResponse = { link: Dbt.Link; }
+export type SaveLinkResponse = { ok: boolean; }
 
 export type RedeemLinkRequest = { linkId: Dbt.linkId; }
 
-export type RedeemLinkResponse = { links: UserLinkItem[]; }
+export type RedeemLinkResponse = { ok: boolean; }
 
 export type RemoveContentRequest = { contentId: Dbt.contentId; }
 

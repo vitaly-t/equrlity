@@ -483,37 +483,41 @@ app.ws.use(async function (ctx, next) {
     let msg = JSON.parse(message);
     let token = msg.jwt;
     let opts = jwtOptions;
-    let userId = jwt.verify(token, opts.secret, opts);
-    let user: Dbt.User = getUser(userId.id);
+    let userJwt = jwt.verify(token, opts.secret, opts);
+    let user: Dbt.User = getUser(userJwt.id);
     if (!user) throw new Error("Invalid user id");
+    ws.userName = user.userName;
     let sub: cache.Subscription;
     sub = {
-      filter: u => u.record.userId && u.record.userId === user.userId,
+      filter: u => true,
       send: async updts => {
-        let msgs: SrvrMsg.Message[] = [];
-        updts.forEach(updt => {
-          let msg: SrvrMsg.Message;
-          switch (updt.table) {
-            case "contents": {
-              msg = { type: "Content", message: updt.record };
-              break;
+        let messages: SrvrMsg.Message[] = [];
+        updts.filter(u => u.record.userId && u.record.userId === user.userId)
+          .forEach(async updt => {
+            let msg: SrvrMsg.Message;
+            switch (updt.table) {
+              case "contents": {
+                msg = { type: "Content", message: updt.record };
+                break;
+              }
+              case "links": {
+                let link: Dbt.Link = updt.record;
+                let message = await pg.getUserLinkItem(link.linkId);
+                msg = { type: "Link", message };
+                break;
+              }
             }
-            case "links": {
-              msg = { type: "Link", message: updt.record };
-              break;
+            if (msg) {
+              if (updt.remove) msg.remove = true;
+              messages.push(msg);
             }
-          }
-          if (msg) {
-            if (updt.remove) msg.remove = true;
-            msgs.push(msg);
-          }
-        });
+          });
         let feeds = await pg.liveUserFeed(user.userId, updts)
-        feeds.forEach(message => msgs.push({ type: "Feed", message }));
-        if (msgs.length > 0) {
-          try {
-            ws.send(JSON.stringify(msgs));
-          }
+        feeds.forEach(message => messages.push({ type: "Feed", message }));
+        let headers: SrvrMsg.MessageHeaders = { credits: user.credits, moniker: user.userName, email: userJwt.email, homePage: user.home_page };
+        let srvmsg: SrvrMsg.ServerMessage = { headers, messages };
+        if (messages.length > 0) {
+          try { ws.send(JSON.stringify(srvmsg)); }
           catch (e) {
             ws.isAlive = false;
             throw (e);
@@ -657,16 +661,16 @@ router.post('/rpc', async function (ctx: any) {
         let usr = getUser(userId);
         if (!usr) throw new Error("Internal error getting user details");
         let redirectUrl = ctx['redirectUrl'];
-        let allTags = await pg.loadTags();
         let profile_pic = usr.profile_pic
-        let feed = await pg.updateUserFeed(userId);
-        let result: Rpc.InitializeResponse = { ok: true, allTags, redirectUrl, profile_pic, feed };
+        let feed = await pg.updateUserFeed(userId, usr.last_feed);
+        let result: Rpc.InitializeResponse = { ok: true, redirectUrl, profile_pic, feed };
         ctx.body = { id, result };
         break;
       }
       case "updateFeed": {
         //let req: Rpc.UpdateFeedRequest = params;
-        let feed = await pg.updateUserFeed(userId);
+        let usr = getUser(userId);
+        let feed = await pg.updateUserFeed(userId, usr.last_feed);
         let result: Rpc.UpdateFeedResponse = { feed };
         ctx.body = { id, result };
         break;
@@ -686,7 +690,6 @@ router.post('/rpc', async function (ctx: any) {
         let ourl = parse(url);
         if (!validateContentSignature(ctx.userId.publicKey, url, signature)) throw new Error("request failed verification");
         let usr = getUser(userId);
-        await pg.saveTags(req.tags)
         let result: Rpc.BookmarkLinkResponse = await pg.handleBookmarkLink(userId, req)
         ctx.body = { id, result };
         break;
@@ -738,8 +741,7 @@ router.post('/rpc', async function (ctx: any) {
         let promotions = await pg.deliverNewPromotions(userId);
         let connectedUsers = cache.getConnectedUserNames(userId);
         let reachableUserCount = cache.getReachableUserIds(userId).length;
-        let allTags = await pg.loadTags();
-        let result: Rpc.GetUserLinksResponse = { links, promotions, connectedUsers, reachableUserCount, allTags };
+        let result: Rpc.GetUserLinksResponse = { links, promotions, connectedUsers, reachableUserCount };
         ctx.body = { id, result };
         break;
       }
@@ -760,8 +762,7 @@ router.post('/rpc', async function (ctx: any) {
         let link = cache.links.get(req.linkId);
         if (link.amount === 0) await pg.removeLink(link);
         else await pg.redeemLink(link);
-        let links = await pg.getUserLinks(userId);
-        let result: Rpc.RedeemLinkResponse = { links };
+        let result: Rpc.RedeemLinkResponse = { ok: true };
         ctx.body = { id, result };
         break;
       }
@@ -777,7 +778,6 @@ router.post('/rpc', async function (ctx: any) {
         if (content.contentId) content = await pg.updateRecord<Dbt.Content>("contents", content);
         else content = await pg.insertContent(content);
         cache.setContent(content);
-        await pg.saveTags(req.content.tags)
         let result: Rpc.SaveContentResponse = { content };
         ctx.body = { id, result };
         break;
@@ -796,8 +796,8 @@ router.post('/rpc', async function (ctx: any) {
       case "saveLink": {
         let req: Rpc.SaveLinkRequest = params;
         if (req.link.userId !== userId) throw new Error("incorrect user for content");
-        let link = await pg.updateRecord<Dbt.Link>("links", req.link);
-        let result: Rpc.SaveLinkResponse = { link };
+        pg.updateLink(req.link);
+        let result: Rpc.SaveLinkResponse = { ok: true };
         ctx.body = { id, result };
         break;
       }
@@ -816,6 +816,7 @@ router.post('/rpc', async function (ctx: any) {
           rec = { ...rec, parent, comment, contentId, userId }
           cmt = await pg.insertRecord<Dbt.Comment>("comments", rec);
         }
+        cache.setComment(cmt); // send comment into feeds!
         let userName = cache.users.get(cmt.userId).userName;
         let itm: Rpc.CommentItem = { ...cmt, userName }
         let result: Rpc.AditCommentResponse = { comment: itm };

@@ -7,7 +7,7 @@ import * as Rpc from '../lib/rpc';
 import * as Crypto from '../lib/Crypto';
 import * as Utils from '../lib/utils';
 import * as OxiDate from '../lib/oxidate';
-import { mergeTags } from '../lib/tags';
+import * as Tags from '../lib/tags';
 import * as SrvrMsg from '../lib/serverMessages';
 
 import { AppState, initState, isSeen, setLoading, setWaiting, prepareUrl, preSerialize, postDeserialize } from './AppState';
@@ -80,7 +80,6 @@ async function __init() {
     localForage.config({ name: process.env.CAPUCHIN_NAME });
     const keys: string[] = await localForage.keys();
     if (keys.indexOf('appState') >= 0) {
-      console.log("loading appState");
       let newst = await localForage.getItem<AppState>('appState');
       // allows for possible evolution (eg new properties) of appState structure in code.
       st = { ...st, ...newst, matchedTags: Object.create(null), links: Object.create(null) };
@@ -99,11 +98,6 @@ async function __init() {
   }
 }
 
-async function updateFeed() {
-  await handleAsyncMessage({ eventType: "UpdateFeed" });
-  setTimeout(updateFeed, 120000);  // configurable somehow?
-}
-
 async function initialize() {
   console.log("initializing...");
   let st = currentState();
@@ -114,7 +108,6 @@ async function initialize() {
     }
     await handleAsyncMessage({ eventType: "Initialize" });
     Comms.openWebSocket(st, receiveServerMessages);
-    updateFeed();
   }
   catch (e) {
     console.log("initialize threw : " + e.message)
@@ -183,9 +176,9 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.url && changeInfo.status === "loading") handleAsyncMessage({ eventType: "Load", url: changeInfo.url });
   else if (changeInfo.status === "complete") {
     let st = currentState();
-    let url = prepareUrl(tab.url)
+    let url = prepareUrl(tab.url);
     if (url && st.allTags && !(url in st.links) && !(url in st.matchedTags)) {
-      console.log("injecting tag search script for url: " + url);
+      //console.log("injecting tag search script for url: " + url);
       //chrome.tabs.executeScript(tabId, { code: injectJs, allFrames: true }, function (rslt: any[]) {
       chrome.tabs.executeScript(tabId, { code: 'document.body.innerText', allFrames: true }, function (rslt: any[]) {
         if (chrome.runtime.lastError) {
@@ -294,10 +287,6 @@ export async function handleAsyncMessage(event: Message) {
         fn = await AsyncHandlers.load(st, event.url);
         break;
       }
-      case "RedeemLink": {
-        fn = await AsyncHandlers.redeemLink(st, event.linkId);
-        break;
-      }
       case "LaunchPage": {
         launchSystemTab(event.page);
         if (event.page === 'contents') fn = await AsyncHandlers.getUserContents(st);
@@ -311,10 +300,6 @@ export async function handleAsyncMessage(event: Message) {
       case "ActivateTab": {
         let t = await getTab(event.tabId);
         fn = await AsyncHandlers.load(st, t.url);
-        break;
-      }
-      case "SaveLink": {
-        fn = await AsyncHandlers.saveLink(st, event.req);
         break;
       }
       case "TransferCredits": {
@@ -339,36 +324,55 @@ export async function handleAsyncMessage(event: Message) {
     let fn = (st: AppState) => { return { ...st, lastErrorMessage: msg }; };
     handleMessage({ eventType: "Thunk", fn });
   }
-
 }
 
-export async function receiveServerMessages(msgs: SrvrMsg.Message[]) {
+export async function receiveServerMessages(srvmsg: SrvrMsg.ServerMessage) {
   let thunk = (st: AppState) => {
-    for (const msg of msgs) {
+    let { credits, moniker, email, homePage } = srvmsg.headers;
+    st = { ...st, credits, moniker, email, homePage };
+    for (const msg of srvmsg.messages) {
       switch (msg.type) {
         case "Feed": {
           let f: Rpc.FeedItem = msg.message;
           let feed = st.feed;
           feed = [...feed, f];
-          st = { ...st, feed };
+          chrome.browserAction.setBadgeText({ text: feed.length.toString() });
+          let allTags = Tags.mergeTags(f.tags, st.allTags)
+          st = { ...st, feed, allTags };
           break;
         }
         case "Content": {
           let cont: Dbt.Content = msg.message;
           let contents = st.contents
+          let allTags = st.allTags;
           let i = contents.findIndex(c => c.contentId === cont.contentId);
-          if (i < 0) contents = [...contents, cont];
-          else contents.splice(i, 1, cont);
-          st = { ...st, contents };
-          break;
-        }
-        case "Tag": {
-          break;
-        }
-        case "Comment": {
+          if (msg.remove) {
+            if (i < 0) break;
+            contents.splice(i, 1);
+          }
+          else {
+            if (i < 0) contents = [...contents, cont];
+            else contents.splice(i, 1, cont);
+            allTags = Tags.mergeTags(cont.tags, allTags);
+          }
+          st = { ...st, contents, allTags };
           break;
         }
         case "Link": {
+          let item: Rpc.UserLinkItem = msg.message;
+          let investments = st.investments;
+          let allTags = st.allTags;
+          let i = investments.findIndex(l => l.link.linkId === item.link.linkId);
+          if (msg.remove) {
+            if (i < 0) break;
+            investments.splice(i, 1);
+          }
+          else {
+            if (i < 0) investments = [...investments, item];
+            else investments.splice(i, 1, item);
+            allTags = Tags.mergeTags(item.link.tags, allTags)
+          }
+          st = { ...st, investments, allTags };
           break;
         }
       }
@@ -402,10 +406,6 @@ export function handleMessage(event: Message): AppState {
           promotions.splice(i, 1);
           st = { ...st, promotions };
         }
-        break;
-      case "SaveTags":
-        let allTags = mergeTags(event.tags, st.allTags);
-        if (allTags != st.allTags) st = { ...st, allTags };
         break;
       case "AddContents":
         let contents = [...event.contents, ...st.contents];
