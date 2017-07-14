@@ -224,9 +224,10 @@ export function genUpdateStatement(tbl: ITable, data: Object = null): string {
 export function genUpsertStatement(tbl: ITable, data: Object = null): string {
   if (tbl.autoIncrement) throw new Error("Cannot use upsert: " + tbl.name + " table has autoIncrement column");
   let istmt = "INSERT INTO " + tbl.name + genInsertColumns(tbl, data) + " VALUES " + genInsertValues(tbl, data);
-  let ustmt = "UPDATE SET " + columnSets(tbl, data).join();
+  let sets = columnSets(tbl, data);
+  let ustmt = (sets.length === 0) ? "NOTHING" : "UPDATE SET " + sets.join();
   let pk = tbl.primaryKey.map(cnm).join();
-  return istmt + " on conflict(" + pk + ") do " + ustmt + ' RETURNING ' + columnNames(tbl).join();
+  return istmt + " ON CONFLICT(" + pk + ") DO " + ustmt + ' RETURNING ' + columnNames(tbl).join();
 }
 
 export function genTypescriptType(tbl: ITable): string {

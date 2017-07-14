@@ -23,6 +23,50 @@ export function currentState() {
   return __state;
 }
 
+async function __init() {
+  //console.log("__init called");
+  let st = currentState();
+  if (!st.jwt) {
+    //console.log("no jwt found");
+    localForage.config({ name: process.env.CAPUCHIN_NAME });
+    console.log("Using localForage name: " + process.env.CAPUCHIN_NAME);
+    const keys: string[] = await localForage.keys();
+    if (keys.indexOf('appState') >= 0) {
+      let newst = await localForage.getItem<AppState>('appState');
+      // allows for possible evolution (eg new properties) of appState structure in code.
+      st = { ...st, ...newst, matchedTags: Object.create(null), links: Object.create(null) };
+    }
+    if (st.jwt) handleMessage({ eventType: "Thunk", fn: (_ => st) });
+    else {
+      await createKeyPairIf(keys);
+      const publicKey = await localForage.getItem<JsonWebKey>('publicKey');
+      const privateKey = await localForage.getItem<JsonWebKey>('privateKey');
+      const userInfo: chrome.identity.UserInfo = Utils.isProduction() ? (await getProfile()) : { email: '', id: publicKey.toString() };
+      const chromeToken: string = Utils.isProduction() ? await getChromeAccessToken() : '';
+      const jwt = await AsyncHandlers.authenticate(userInfo, chromeToken, publicKey);
+      if (!jwt) throw new Error("Unable to authenticate");
+      handleMessage({ eventType: "Thunk", fn: ((st: AppState) => { return { ...st, publicKey, privateKey, jwt } }) });
+    }
+  }
+}
+
+async function initialize() {
+  console.log("initializing...");
+  let st = currentState();
+  try {
+    while (!st.jwt) {
+      await __init();
+      st = currentState();
+    }
+    await handleAsyncMessage({ eventType: "Initialize" });
+    Comms.openWebSocket(st, receiveServerMessages);
+  }
+  catch (e) {
+    console.log("initialize threw : " + e.message)
+    setTimeout(initialize, 5000);
+  }
+}
+
 async function createKeyPairIf(keys: string[]): Promise<void> {
   if (!Crypto.checkForKeyPair(keys)) {
     console.log("creating key pair");
@@ -70,49 +114,6 @@ async function launchSystemTab(nm: string) {
     }
   }
   if (!tabids.has(nm)) await createSystemTab(nm);
-}
-
-async function __init() {
-  //console.log("__init called");
-  let st = currentState();
-  if (!st.jwt) {
-    //console.log("no jwt found");
-    localForage.config({ name: process.env.CAPUCHIN_NAME });
-    const keys: string[] = await localForage.keys();
-    if (keys.indexOf('appState') >= 0) {
-      let newst = await localForage.getItem<AppState>('appState');
-      // allows for possible evolution (eg new properties) of appState structure in code.
-      st = { ...st, ...newst, matchedTags: Object.create(null), links: Object.create(null) };
-    }
-    if (st.jwt) handleMessage({ eventType: "Thunk", fn: (_ => st) });
-    else {
-      await createKeyPairIf(keys);
-      const publicKey = await localForage.getItem<JsonWebKey>('publicKey');
-      const privateKey = await localForage.getItem<JsonWebKey>('privateKey');
-      const userInfo: chrome.identity.UserInfo = Utils.isProduction() ? (await getProfile()) : { email: '', id: publicKey.toString() };
-      const chromeToken: string = Utils.isProduction() ? await getChromeAccessToken() : '';
-      const jwt = await AsyncHandlers.authenticate(userInfo, chromeToken, publicKey);
-      if (!jwt) throw new Error("Unable to authenticate");
-      handleMessage({ eventType: "Thunk", fn: ((st: AppState) => { return { ...st, publicKey, privateKey, jwt } }) });
-    }
-  }
-}
-
-async function initialize() {
-  console.log("initializing...");
-  let st = currentState();
-  try {
-    while (!st.jwt) {
-      await __init();
-      st = currentState();
-    }
-    await handleAsyncMessage({ eventType: "Initialize" });
-    Comms.openWebSocket(st, receiveServerMessages);
-  }
-  catch (e) {
-    console.log("initialize threw : " + e.message)
-    setTimeout(initialize, 5000);
-  }
 }
 
 let injectJs = `

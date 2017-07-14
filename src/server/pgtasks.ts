@@ -51,11 +51,12 @@ export async function upsertRecords<T>(t: ITask<any>, tblnm: string, recs: Objec
   let rslt: T[] = []
   for (const rec of recs) {
     let stmt = OxiGen.genUpsertStatement(tbl, rec);
-    let r: T = await t.one(stmt, rec);
-    rslt.push(r);
+    let r: T[] = await t.any(stmt, rec);
+    if (r.length === 1) rslt.push(r[0]);
   }
   return rslt;
 }
+
 
 export async function retrieveRecord<T>(t: ITask<any>, tblnm: string, pk: Object): Promise<T> {
   let tbl = oxb.tables.get(tblnm);

@@ -305,12 +305,13 @@ class PromoteContent extends React.Component<PromoteContentProps, PromoteContent
   constructor(props: PromoteContentProps) {
     super(props);
     let tags = props.info.tags || [];
-    let typ = props.info.contentType;
-    tags.unshift(typ);
-    let paymentSchedule = (typ === 'audio' || typ === 'video') ? Utils.defaultPaymentSchedule() : [];
+    tags.unshift(props.info.contentType);
+    let paymentSchedule = this.isMediaType() ? Utils.defaultPaymentSchedule() : [];
     let stringSchedule = paymentSchedule.map(i => i.toString()).join();
     this.state = { isOpen: true, amount: 0, title: props.info.title, tags, comment: '', stringSchedule };
   }
+
+  isMediaType() { return ['audio', 'video'].indexOf(this.props.info.contentType) >= 0; }
 
   changeTitle(e) { this.setState({ title: e.target.value }); }
   changeTags(e) { this.setState({ tags: e.target.value }); }
@@ -329,24 +330,27 @@ class PromoteContent extends React.Component<PromoteContentProps, PromoteContent
 
   save() {
     let { title, tags, amount, comment, stringSchedule } = this.state;
-    let validSched = true
-    let paymentSchedule = stringSchedule.split(",").map(s => {
-      let i = parseInt(s);
-      if (isNaN(i)) {
-        i = 0;
-        validSched = false
+    let paymentSchedule = [];
+    if (this.isMediaType()) {
+      let validSched = true
+      paymentSchedule = stringSchedule.split(",").map(s => {
+        let i = parseInt(s);
+        if (isNaN(i)) {
+          i = 0;
+          validSched = false
+        }
+        return i;
+      });
+      if (!validSched) {
+        toast.show({ message: "Schedule contains invalid values which need to be corrected before proceeding." });
+        return;
       }
-      return i;
-    });
-    if (!validSched) {
-      toast.show({ message: "Schedule contains invalid values which need to be corrected before proceeding." });
-      return;
+      if (amount === 0 && paymentSchedule.findIndex(i => i < 0) >= 0) {
+        toast.show({ message: "You need to specify an investment amount, as the schedule contains negative elements." });
+        return;
+      }
     }
     let info = this.props.info;
-    if (amount === 0 && paymentSchedule.findIndex(i => i < 0) >= 0) {
-      toast.show({ message: "You need to specify an investment amount, as the schedule contains negative elements." });
-      return;
-    }
     let req: Rpc.PromoteContentRequest = { contentId: info.contentId, title, comment, tags, amount, signature: '', paymentSchedule };
     Chrome.sendMessage({ eventType: "PromoteContent", req });
     this.close();

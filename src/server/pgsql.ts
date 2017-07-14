@@ -625,7 +625,7 @@ async function _updateUserFeeds(t: ITask<any>, userId: Dbt.userId, links: Dbt.Li
   return feeds;
 }
 
-function _convertLinksToFeeds(userId: Dbt.userId, feeds: Dbt.Feed[]) {
+function _convertLinksToFeeds(userId: Dbt.userId, feeds: Dbt.Feed[]): Rpc.FeedItem[] {
   let rslt: Rpc.FeedItem[] = [];
   for (const f of feeds) {
     let l: Dbt.Link = cache.links.get(f.linkId);
@@ -650,21 +650,26 @@ export async function updateUserFeed(userId: Dbt.userId, last_feed: Date): Promi
   });
 }
 
+function _convertCommentsToFeeds(userId: Dbt.userId, comments: Dbt.Comment[]): Rpc.FeedItem[] {
+  let rslt: Rpc.FeedItem[] = [];
+  for (const c of comments) {
+    let { updated, created, comment } = c;
+    let cont = cache.contents.get(c.contentId);
+    if (cont.userId !== userId) throw new Error("comment not for user");
+    let { tags } = cont;
+    let source = cache.users.get(c.userId).userName;
+    let url = Utils.contentToUrl(c.contentId);
+    let itm: Rpc.FeedItem = { type: "comment", source, created, tags, url, comment };
+    rslt.push(itm);
+  };
+  return rslt;
+}
+
 export async function getCommentsFeed(userId: Dbt.userId, last_feed: Date): Promise<Rpc.FeedItem[]> {
   let usr = cache.users.get(userId)
   return await db.tx(async t => {
     let comments: Dbt.Comment[] = await tasks.getCommentsFeed(t, userId, last_feed);
-    let rslt: Rpc.FeedItem[] = [];
-    for (const c of comments) {
-      let { updated, created, comment } = c;
-      let cont = cache.contents.get(c.contentId);
-      let { tags } = cont;
-      let source = cache.users.get(c.userId).userName;
-      let url = Utils.contentToUrl(c.contentId);
-      let itm: Rpc.FeedItem = { type: "comment", source, created, tags, url, comment };
-      rslt.push(itm);
-    };
-    return rslt;
+    return _convertCommentsToFeeds(userId, comments);
   });
 }
 
@@ -672,10 +677,18 @@ export async function liveUserFeed(userId: Dbt.userId, updts: cache.CacheUpdate[
   let usr = cache.users.get(userId)
   let now = new Date();
   let links = updts.filter(u => u.table === "links").map(u => u.record as Dbt.Link);
-  if (links.length === 0) return [];
+  let comments = updts.filter(u => {
+    if (u.table !== "comments") return false;
+    let cont: Dbt.Content = cache.contents.get(u.record.contentId);
+    if (cont.userId !== userId) return false;
+    return true;
+  }).map(u => u.record as Dbt.Comment);
+  if (links.length === 0 && comments.length === 0) return [];
   return await db.tx(async t => {
-    let feeds = await _updateUserFeeds(t, userId, links);
-    return _convertLinksToFeeds(userId, feeds);
+    let linkfeeds = await _updateUserFeeds(t, userId, links);
+    let feeds = _convertLinksToFeeds(userId, linkfeeds);
+    let cmts = _convertCommentsToFeeds(userId, comments);
+    return [...feeds, ...cmts];
   });
 }
 
