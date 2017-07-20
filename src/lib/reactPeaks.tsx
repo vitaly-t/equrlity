@@ -8,8 +8,8 @@ import { PlayBackControls } from './playerControls';
 import { StreamToOwn } from './streamToOwn';
 
 export interface PeaksPlayerProps {
-  src: string, type: string, paymentSchedule: number[], streamNumber: number, purchaseCost: number,
-  linkDepth: Dbt.integer, peaksUri: Dbt.urlString, onFirstPlay: () => void, onPurchase: () => void
+  src: string, type: string, paymentSchedule: number[], streamNumber: number, purchaseCost: number, credits: number,
+  linkDepth: Dbt.integer, peaksUri: Dbt.urlString, onFirstPlay?: () => Promise<boolean>, onPurchase?: () => Promise<boolean>
 };
 export interface PeaksPlayerState { pos: number, isReady: boolean, hasPlayed: boolean };
 export class PeaksPlayer extends React.Component<PeaksPlayerProps, PeaksPlayerState> {
@@ -53,26 +53,41 @@ export class PeaksPlayer extends React.Component<PeaksPlayerProps, PeaksPlayerSt
     this.peaks.destroy();
   }
 
-  onPlay() {
+  async onPurchase(): Promise<boolean> {
+    if (!this.props.onPurchase) return true;
+    let ok = await this.props.onPurchase();
+    if (ok) this.setState({ hasPlayed: true });
+    else this.peaks.player.pause();
+    return ok;
+  }
+
+  async onPlay() {
     //this.audioEl.play();  // same diff..
     this.peaks.player.play();
     if (!this.state.hasPlayed) {
-      if (this.props.onFirstPlay) this.props.onFirstPlay();
+      if (this.props.onFirstPlay) {
+        let ok = await this.props.onFirstPlay();
+        if (!ok) {
+          this.peaks.player.pause();
+          return;
+        }
+      }
       this.setState({ hasPlayed: true });
     }
     else this.forceUpdate();
   }
 
   render() {
-    let { paymentSchedule, streamNumber, purchaseCost, linkDepth } = this.props;
+    let { paymentSchedule, streamNumber, purchaseCost, linkDepth, credits } = this.props;
     let audio = this.audioEl;
     let isPlaying = () => !audio.ended && !audio.paused;
+    let canPlay = !(paymentSchedule && paymentSchedule.length > 0 && streamNumber <= paymentSchedule.length && paymentSchedule[streamNumber - 1] > credits)
     return (
       <div style={{ width: '100%' }} >
         <div style={{ width: '100%', height: '210px', marginRight: '10px' }} ref={c => this.peaksEl = c} />
         <audio id="audioSource" controls={false} preload="auto" ref={c => { this.audioEl = c; }} src={this.props.src} type={this.props.type} />
         {!this.state.isReady ? <h2 style={{ height: "40px", color: "#48AFF0" }}><b><i>... loading ...</i></b></h2>
-          : <PlayBackControls
+          : !canPlay ? null : <PlayBackControls
             height={40}
             isPlaying={isPlaying()}
             isMuted={audio.muted}
@@ -87,7 +102,7 @@ export class PeaksPlayer extends React.Component<PeaksPlayerProps, PeaksPlayerSt
             onPause={() => { this.peaks.player.pause(); this.forceUpdate(); }}
             onToggleMute={() => { audio.muted = !audio.muted, this.forceUpdate(); }}
           />}
-        {!this.state.hasPlayed && <StreamToOwn paymentSchedule={paymentSchedule} streamNumber={streamNumber} purchaseCost={purchaseCost} linkDepth={linkDepth} onPurchase={this.props.onPurchase} />}
+        {!this.state.hasPlayed && <StreamToOwn paymentSchedule={paymentSchedule} streamNumber={streamNumber} purchaseCost={purchaseCost} linkDepth={linkDepth} onPurchase={this.props.onPurchase} credits={credits} />}
       </div>
 
     );

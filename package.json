@@ -1,7 +1,7 @@
 {
   "name": "pseudoqurl",
-  "version": "0.8.0",
-  "description": "Attention Economy prototype",
+  "version": "0.9.8",
+  "description": "Intention Economy prototype",
   "main": "index.ts",
   "scripts": {
     "start": "node dist/server/server.js",
@@ -121,6 +121,6 @@
     "webpack": "^2.4.1"
   },
   "engines": {
-    "node": "7.7.4"
+    "node": "8.1.4"
   }
 }

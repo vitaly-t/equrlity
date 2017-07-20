@@ -151,12 +151,13 @@ export async function init() {
 }
 
 export async function initCache() {
-  let userRows: Array<Dbt.User> = await db.any("select * from users;");
+  let userRows: Array<Dbt.User> = await db.any("select * from users");
   let authRows: Array<Dbt.Auth> = await db.any("select * from auths");
   let contentRows: Array<Dbt.Content> = await db.any("select * from contents");
   let commentRows: Array<Dbt.Comment> = await db.any("select * from comments");
   let linkRows: Dbt.Link[] = await db.any('select * from links order by "linkId" ');
-  cache.init(userRows, contentRows, linkRows, commentRows);
+  let tagRows: Dbt.Tag[] = await db.any('select * from tags order by tag ');
+  cache.init(userRows, contentRows, linkRows, commentRows, tagRows);
 }
 
 export async function createDataTables() {
@@ -193,6 +194,18 @@ export async function resetDataTables() {
     await db.none(stmt);
   };
   await initCache();
+}
+
+export async function cacheUpdateTask(task: (t: ITask<any>) => Promise<cache.CacheUpdate[]>): Promise<cache.CacheUpdate[]> {
+  let updts = await db.task(t => task(t));
+  cache.update(updts)
+  return updts;
+}
+
+export async function cacheUpdateTx(tx: (t: ITask<any>) => Promise<cache.CacheUpdate[]>): Promise<cache.CacheUpdate[]> {
+  let updts = await db.tx(t => tx(t));
+  cache.update(updts);
+  return updts;
 }
 
 export async function updateRecord<T>(tblnm: string, rec: Object): Promise<T> {
@@ -273,7 +286,7 @@ export async function getUserByAuthId(authId: string, provider: Dbt.authProvider
 
 export async function touchUser(userId: Dbt.userId) {
   let rslt = await db.task(t => tasks.touchUser(t, userId));
-  cache.setUser(rslt);
+  cache.touchUser(rslt);
 }
 
 export async function getLinksForUrl(url: Dbt.urlString): Promise<Dbt.Link[]> {
@@ -386,19 +399,16 @@ export async function payForView(viewerId: Dbt.userId, viewedLinkId: Dbt.linkId,
   let viewedLink = links[0];
   if (viewerId !== viewedLink.userId) {
     cache.connectUsers(viewerId, viewedLink.userId);
-    cache.update(await db.tx(t => tasks.payForView(t, links, viewerId, amount)));
+    cacheUpdateTx(t => tasks.payForView(t, links, viewerId, amount));
   }
 }
 
-export async function purchaseContent(viewerId: Dbt.userId, viewedLinkId: Dbt.linkId, amount: Dbt.integer): Promise<Dbt.Content | null> {
+export async function purchaseContent(viewerId: Dbt.userId, viewedLinkId: Dbt.linkId, amount: Dbt.integer): Promise<void> {
   let links = cache.getChainFromLinkId(viewedLinkId);
   let viewedLink = links[0];
   if (viewerId === viewedLink.userId) return null;
   cache.connectUsers(viewerId, viewedLink.userId);
-  let updts = await db.tx(t => tasks.purchaseContent(t, links, viewerId, amount));
-  cache.update(updts);
-  let content: Dbt.Content = updts.find(e => e.table === "contents" as cache.CachedTable).record;
-  return content;
+  cacheUpdateTx(t => tasks.purchaseContent(t, links, viewerId, amount));
 }
 
 export async function createUser(email?: string): Promise<Dbt.User> {
@@ -411,76 +421,37 @@ export async function createUser(email?: string): Promise<Dbt.User> {
   return user;
 };
 
-async function _handlePromoteContent(t: ITask<any>, userId, req: Rpc.PromoteContentRequest): Promise<[cache.CacheUpdate[], Rpc.PromoteContentResponse]> {
-  let updts = await tasks.promoteContent(t, userId, req);
+async function _handleShareContent(t: ITask<any>, userId, req: Rpc.ShareContentRequest): Promise<[cache.CacheUpdate[], Rpc.ShareContentResponse]> {
+  let updts = await tasks.shareContent(t, userId, req);
   let link: Dbt.Link = updts.find(e => e.table === "links" as cache.CachedTable).record;
   await _promoteLink(t, link, req.amount);
   if (link.prevLink) {
     let prev = cache.links.get(link.prevLink);
     cache.connectUsers(userId, prev.userId);
   }
-  let rsp: Rpc.PromoteContentResponse = { link };
+  let rsp: Rpc.ShareContentResponse = { link };
   return [updts, rsp];
 }
 
-export async function handlePromoteContent(userId, req: Rpc.PromoteContentRequest): Promise<Rpc.PromoteContentResponse> {
-  let pr = await db.tx(t => _handlePromoteContent(t, userId, req));
+export async function handleShareContent(userId, req: Rpc.ShareContentRequest): Promise<Rpc.ShareContentResponse> {
+  let pr = await db.tx(t => _handleShareContent(t, userId, req));
   let updts: cache.CacheUpdate[] = pr[0];
-  let rsp: Rpc.PromoteContentResponse = pr[1];
+  let rsp: Rpc.ShareContentResponse = pr[1];
   cache.update(updts);
   return rsp;
 }
 
-/*
-async function _handlePromoteLink(t: ITask<any>, userId, req: Rpc.PromoteLinkRequest): Promise<[cache.CacheUpdate[], Rpc.PromoteLinkResponse]> {
-  let { url, signature, title, comment, amount, tags } = req;
-  let ourl = parse(url);
-  let linkId = '';
-  let link = null;
-  let linkDepth = 0;
-  let rslt: cache.CacheUpdate[] = [];
-  saveTags(tags);
-  if (Utils.isPseudoQLinkURL(ourl)) {
-    linkId = Utils.getLinkIdFromUrl(ourl);
-    link = cache.links.get(linkId);
-    linkDepth = cache.getLinkDepth(link);
-
-    if (link.userId === userId) {
-      console.log("investing in link: " + linkId);
-      rslt = await tasks.investInLink(t, link, amount);
-    }
-    else {
-      cache.connectUsers(userId, link.userId);
-      let prevId = await tasks.getLinkAlreadyInvestedIn(t, userId, url);
-      if (prevId) throw new Error("user has previously invested in this content");
-      rslt = await tasks.promoteLink(t, userId, url, title, comment, amount, tags);
-      linkDepth += 1;
-    }
-  }
-  else {
-    rslt = await tasks.promoteLink(t, userId, url, title, comment, amount, tags);
-  }
-  if (amount == 0) return [rslt, { link: null, linkDepth: -1 }];
-
-  link = rslt.find(e => e.table === "links" as cache.CachedTable).record;
-  if (!link) throw new Error("no link generated");
-  await _promoteLink(t, link, amount);
-  let linkPromoter = cache.users.get(userId).userName;
-  return [rslt, { link, linkDepth }];
-}
-*/
-
-export async function bookmarkAndPromoteLink(userId, req: Rpc.BookmarkLinkRequest): Promise<Rpc.PromoteContentResponse> {
+export async function bookmarkAndShareLink(userId, req: Rpc.BookmarkLinkRequest): Promise<Rpc.ShareContentResponse> {
   let cont: Dbt.Content;
   let pr = await db.tx(async t => {
     let { contentId, comment, tags, title, signature, url } = req;
     cont = await tasks.bookmarkLink(t, userId, contentId, title, tags, url, comment);
     contentId = cont.contentId;
-    let preq: Rpc.PromoteContentRequest = { contentId, comment, tags, title, amount: 0, signature, paymentSchedule: [] };  //TODO: fixup signature mangling here
-    return await _handlePromoteContent(t, userId, preq);
+    let preq: Rpc.ShareContentRequest = { contentId, comment, tags, title, amount: 0, signature, paymentSchedule: [] };  //TODO: fixup signature mangling here
+    return await _handleShareContent(t, userId, preq);
   });
   let updts: cache.CacheUpdate[] = pr[0];
-  let rsp: Rpc.PromoteContentResponse = pr[1];
+  let rsp: Rpc.ShareContentResponse = pr[1];
   updts.unshift({ table: "contents", record: cont });
   cache.update(updts);
   return rsp;
@@ -605,6 +576,7 @@ export async function saveUserFollowings(userId: Dbt.userId, follows: Dbt.userNa
 
 function _feedFilter(usr: Dbt.User, l: Dbt.Link): boolean {
   let { subscriptions, blacklist, following } = usr;
+  if (l.userId === usr.userId) return false;
   if (subscriptions && subscriptions.findIndex(t => l.tags && l.tags.indexOf(t) >= 0) >= 0) return true;
   if (following && following.indexOf(l.userId) >= 0) {
     return !(blacklist && blacklist.findIndex(t => l.tags && l.tags.indexOf(t) >= 0) >= 0);
@@ -614,14 +586,10 @@ function _feedFilter(usr: Dbt.User, l: Dbt.Link): boolean {
 
 async function _updateUserFeeds(t: ITask<any>, userId: Dbt.userId, links: Dbt.Link[]): Promise<Dbt.Feed[]> {
   let usr = cache.users.get(userId)
-  let now = new Date();
   let f = OxiGen.emptyRec<Dbt.Feed>("feeds");
   let feeds = links.filter(l => _feedFilter(usr, l))
     .map(l => { return { ...f, userId, linkId: l.linkId }; });
   await tasks.upsertRecords<Dbt.Feed>(t, "feeds", feeds);
-  usr = { ...usr, last_feed: now };
-  usr = await tasks.updateRecord<Dbt.User>(t, "users", usr);
-  cache.setUser(usr);
   return feeds;
 }
 
@@ -632,7 +600,7 @@ function _convertLinksToFeeds(userId: Dbt.userId, feeds: Dbt.Feed[]): Rpc.FeedIt
     let { tags, created, comment } = l;
     let source = cache.users.get(l.userId).userName;
     let url = Utils.linkToUrl(l.linkId, l.title);
-    let itm: Rpc.FeedItem = { type: "squawk", source, created, tags, url, comment };
+    let itm: Rpc.FeedItem = { type: "share", id: l.linkId, source, created, tags, url, comment };
     rslt.push(itm);
   };
   return rslt;
@@ -640,13 +608,15 @@ function _convertLinksToFeeds(userId: Dbt.userId, feeds: Dbt.Feed[]): Rpc.FeedIt
 
 export async function updateUserFeed(userId: Dbt.userId, last_feed: Date): Promise<Rpc.FeedItem[]> {
   let usr = cache.users.get(userId)
+  let min_feed = OxiDate.addDays(new Date(), -30);
+  if (last_feed < min_feed) last_feed = min_feed;
   return await db.tx(async t => {
     let links: Dbt.Link[] = await t.any('select * from links where created > $1', [last_feed]);
     await _updateUserFeeds(t, userId, links);
     let feeds: Dbt.Feed[] = await t.any(`select * from feeds where "userId" = '${userId}' and dismissed is null order by created desc`);
     let linkItems = _convertLinksToFeeds(userId, feeds);
     let commentItems = await getCommentsFeed(userId, last_feed);
-    return [...linkItems, commentItems];
+    return [...linkItems, ...commentItems];
   });
 }
 
@@ -659,7 +629,7 @@ function _convertCommentsToFeeds(userId: Dbt.userId, comments: Dbt.Comment[]): R
     let { tags } = cont;
     let source = cache.users.get(c.userId).userName;
     let url = Utils.contentToUrl(c.contentId);
-    let itm: Rpc.FeedItem = { type: "comment", source, created, tags, url, comment };
+    let itm: Rpc.FeedItem = { type: "comment", id: c.commentId.toString(), source, created, tags, url, comment };
     rslt.push(itm);
   };
   return rslt;
@@ -692,11 +662,11 @@ export async function liveUserFeed(userId: Dbt.userId, updts: cache.CacheUpdate[
   });
 }
 
-export async function dismissSquawks(userId: Dbt.userId, urls: Dbt.urlString[], save: boolean): Promise<void> {
-  return await db.tx(t => tasks.dismissSquawks(t, userId, urls, save));
+export async function dismissFeeds(userId: Dbt.userId, urls: Dbt.urlString[], save: boolean): Promise<void> {
+  return await db.tx(t => tasks.dismissFeeds(t, userId, urls, save));
 }
 
-export async function generateSquawks() {
+export async function generateFeeds() {
   let u = await createUser();
   let i = 0;
   let uids = (await db.any(`select "userId" from users`)).map(u => u.userId);
@@ -705,7 +675,7 @@ export async function generateSquawks() {
     for (const uid of uids) {
       let preq: Rpc.BookmarkLinkRequest = { comment: "great comment " + i, tags: [], url: "https://www.example.com/thing/" + i, signature: "", title: "awesome link " + i };
       try {
-        await bookmarkAndPromoteLink(uid, preq);
+        await bookmarkAndShareLink(uid, preq);
       }
       catch (e) { }
       await Utils.sleep(2000);

@@ -23,8 +23,10 @@ export function currentState() {
   return __state;
 }
 
+let defaultBadgeColor;
 async function __init() {
   //console.log("__init called");
+  chrome.browserAction.getBadgeBackgroundColor({}, c => { defaultBadgeColor = c; });
   let st = currentState();
   if (!st.jwt) {
     //console.log("no jwt found");
@@ -35,6 +37,7 @@ async function __init() {
       let newst = await localForage.getItem<AppState>('appState');
       // allows for possible evolution (eg new properties) of appState structure in code.
       st = { ...st, ...newst, matchedTags: Object.create(null), links: Object.create(null) };
+
     }
     if (st.jwt) handleMessage({ eventType: "Thunk", fn: (_ => st) });
     else {
@@ -50,20 +53,33 @@ async function __init() {
   }
 }
 
+let _initTimer;
 async function initialize() {
-  console.log("initializing...");
+  console.log("initialize called...");
+  if (_initTimer) {
+    clearTimeout(_initTimer);
+    chrome.browserAction.setBadgeText({ text: "0" });
+    chrome.browserAction.setBadgeBackgroundColor({ color: defaultBadgeColor });
+    _initTimer = null;
+  }
   let st = currentState();
   try {
     while (!st.jwt) {
       await __init();
       st = currentState();
     }
-    await handleAsyncMessage({ eventType: "Initialize" });
-    Comms.openWebSocket(st, receiveServerMessages);
+    Comms.openWebSocket(st, receiveServerMessages, err => {
+      console.log("websocket error");
+      chrome.browserAction.setBadgeText({ text: "?" });
+      chrome.browserAction.setBadgeBackgroundColor({ color: "red" });
+      if (!_initTimer) _initTimer = setTimeout(initialize, 5000);
+    });
   }
   catch (e) {
     console.log("initialize threw : " + e.message)
-    setTimeout(initialize, 5000);
+    chrome.browserAction.setBadgeText({ text: "?" });
+    chrome.browserAction.setBadgeBackgroundColor({ color: "red" });
+    if (!_initTimer) _initTimer = setTimeout(initialize, 5000);
   }
 }
 
@@ -221,8 +237,10 @@ chrome.tabs.onActivated.addListener(({ tabId, windowId }) => {
 
 function addHeaders(details) {
   let hdrs = details.requestHeaders;
-  hdrs.push({ name: 'x-psq-client-version', value: 'capuchin-' + Utils.capuchinVersion() });
-  if (__state && __state.jwt) hdrs.push({ name: 'Authorization', value: 'Bearer ' + __state.jwt });
+  if (hdrs.findIndex(h => h.name === 'x-psq-client-version') < 0) { // first in wins!!
+    hdrs.push({ name: 'x-psq-client-version', value: 'capuchin-' + Utils.capuchinVersion() });
+    if (__state && __state.jwt) hdrs.push({ name: 'Authorization', value: 'Bearer ' + __state.jwt });
+  }
   return { requestHeaders: hdrs };
 }
 
@@ -234,8 +252,8 @@ function addResponseHeaders(details) {
   //NB: cannot be async.  
   //if (!__initialized) await initialize();
   let { responseHeaders } = details;
-  responseHeaders.push({ name: 'x-psq-privkey', value: JSON.stringify(__state.privateKey) });
   if (responseHeaders.findIndex(e => e.name === 'x-psq-moniker') < 0) {
+    responseHeaders.push({ name: 'x-psq-privkey', value: JSON.stringify(__state.privateKey) });
     responseHeaders.push({ name: 'x-psq-credits', value: __state.credits.toString() });
     responseHeaders.push({ name: 'x-psq-moniker', value: __state.moniker });
     responseHeaders.push({ name: 'x-psq-email', value: __state.email });
@@ -260,10 +278,6 @@ export async function handleAsyncMessage(event: Message) {
   //console.log("Async Handling :" + event.eventType);
   try {
     switch (event.eventType) {
-      case "Initialize": {
-        fn = await AsyncHandlers.initialize(st);
-        break;
-      }
       case "ChangeSettings": {
         fn = await AsyncHandlers.changeSettings(st, event.settings);
         break;
@@ -276,8 +290,8 @@ export async function handleAsyncMessage(event: Message) {
         fn = await AsyncHandlers.saveContent(st, event.req);
         break;
       }
-      case "PromoteContent": {
-        fn = await AsyncHandlers.promoteContent(st, event.req);
+      case "ShareContent": {
+        fn = await AsyncHandlers.shareContent(st, event.req);
         break;
       }
       case "RemoveContent": {
@@ -311,8 +325,8 @@ export async function handleAsyncMessage(event: Message) {
         fn = await AsyncHandlers.updateFeed(st);
         break;
       }
-      case "DismissSquawks": {
-        fn = await AsyncHandlers.dismissSquawks(st, event.urls, event.save);
+      case "DismissFeeds": {
+        fn = await AsyncHandlers.dismissFeeds(st, event.feeds, event.save);
         break;
       }
       default:
@@ -329,23 +343,47 @@ export async function handleAsyncMessage(event: Message) {
 
 export async function receiveServerMessages(srvmsg: SrvrMsg.ServerMessage) {
   let thunk = (st: AppState) => {
-    let { credits, moniker, email, homePage } = srvmsg.headers;
-    st = { ...st, credits, moniker, email, homePage };
+    let { credits, moniker, email, homePage, timeStamp } = srvmsg.headers;
+    st = { ...st, credits, moniker, email, homePage, last_feed: timeStamp };
+    let tags: Dbt.tag[] = [];
     for (const msg of srvmsg.messages) {
       switch (msg.type) {
+        case "Init": {
+          let rslt: Rpc.InitializeResponse = msg.message;
+          let { profile_pic, last_feed, allTags } = rslt
+          let _tags = Tags.mergeTags(allTags, st.allTags);
+          //if (rslt.redirectUrl) chrome.tabs.update(activeTab.id, { url: rslt.redirectUrl });
+          let feed = st.feed;
+          rslt.feed.forEach(f => {
+            let i = feed.findIndex(_ => _.id === f.id);
+            if (i < 0) feed = [...feed, f];
+            else feed.splice(i, 1, f);
+          })
+          feed.sort((a, b) => (new Date(b.created)).getTime() - (new Date(a.created).getTime()));
+          chrome.browserAction.setBadgeText({ text: feed.length.toString() });
+          st = { ...st, /*activeTab,*/ profile_pic, feed, last_feed, allTags: _tags };
+          break;
+        }
         case "Feed": {
           let f: Rpc.FeedItem = msg.message;
           let feed = st.feed;
-          feed = [...feed, f];
+          let i = feed.findIndex(_ => _.id === f.id);
+          if (msg.remove) {
+            if (i < 0) break;
+            feed.splice(i, 1);
+          }
+          else {
+            if (i < 0) feed = [...feed, f];
+            else feed.splice(i, 1, f);
+          }
+          feed.sort((a, b) => (new Date(b.created)).getTime() - (new Date(a.created).getTime()));
           chrome.browserAction.setBadgeText({ text: feed.length.toString() });
-          let allTags = Tags.mergeTags(f.tags, st.allTags)
-          st = { ...st, feed, allTags };
+          st = { ...st, feed };
           break;
         }
         case "Content": {
           let cont: Dbt.Content = msg.message;
           let contents = st.contents
-          let allTags = st.allTags;
           let i = contents.findIndex(c => c.contentId === cont.contentId);
           if (msg.remove) {
             if (i < 0) break;
@@ -354,15 +392,14 @@ export async function receiveServerMessages(srvmsg: SrvrMsg.ServerMessage) {
           else {
             if (i < 0) contents = [...contents, cont];
             else contents.splice(i, 1, cont);
-            allTags = Tags.mergeTags(cont.tags, allTags);
           }
-          st = { ...st, contents, allTags };
+          contents.sort((a, b) => (new Date(b.created)).getTime() - (new Date(a.created).getTime()));
+          st = { ...st, contents };
           break;
         }
         case "Link": {
           let item: Rpc.UserLinkItem = msg.message;
           let investments = st.investments;
-          let allTags = st.allTags;
           let i = investments.findIndex(l => l.link.linkId === item.link.linkId);
           if (msg.remove) {
             if (i < 0) break;
@@ -371,12 +408,20 @@ export async function receiveServerMessages(srvmsg: SrvrMsg.ServerMessage) {
           else {
             if (i < 0) investments = [...investments, item];
             else investments.splice(i, 1, item);
-            allTags = Tags.mergeTags(item.link.tags, allTags)
           }
-          st = { ...st, investments, allTags };
+          investments.sort((a, b) => (new Date(b.link.created)).getTime() - (new Date(a.link.created).getTime()));
+          st = { ...st, investments };
+          break;
+        }
+        case "Tag": {
+          tags.push(msg.message.tag);
           break;
         }
       }
+    }
+    if (tags.length > 0) {
+      let allTags = Tags.mergeTags(tags, st.allTags);
+      st = { ...st, allTags };
     }
     return st;
   }

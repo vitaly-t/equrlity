@@ -6,35 +6,35 @@ import * as Dbt from '../lib/datatypes';
 import { signData, sendApiRequest } from '../lib/axiosClient';
 
 
-export async function sendPromoteContent(st: AppState, req: Rpc.PromoteContentRequest): Promise<AxiosResponse> {
+export async function sendShareContent(st: AppState, req: Rpc.ShareContentRequest): Promise<AxiosResponse> {
   const signature = await signData(st.privateKey, req.contentId.toString());
   req = { ...req, signature };
-  return await sendApiRequest("promoteContent", req);
+  return await sendApiRequest("shareContent", req);
 }
 
 export async function sendRemoveContent(st: AppState, req: Rpc.RemoveContentRequest): Promise<AxiosResponse> {
   return await sendApiRequest("removeContent", req);
 }
 
-export async function sendBookmarkLink(st: AppState, url: string, title: string, comment: string, tags: string[], squawk?: boolean): Promise<AxiosResponse> {
+export async function sendBookmarkLink(st: AppState, url: string, title: string, comment: string, tags: string[], share?: boolean): Promise<AxiosResponse> {
   const signature = await signData(st.privateKey, url);
-  let req: Rpc.BookmarkLinkRequest = { url, signature, title, comment, tags, squawk };
+  let req: Rpc.BookmarkLinkRequest = { url, signature, title, comment, tags, share };
   let cont = getBookmark(st, url);
   if (cont) req = { ...req, contentId: cont.contentId };
   return await sendApiRequest("bookmarkLink", req);
 }
 
 export async function sendInitialize(st: AppState): Promise<AxiosResponse> {
-  return await sendApiRequest("initialize", { publicKey: st.publicKey });
+  return await sendApiRequest("initialize", { publicKey: st.publicKey, last_feed: st.last_feed });
 }
 
 export async function sendUpdateFeed(st: AppState): Promise<AxiosResponse> {
   return await sendApiRequest("updateFeed", {});
 }
 
-export async function sendDismissSquawks(st: AppState, urls: Dbt.urlString[], save?: boolean): Promise<AxiosResponse> {
+export async function sendDismissFeeds(st: AppState, urls: Dbt.urlString[], save?: boolean): Promise<AxiosResponse> {
   save = save || false;
-  return await sendApiRequest("dismissSquawks", { urls, save });
+  return await sendApiRequest("dismissFeeds", { urls, save });
 }
 
 export async function sendLoadLink(st: AppState, url: string): Promise<AxiosResponse> {
@@ -69,24 +69,45 @@ export async function sendTransferCredits(st: AppState, req: Rpc.TransferCredits
   return await sendApiRequest("transferCredits", req);
 }
 
-export function openWebSocket(st: AppState, messageHandler: (msg: any) => void) {
+export function openWebSocket(st: AppState, messageHandler: (msg: any) => void, errorHandler: (err: Error) => void) {
+  //console.log("opening Websocket");
   if (!st.jwt) throw new Error("missing jwt");
   let url = Utils.serverUrl.replace('http', 'ws');
   var ws = new WebSocket(url);
+  let _pingTimer;
+  function resetPinger() {
+    if (_pingTimer) clearTimeout(_pingTimer);
+    _pingTimer = setTimeout(() => {
+      //console.log("pinging server");
+      if (ws.readyState !== 1) {
+        errorHandler(new Error("Socket not ready for ping."));
+      }
+      else ws.send('{"ping": true}');
+    }, 10000)
+  }
   ws.onopen = (event) => {
-    ws.send(JSON.stringify({ jwt: st.jwt }));
+    ws.send(JSON.stringify({ jwt: st.jwt, publicKey: st.publicKey, last_feed: st.last_feed }));
   };
   ws.onmessage = (event) => {
-    if (event.data instanceof ArrayBuffer) {
-      console.log("arraybuffer received")
-    }
-    else if (event.data instanceof Blob) {
-      console.log("arraybuffer received")
-    }
-    else if (typeof event.data === 'string') {
-      console.log("string received")
-      let msg = JSON.parse(event.data);
-      messageHandler(msg);
+    if (typeof event.data === 'string') {
+      //console.log("string received")
+      let msg;
+      try {
+        msg = JSON.parse(event.data);
+        resetPinger();
+      }
+      catch (e) {
+        errorHandler(new Error('Invalid JSON received on websocket: ' + event.data));
+      }
+      if (msg) {
+        if (!msg.pong) messageHandler(msg);
+        //else console.log("pong received");
+      }
     }
   }
+  ws.onerror = (event: ErrorEvent) => {
+    ws.close();
+    errorHandler(new Error("Websocket Error: " + event.message));
+  }
+  resetPinger();
 }

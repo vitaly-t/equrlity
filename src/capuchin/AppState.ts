@@ -26,16 +26,15 @@ export interface AppState {
   reachableUserCount: Dbt.integer;
   contents: Dbt.Content[];
   allTags: TagSelectOption[];
-  currentContent: Dbt.Content;  // used to pass the target content to edit from settings page to contentedit page. It is ephemeral!!
-  currentLink: Dbt.Link;  // used to pass the target link to edit from settings page to linkedit page. It is ephemeral!!
+  last_feed: string;
 }
 
 export function initState(): AppState {
   console.log("initState called");
   return {
-    publicKey: null, privateKey: null, links: Object.create(null) /*new Map<string, Dbt.Content>()*/, matchedTags: Object.create(null) /*new Map<string, Dbt.tags>()*/,
+    publicKey: null, privateKey: null, links: Object.create(null), matchedTags: Object.create(null),
     activeUrl: null, moniker: 'unknown', authprov: '', email: '', credits: 0, jwt: '', lastErrorMessage: '', homePage: '', profile_pic: '', feed: [],
-    investments: [], promotions: [], connectedUsers: [], reachableUserCount: 0, contents: [], allTags: [], currentContent: null, currentLink: null
+    investments: [], promotions: [], connectedUsers: [], reachableUserCount: 0, contents: [], allTags: [], last_feed: ''
   };
 }
 

@@ -19,7 +19,7 @@ import * as Chrome from './chrome';
 
 
 interface ContentEditorProps { info: Dbt.Content, allTags: Tags.TagSelectOption[], creator: string, style?: any, onClose: () => void }
-interface ContentEditorState { url: Dbt.urlString, title: string, content: string, tags: string[], isError: boolean, isPublic: boolean, prevContent: string, isOpen: boolean };
+interface ContentEditorState { url: Dbt.urlString, title: string, content: string, tags: string[], isError: boolean, prevContent: string, isOpen: boolean };
 
 export class ContentEditor extends React.Component<ContentEditorProps, ContentEditorState> {
 
@@ -30,13 +30,13 @@ export class ContentEditor extends React.Component<ContentEditorProps, ContentEd
     if (!tags) tags = [];
     content = content || '';
     url = url || '';
-    this.state = { url, title, content, tags, isError: false, isPublic, prevContent: content, isOpen: true };
+    this.state = { url, title, content, tags, isError: false, prevContent: content, isOpen: true };
   }
 
   save() {
     if (this.state.isError) return;
-    let { title, tags, isPublic, content, url } = this.state;
-    let cont: Dbt.Content = { ...this.props.info, url, content, title, tags, isPublic };
+    let { title, tags, content, url } = this.state;
+    let cont: Dbt.Content = { ...this.props.info, url, content, title, tags };
     let req: Rpc.SaveContentRequest = { content: cont };
     Chrome.sendMessage({ eventType: "SaveContent", req });
     this.close()
@@ -66,12 +66,12 @@ export class ContentEditor extends React.Component<ContentEditorProps, ContentEd
     let btnStyle = { marginRight: gutter / 2 };
     let rowStyle = { padding: 4 };
     let lspan = 1;
-    let { title, isPublic, content, tags, isOpen } = this.state;
+    let { title, content, tags, isOpen } = this.state;
     let { info } = this.props;
     let isDirty = content !== info.content;
     let btns = [
-      <Button style={btnStyle} key='save' className="pt-intent-primary" onClick={() => this.save()} text="Save" />,
-      <Button style={btnStyle} key='stop' onClick={() => this.abandonEdit()} text="Abandon" />
+      <Button style={btnStyle} key='stop' onClick={() => this.abandonEdit()} text="Abandon" />,
+      <Button style={btnStyle} key='save' className="pt-intent-primary" onClick={() => this.save()} text="Save" />
     ];
     let created = info.created ? OxiDate.toFormat(new Date(info.created), "DDDD, MMMM D @ HH:MIP") : '';
     let updated = info.updated ? OxiDate.toFormat(new Date(info.updated), "DDDD, MMMM D @ HH:MIP") : '';
@@ -103,7 +103,6 @@ export class ContentEditor extends React.Component<ContentEditorProps, ContentEd
             <Col span={8}>
               <input type="text" style={{ width: '100%' }} value={title} onChange={e => this.setState({ title: e.target.value })} />
             </Col>
-            <Col span={2}><Checkbox label="Public?" checked={isPublic} onChange={e => this.setState({ isPublic: !this.state.isPublic })} /></Col>
           </Row>
           <Row style={rowStyle} gutter={gutter}>
             <Col span={lspan}>Body:</Col>
@@ -120,8 +119,8 @@ export class ContentEditor extends React.Component<ContentEditorProps, ContentEd
               <Tags.TagGroupEditor tags={this.state.tags} creatable={true} allTags={this.props.allTags} onChange={tags => this.changeTags(tags)} />
             </Col>
           </Row>
-          <Row style={rowStyle} gutter={gutter}>
-            <Col span={12}>{btns}</Col>
+          <Row style={rowStyle} gutter={gutter} justify="end" >
+            {btns}
           </Row>
         </div>
       </Dialog >

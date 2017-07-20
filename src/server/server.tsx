@@ -42,9 +42,7 @@ import { serve } from './koa-static';
 import clientIP from './clientIP.js';
 import * as pg from './pgsql';
 import * as cache from './cache';
-
-const jwt_secret = process.env.JWT_PSEUDOQURL_KEY;
-const jwtOptions = { secret: jwt_secret, ignoreExpiration: true, key: 'userId' };
+import * as Wss from './ws-server';
 
 pg.init();
 
@@ -178,7 +176,7 @@ app.use(async (ctx, next) => {
   }
 });
 
-app.use(jwt.jwt(jwtOptions));
+app.use(jwt.jwt());
 
 /*
 publicRouter.get('/download/pseudoqurl.crx', async function (ctx, next) {
@@ -313,7 +311,7 @@ publicRouter.get('/load/content/:id', async (ctx, next) => {
   let peaks = false;
   if (content.contentType === 'audio' && await pg.getAudioPeaks(content.db_hash)) peaks = true;
 
-  let result: Rpc.LoadContentResponse = { content, owner, comments, paymentSchedule: [], streamNumber: 0, peaks, linkDepth: 0 }
+  let result: Rpc.LoadContentResponse = { content, owner, comments, paymentSchedule: [], streamNumber: 0, peaks, linkDepth: 0, credits: 0 }
   ctx.body = { result };
 });
 
@@ -341,14 +339,15 @@ publicRouter.get('/load/link/:id', async (ctx, next) => {
     return { ...c, userName }
   })
   let streamNumber = 0;
-  let { paymentSchedule } = link
+  let paymentSchedule = Utils.paymentScheduleFromLink(link);
   let viewerId = link.isPublic ? null : ctx['userId'].id;
   if (viewerId) streamNumber = await pg.getNextStreamNumber(viewerId, linkId);
 
   let peaks = false;
   if (content.contentType === 'audio' && await pg.getAudioPeaks(content.db_hash)) peaks = true;
   let linkDepth = cache.getChainFromLinkId(linkId).length - 1;
-  let result: Rpc.LoadContentResponse = { content, owner, comments, paymentSchedule, streamNumber, peaks, linkDepth }
+  let credits = cache.users.get(ctx['userId'].id).credits;
+  let result: Rpc.LoadContentResponse = { content, owner, comments, paymentSchedule, streamNumber, peaks, linkDepth, credits }
   ctx.body = { result };
 });
 
@@ -441,7 +440,7 @@ publicRouter.post('/auth', async (ctx, next) => {
     await pg.createAuth(authId, user.userId, "chrome");
   }
   let id = user.userId;
-  token = jwt.sign({ id, publicKey, email }, jwt_secret);
+  token = jwt.signJwt({ id, publicKey, email });
   ctx.body = { jwt: token };
 }
 );
@@ -459,77 +458,7 @@ app.use(async (ctx, next) => {
   }
 });
 
-type CacheSub = { ws: any, sub: cache.Subscription }
-let _socketSubs: CacheSub[] = [];
-
-const interval = setInterval(() => {
-  _socketSubs.forEach(({ ws, sub }) => {
-    if (ws.isAlive === false) {
-      ws.terminate();
-      cache.unSubscribe(sub);
-    }
-  });
-  _socketSubs = _socketSubs.filter(({ ws, sub }) => ws.isAlive);
-  _socketSubs.forEach(({ ws, sub }) => {
-    ws.isAlive = false;
-    ws.ping('', false, true);
-  });
-}, 60000);
-
-app.ws.use(async function (ctx, next) {
-  let ws = ctx.websocket;
-  ws.on('message', (message) => {
-    console.log(message);
-    let msg = JSON.parse(message);
-    let token = msg.jwt;
-    let opts = jwtOptions;
-    let userJwt = jwt.verify(token, opts.secret, opts);
-    let user: Dbt.User = getUser(userJwt.id);
-    if (!user) throw new Error("Invalid user id");
-    ws.userName = user.userName;
-    let sub: cache.Subscription;
-    sub = {
-      filter: u => true,
-      send: async updts => {
-        let messages: SrvrMsg.Message[] = [];
-        updts.filter(u => u.record.userId && u.record.userId === user.userId)
-          .forEach(async updt => {
-            let msg: SrvrMsg.Message;
-            switch (updt.table) {
-              case "contents": {
-                msg = { type: "Content", message: updt.record };
-                break;
-              }
-              case "links": {
-                let link: Dbt.Link = updt.record;
-                let message = await pg.getUserLinkItem(link.linkId);
-                msg = { type: "Link", message };
-                break;
-              }
-            }
-            if (msg) {
-              if (updt.remove) msg.remove = true;
-              messages.push(msg);
-            }
-          });
-        let feeds = await pg.liveUserFeed(user.userId, updts)
-        feeds.forEach(message => messages.push({ type: "Feed", message }));
-        let headers: SrvrMsg.MessageHeaders = { credits: user.credits, moniker: user.userName, email: userJwt.email, homePage: user.home_page };
-        let srvmsg: SrvrMsg.ServerMessage = { headers, messages };
-        if (messages.length > 0) {
-          try { ws.send(JSON.stringify(srvmsg)); }
-          catch (e) {
-            ws.isAlive = false;
-            throw (e);
-          }
-        }
-      }
-    };
-    cache.subscribe(sub);
-    _socketSubs.push({ ws, sub });
-  });
-  await next();
-});
+app.ws.use(Wss.server);
 
 app.use(async function (ctx, next) {
   if (ctx['invalidClientMsg']) {
@@ -553,7 +482,7 @@ app.use(async function (ctx, next) {
   if (!user) throw new Error("system corruption detected");
   let { publicKey, email, id } = userId;
   if (!_userId || _userId.publicKey !== publicKey || _userId.email !== email || _userId.id !== id) {
-    let token = jwt.sign(userId, jwt_secret); //{expiresInMinutes: 60*24*14});
+    let token = jwt.signJwt(userId); //{expiresInMinutes: 60*24*14});
     console.log("sending token");
     ctx.set('x-psq-token', token);
   }
@@ -592,7 +521,7 @@ app.use(async function (ctx, next) {
     }
     ctx['user'] = user;
   }
-  ctx['token'] = jwt.sign(ctx['userId'], jwt_secret); //{expiresInMinutes: 60*24*14});
+  ctx['token'] = jwt.signJwt(ctx['userId']); //{expiresInMinutes: 60*24*14});
   await next();
 });
 
@@ -655,18 +584,6 @@ router.post('/rpc', async function (ctx: any) {
   let userId = ctx.userId.id;
   try {
     switch (method as Rpc.Method) {
-      case "initialize": {
-        let req: Rpc.InitializeRequest = params;
-        checkPK(ctx, req.publicKey)
-        let usr = getUser(userId);
-        if (!usr) throw new Error("Internal error getting user details");
-        let redirectUrl = ctx['redirectUrl'];
-        let profile_pic = usr.profile_pic
-        let feed = await pg.updateUserFeed(userId, usr.last_feed);
-        let result: Rpc.InitializeResponse = { ok: true, redirectUrl, profile_pic, feed };
-        ctx.body = { id, result };
-        break;
-      }
       case "updateFeed": {
         //let req: Rpc.UpdateFeedRequest = params;
         let usr = getUser(userId);
@@ -675,12 +592,12 @@ router.post('/rpc', async function (ctx: any) {
         ctx.body = { id, result };
         break;
       }
-      case "promoteContent": {
-        let req: Rpc.PromoteContentRequest = params;
+      case "shareContent": {
+        let req: Rpc.ShareContentRequest = params;
         let { contentId, signature } = req;
         if (!validateContentSignature(ctx.userId.publicKey, contentId.toString(), signature)) throw new Error("request failed verification");
         let usr = getUser(userId);
-        let result: Rpc.PromoteContentResponse = await pg.handlePromoteContent(userId, req)
+        let result: Rpc.ShareContentResponse = await pg.handleShareContent(userId, req)
         ctx.body = { id, result };
         break;
       }
@@ -718,7 +635,11 @@ router.post('/rpc', async function (ctx: any) {
             return;
           }
         } else profile_pic = '';
-        let following = req.following.map(nm => cache.getUserByName(nm).userId);
+        let following = [];
+        req.following.forEach(nm => {
+          let u = cache.getUserByName(nm);
+          if (u) following.push(u.userId);
+        });
         let i = following.indexOf(userId);
         if (i >= 0) following.splice(i, 1);
         usr = { ...usr, userName, home_page: homePage, info, profile_pic, subscriptions, blacklist, following };
@@ -760,8 +681,10 @@ router.post('/rpc', async function (ctx: any) {
       case "redeemLink": {
         let req: Rpc.RedeemLinkRequest = params;
         let link = cache.links.get(req.linkId);
-        if (link.amount === 0) await pg.removeLink(link);
-        else await pg.redeemLink(link);
+        if (link) {
+          if (!link.amount) await pg.removeLink(link);
+          else await pg.redeemLink(link);
+        }
         let result: Rpc.RedeemLinkResponse = { ok: true };
         ctx.body = { id, result };
         break;
@@ -823,10 +746,10 @@ router.post('/rpc', async function (ctx: any) {
         ctx.body = { id, result };
         break;
       }
-      case "dismissSquawks": {
-        let req: Rpc.DismissSquawksRequest = params;
-        await pg.dismissSquawks(userId, req.urls, req.save);
-        let result: Rpc.DismissSquawksResponse = { ok: true };
+      case "dismissFeeds": {
+        let req: Rpc.DismissFeedsRequest = params;
+        await pg.dismissFeeds(userId, req.urls, req.save);
+        let result: Rpc.DismissFeedsResponse = { ok: true };
         ctx.body = { id, result };
         break;
       }
@@ -842,9 +765,9 @@ router.post('/rpc', async function (ctx: any) {
         let req: Rpc.PayForViewRequest = params;
         let { linkId, purchase, amount } = req;
         let content: Dbt.Content | null = null;
-        if (purchase) content = await pg.purchaseContent(userId, linkId, amount);
+        if (purchase) await pg.purchaseContent(userId, linkId, amount);
         else await pg.payForView(userId, linkId, amount);
-        let result: Rpc.PayForViewResponse = { ok: true, content };
+        let result: Rpc.PayForViewResponse = { ok: true };
         ctx.body = { id, result };
         break;
       }
@@ -854,7 +777,7 @@ router.post('/rpc', async function (ctx: any) {
     }
   }
   catch (e) {
-    console.log("returning rpc error: " + e.message);
+    console.log("rpc error - method : " + method + ", message:" + e.message);
     ctx.body = { id, error: { message: e.message } };
   }
 

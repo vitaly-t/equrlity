@@ -208,7 +208,7 @@ export async function deliveriesCount(t: ITask<any>, linkId: Dbt.linkId): Promis
   return parseInt(rslt.cnt);
 }
 
-export async function promoteContent(t: ITask<any>, userId, req: Rpc.PromoteContentRequest): Promise<CacheUpdate[]> {
+export async function shareContent(t: ITask<any>, userId, req: Rpc.ShareContentRequest): Promise<CacheUpdate[]> {
   let { contentId, amount, tags, comment, title, paymentSchedule } = req;
   let usr = await retrieveRecord<Dbt.User>(t, "users", { userId });
   if (amount > usr.credits) amount = usr.credits; //throw new Error("Negative balances not allowed");
@@ -235,49 +235,8 @@ export async function promoteContent(t: ITask<any>, userId, req: Rpc.PromoteCont
   return rslt;
 }
 
-export async function promoteLink(t: ITask<any>, userId: Dbt.userId, url: string, title, comment: string, amount: Dbt.integer, tags: string[]): Promise<CacheUpdate[]> {
-  let usr = await retrieveRecord<Dbt.User>(t, "users", { userId });
-  if (amount > usr.credits) throw new Error("Negative balances not allowed");
-  let ourl = parse(url);
-  let cont = OxiGen.emptyRec<Dbt.Content>("contents");
-  let rslt: CacheUpdate[] = [];
-  cont = { ...cont, userId, title, contentType: "bookmark", url, content: comment, tags }
-  cont = await insertContent(t, cont);
-  rslt.push({ table: "contents" as CachedTable, record: cont });
-  if (amount > 0) {
-    let { contentId } = cont;
-    let prevLink = null
-    if (Utils.isPseudoQLinkURL(ourl)) {
-      prevLink = Utils.getLinkIdFromUrl(parse(url));
-      let link = await retrieveRecord<Dbt.Link>(t, "links", { linkId: prevLink });
-    }
-    let link: Dbt.Link = { ...emptyLink(), prevLink, userId, comment, contentId, amount, tags };
-    link = await insertLink(t, link);
-    rslt.push({ table: "links" as CachedTable, record: link });
-    Array.prototype.push.apply(rslt, await adjustUserBalance(t, usr, -amount));
-  }
-  return rslt;
-}
-
 export async function redeemLink(t: ITask<any>, link: Dbt.Link): Promise<CacheUpdate[]> {
   return investInLink(t, link, -link.amount);
-  /*
-  let conts = await t.any(`select url from contents where "contentId" = '${link.contentId}'`);
-  let url = conts[0].url;
-  let linksToReParent = await t.any(`select * from links where "prevLink" = '${link.linkId}'`)
-  let ids = linksToReParent.map(l => "'" + l.contentId + "'").join(",");
-  await t.any(`update contents set url = '${url}' where "contentId" in (${ids})`)
-  let contUpdts = await t.any(`select * from contents where "contentId" in (${ids})`);
-  await t.any(`update links set "prevLink" = ${link.prevLink ? "'" + link.prevLink + "'" : 'null'} where "prevLink" = '${link.linkId}'`);
-  await t.any(`delete from links where "linkId" = '${link.linkId}'`);
-  let rslt: CacheUpdate[] = [];
-  for (const c of contUpdts) rslt.push({ table: "contents" as CachedTable, record: c });
-  rslt.push({ table: "links" as CachedTable, record: link, remove: true });
-  let user = await retrieveRecord<Dbt.User>(t, "users", { userId: link.userId });
-  if (link.amount > 0) Array.prototype.push.apply(rslt, await adjustUserBalance(t, user, link.amount));
-  for (const l of linksToReParent) rslt.push({ table: "links" as CachedTable, record: { ...l, prevLink: link.prevLink } });
-  return rslt;
-  */
 }
 
 export async function investInLink(t: ITask<any>, link: Dbt.Link, adj: Dbt.integer): Promise<CacheUpdate[]> {
@@ -310,8 +269,7 @@ export async function updateLink(t: ITask<any>, link: Dbt.Link, prv: Dbt.Link): 
 
 export async function removeLink(t: ITask<any>, link: Dbt.Link): Promise<void> {
   let { amount, linkId } = link;
-  if (amount !== 0) throw new Error("Link must be redeemed first");
-  let rslt: CacheUpdate[] = [];
+  if (amount) throw new Error("Link must be redeemed first");
   await deleteRecord<Dbt.Link>(t, "links", { linkId });
 }
 
@@ -610,7 +568,7 @@ export async function handleBookmarkLink(t: ITask<any>, userId: Dbt.userId, req:
   let { contentId, title, tags, url, comment } = req;
   let content = await bookmarkLink(t, userId, contentId, title, tags, url, comment);
   let link;
-  if (req.squawk) {
+  if (req.share) {
     let { comment, tags, title, signature } = req;
     let contentId = content.contentId;
     link = OxiGen.emptyRec<Dbt.Link>("links");
@@ -620,7 +578,7 @@ export async function handleBookmarkLink(t: ITask<any>, userId: Dbt.userId, req:
   return { content, link };
 }
 
-export async function dismissSquawks(t: ITask<any>, userId: Dbt.userId, urls: Dbt.urlString[], save: boolean): Promise<void> {
+export async function dismissFeeds(t: ITask<any>, userId: Dbt.userId, urls: Dbt.urlString[], save: boolean): Promise<void> {
   let ourls = urls.map(u => parse(u));
   let linkIds = ourls.map(Utils.getLinkIdFromUrl);
   let s = linkIds.map(l => "'" + l + "'").join();

@@ -58,14 +58,14 @@ export class BookmarkPanel extends React.Component<BookmarkPanelProps, BookmarkP
     let rspan = 10;
     let btnStyle = { marginRight: 10 };
     let rowStyle = { marginBottom: 10 };
-    let saveaction = (squawk: boolean) => {
+    let saveaction = (share: boolean) => {
       let { title, comment, tags, url } = this.state;
-      Chrome.sendMessage({ eventType: "BookmarkLink", url, title, comment, tags, squawk });
+      Chrome.sendMessage({ eventType: "BookmarkLink", url, title, comment, tags, share });
       window.close();
     }
     let btns = [
       <Button key="Close" style={btnStyle} onClick={() => window.close()} text="Close" />,
-      <Button key="Squawk" style={btnStyle} className="pt-intent-success" onClick={() => saveaction(true)} text="Squawk" />,
+      <Button key="Share" style={btnStyle} className="pt-intent-success" onClick={() => saveaction(true)} text="Share" />,
       <Button key="Save" style={btnStyle} className="pt-intent-primary" onClick={() => saveaction(false)} text="Save" />
     ]
 
@@ -126,7 +126,7 @@ export class PopupPanel extends React.Component<PopupPanelProps, PopupPanelState
     let rowStyle = { marginBottom: 10 };
     let btns = [
       <Button key="Settings" style={btnStyle} className="pt-intent-success" onClick={settingsAction} text="Settings" />,
-      <Button key="Investments" style={btnStyle} className="pt-intent-success" onClick={linksAction} text="Squawks" />,
+      <Button key="Shares" style={btnStyle} className="pt-intent-success" onClick={linksAction} text="Shares" />,
       //<Button key="People" style={btnStyle} className="pt-intent-success" onClick={usersAction} text="People" />,
       <Button key="Contents" style={btnStyle} className="pt-intent-success" onClick={contentsAction} text="Contents" />,
     ]

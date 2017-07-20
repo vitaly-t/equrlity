@@ -16,17 +16,18 @@ import { YesNoBox } from '../lib/dialogs';
 import { sendApiRequest } from '../lib/axiosClient';
 
 import { LinkEditor } from './linkEditor';
+import { FeedsPanel } from './feeds';
 import { AppState, postDeserialize } from "./AppState";
 import * as Chrome from './chrome';
 
 interface LinksPageProps { appState: AppState };
-interface LinksPageState { transferAmount: number, transferTo: string, editingItem: Rpc.UserLinkItem, filters: string[], feedFilters: string[], confirmDismissAll: boolean };
+interface LinksPageState { transferAmount: number, transferTo: string, editingItem: Rpc.UserLinkItem, filters: string[] };
 
 export class LinksPage extends React.Component<LinksPageProps, LinksPageState> {
 
   constructor(props: LinksPageProps) {
     super(props);
-    this.state = { transferAmount: 0, transferTo: '', editingItem: null, filters: [], feedFilters: [], confirmDismissAll: false };
+    this.state = { transferAmount: 0, transferTo: '', editingItem: null, filters: [] };
   }
 
   changeTransferAmount(value: string) { this.setState({ transferAmount: parseInt(value) }); }
@@ -47,32 +48,24 @@ export class LinksPage extends React.Component<LinksPageProps, LinksPageState> {
     this.setState({ filters });
   }
 
-  addFeedFilter(f: string) {
-    let feedFilters = this.state.feedFilters;
-    if (feedFilters.indexOf(f) < 0) {
-      feedFilters = [...feedFilters, f];
-      this.setState({ feedFilters });
-    }
-  }
-
-  removeFeedFilter(f: string) {
-    let feedFilters = [...this.state.feedFilters];
-    let i = feedFilters.indexOf(f);
-    if (i >= 0) feedFilters.splice(i, 1);
-    this.setState({ feedFilters });
-  }
-
   render() {
     let st = this.props.appState;
     let invs = st.investments;
-    let invdiv = <p>You have no current squawks.</p>
+    let invdiv = <p>You have no current Shares.</p>
     let btnStyle = { marginRight: "5px" };
     if (this.state.editingItem) {
       let onClose = () => this.setState({ editingItem: null });
       invdiv = <LinkEditor info={this.state.editingItem} allTags={this.props.appState.allTags} onClose={onClose} />
     }
     else if (invs.length > 0) {
-      let invrows = invs.map(item => {
+      let tagfilter = (tags: string[]): boolean => {
+        if (!tags) tags = [];
+        let fltrs = this.state.filters;
+        for (let f of fltrs) if (tags.indexOf(f) < 0) return false;
+        return true;
+      }
+
+      let invrows = invs.filter(f => tagfilter(f.link.tags)).map(item => {
         let l = item.link
         let linkId = l.linkId;
         let url = Utils.linkToUrl(linkId, l.title);
@@ -133,96 +126,7 @@ export class LinksPage extends React.Component<LinksPageProps, LinksPageState> {
       );
     }
 
-    let links = st.feed;
-    let linkdiv = <p>There are no current squawks for you.</p>
-    let filteredLinks: Rpc.FeedItem[] = []
-    if (links.length > 0) {
-      let tagfilter = (tags: string[], source: string): boolean => {
-        if (!tags) tags = [];
-        let fltrs = this.state.feedFilters;
-        for (let f of fltrs) if (tags.indexOf(f) < 0 && f !== source) return false;
-        return true;
-      }
-      filteredLinks = links.filter(f => tagfilter(f.tags, f.source));
-      let linkrows = filteredLinks.map(f => {
-        let { url, comment, source, type } = f
-        let dismiss = () => { Chrome.sendMessage({ eventType: "DismissSquawks", urls: [url] }); };
-        let save = () => { Chrome.sendMessage({ eventType: "DismissSquawks", urls: [url], save: true }); };
-        let onclick = () => { chrome.tabs.create({ active: true, url }); };
-        let tags = <Tags.TagGroup tags={f.tags} onClick={(s) => this.addFeedFilter(s)} />;
-
-        let btngrp = (
-          <div className="pt-button-group pt-vertical pt-align-left pt-large">
-            <Button onClick={save} text="Bookmark" />
-            <Button onClick={dismiss} text="Dismiss" />
-          </div>
-        );
-
-        let pop = (<Popover content={btngrp} popoverClassName="pt-minimal" interactionKind={PopoverInteractionKind.HOVER} position={Position.BOTTOM} >
-          <Button iconName="pt-icon-cog" text="" />
-        </Popover>
-        );
-
-        return (
-          <tr key={url} >
-            <td>{type}</td>
-            <td><a href="" onClick={onclick} >{url}</a></td>
-            <td><Tags.TagGroup tags={[source]} onClick={(s) => this.addFeedFilter(s)} /></td>
-            <td>{comment}</td>
-            <td>{tags}</td>
-            <td>{pop}</td>
-          </tr>
-        );
-      });
-      linkdiv = (
-        <table className="pt-table pt-striped pt-bordered">
-          <thead>
-            <tr>
-              <th>Type</th>
-              <th>Link</th>
-              <th>Source</th>
-              <th>Comment</th>
-              <th>Tags</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {linkrows}
-          </tbody>
-        </table>
-      );
-    }
-
-    let dismissAll = () => {
-      this.setState({ confirmDismissAll: true });
-    }
-    let saveAll = () => {
-      let urls = filteredLinks.map(r => r.url);
-      this.setState({ feedFilters: [] });
-      Chrome.sendMessage({ eventType: "DismissSquawks", urls, save: true });
-    }
     let vsp = <div style={{ height: "20px" }} />;
-    let feedFltrDiv;
-    if (this.state.confirmDismissAll) {
-      let msg = `Dismiss all ${filteredLinks.length} squawks?`;
-      let onClose = () => this.setState({ confirmDismissAll: false });
-      let onYes = () => {
-        let urls = filteredLinks.map(r => r.url)
-        this.setState({ feedFilters: [] });
-        Chrome.sendMessage({ eventType: "DismissSquawks", urls });
-      };
-      feedFltrDiv = <YesNoBox message={msg} onYes={onYes} onClose={onClose} />
-    }
-    else {
-      let cols = [];
-      cols.push(<Col key="saveAll" ><Button disabled={filteredLinks.length === 0} className="pt-intent-success" style={btnStyle} onClick={saveAll} text="Bookmark All" /></Col>)
-      cols.push(<Col key="dismissAll" ><Button disabled={filteredLinks.length === 0} className="pt-intent-danger" style={btnStyle} onClick={dismissAll} text="Dismiss All" /></Col>)
-      if (this.state.feedFilters.length > 0) {
-        let feedFltrs = <Tags.TagGroup tags={this.state.feedFilters} onRemove={(s) => this.removeFeedFilter(s)} />;
-        cols.push(<Col key="feedFilters" ><Row>Showing :  {feedFltrs}</Row></Col>);
-      }
-      feedFltrDiv = <Row>{cols}</Row>;
-    }
 
     let fltrDiv = null;
     if (this.state.filters.length > 0) {
@@ -245,7 +149,7 @@ export class LinksPage extends React.Component<LinksPageProps, LinksPageState> {
     let transferDiv = (
       <div>
         {vsp}
-        <p>If you wish, you can transfer PseudoQoins to another user.</p>
+        <p>If you wish, you can transfer credits to another user.</p>
         <div style={divStyle} >
           <div style={{ display: 'inline' }}>Amount to Transfer: </div>
           <input type="number" style={{ display: 'inline', height: 24, marginLeft: 20, marginTop: 6, width: '100px' }}
@@ -259,18 +163,13 @@ export class LinksPage extends React.Component<LinksPageProps, LinksPageState> {
 
     return (
       <div style={{ margin: "16px" }}>
-        <h4>Feed: </h4>
-        {vsp}
-        {feedFltrDiv}
-        {vsp}
-        {linkdiv}
-        {vsp}
-        <h4>Squawks: </h4>
+        <FeedsPanel appState={st} />
+        <h4>Shares: </h4>
         {fltrDiv}
         {vsp}
         {invdiv}
         {vsp}
-        <h6>Your Current Wallet Balance is : {st.credits} PseudoQoins.</h6>
+        <h6>Your Current Wallet Balance is : {st.credits} credits.</h6>
         {transferDiv}
         {vsp}
       </div>);

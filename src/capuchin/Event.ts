@@ -11,9 +11,13 @@ import * as Utils from '../lib/utils';
 import { TagSelectOption } from '../lib/tags';
 import { sendAuthRequest, extractResult } from '../lib/axiosClient';
 
-export interface PromoteContent {
-  eventType: "PromoteContent";
-  req: Rpc.PromoteContentRequest;
+export interface Initialize {
+  eventType: "Initialize";
+}
+
+export interface ShareContent {
+  eventType: "ShareContent";
+  req: Rpc.ShareContentRequest;
 }
 
 export interface BookmarkLink {
@@ -22,11 +26,7 @@ export interface BookmarkLink {
   title: string;
   comment: string;
   tags?: string[];
-  squawk?: boolean;
-}
-
-export interface Initialize {
-  eventType: "Initialize";
+  share?: boolean;
 }
 
 export interface Load {
@@ -88,9 +88,9 @@ export interface SaveTags {
   tags: string[];
 }
 
-export interface DismissSquawks {
-  eventType: "DismissSquawks";
-  urls: Dbt.urlString[];
+export interface DismissFeeds {
+  eventType: "DismissFeeds";
+  feeds: Rpc.FeedItem[];
   save?: boolean;
 }
 
@@ -103,8 +103,8 @@ export interface Thunk {
   fn: (st: AppState) => AppState;
 }
 
-export type Message = PromoteContent | BookmarkLink | Initialize | Load | ActivateTab | Render | ChangeSettings
-  | LaunchPage | SaveContent | RemoveContent | AddContents | DismissSquawks | UpdateFeed
+export type Message = ShareContent | BookmarkLink | Initialize | Load | ActivateTab | Render | ChangeSettings
+  | LaunchPage | SaveContent | RemoveContent | AddContents | DismissFeeds | UpdateFeed
   | GetUserLinks | DismissPromotion | TransferCredits | Thunk;
 
 export function getTab(tabId: number): Promise<chrome.tabs.Tab> {
@@ -158,20 +158,6 @@ export namespace AsyncHandlers {
     return result;
   }
 
-  export async function initialize(state: AppState): Promise<(st: AppState) => AppState> {
-    const rsp = await Comms.sendInitialize(state)
-    let activeTab = await currentTab()
-    let thunk = (st: AppState) => {
-      st = extractHeadersToState(st, rsp);
-      let rslt: Rpc.InitializeResponse = extractResult(rsp);
-      let { profile_pic, feed } = rslt
-      if (rslt.redirectUrl) chrome.tabs.update(activeTab.id, { url: rslt.redirectUrl });
-      chrome.browserAction.setBadgeText({ text: feed.length.toString() });
-      return { ...st, activeTab, profile_pic, feed }
-    }
-    return thunk;
-  }
-
   export async function updateFeed(state: AppState): Promise<(st: AppState) => AppState> {
     const rsp = await Comms.sendUpdateFeed(state)
     let thunk = (st: AppState) => {
@@ -184,34 +170,24 @@ export namespace AsyncHandlers {
     return thunk;
   }
 
-  export async function dismissSquawks(state: AppState, urls: Dbt.urlString[], save?: boolean): Promise<(st: AppState) => AppState> {
-    let rsp = await Comms.sendDismissSquawks(state, urls, save);
-    let rsp2;
-    if (save) rsp2 = await Comms.sendGetUserContents(state);
+  export async function dismissFeeds(state: AppState, items: Rpc.FeedItem[], save?: boolean): Promise<(st: AppState) => AppState> {
+    let urls = items.filter(i => i.type === "share").map(i => i.url);
+    Comms.sendDismissFeeds(state, urls, save);
     let thunk = (st: AppState) => {
-      st = extractHeadersToState(st, rsp);
-      let rslt: Rpc.DismissSquawksResponse = extractResult(rsp);
-      if (rslt.ok) {
-        let feed = st.feed.filter(f => urls.indexOf(f.url) < 0);
-        chrome.browserAction.setBadgeText({ text: feed.length.toString() });
-        st = { ...st, feed }
-        if (save) {
-          st = extractHeadersToState(st, rsp2);
-          let rslt2: Rpc.GetUserContentsResponse = extractResult(rsp2);
-          let contents = rslt2.contents;
-          st = { ...st, contents }
-        }
-      }
+      let ids = items.filter(i => i.id ? true : false).map(i => i.id);
+      let feed = st.feed.filter(f => f.id && ids.indexOf(f.id) < 0);
+      chrome.browserAction.setBadgeText({ text: feed.length.toString() });
+      st = { ...st, feed }
       return st;
     }
     return thunk;
   }
 
-  export async function promoteContent(state: AppState, req: Rpc.PromoteContentRequest): Promise<(st: AppState) => AppState> {
-    let response = await Comms.sendPromoteContent(state, req)
+  export async function shareContent(state: AppState, req: Rpc.ShareContentRequest): Promise<(st: AppState) => AppState> {
+    let response = await Comms.sendShareContent(state, req)
     let thunk = (st: AppState) => {
       st = extractHeadersToState(st, response);
-      let rslt: Rpc.PromoteContentResponse = extractResult(response);
+      let rslt: Rpc.ShareContentResponse = extractResult(response);
       if (rslt.link) {
         let { investments } = st
         let inv: Rpc.UserLinkItem = { link: rslt.link, linkDepth: 0, viewCount: 0, promotionsCount: 0, deliveriesCount: 0 };
@@ -245,8 +221,8 @@ export namespace AsyncHandlers {
   }
 
   export async function bookmarkLink(state: AppState, req: BookmarkLink): Promise<(st: AppState) => AppState> {
-    let { url, title, comment, tags, squawk } = req;
-    let response = await Comms.sendBookmarkLink(state, url, title, comment, tags, squawk)
+    let { url, title, comment, tags, share } = req;
+    let response = await Comms.sendBookmarkLink(state, url, title, comment, tags, share)
     let thunk = (st: AppState) => {
       st = extractHeadersToState(st, response);
       let rslt: Rpc.BookmarkLinkResponse = extractResult(response);

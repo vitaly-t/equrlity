@@ -75,7 +75,7 @@ export class LinkEditor extends React.Component<LinkEditorProps, LinkEditorState
     }
     let lspan = 2;
     return (
-      <Dialog iconName="inbox" style={{ width: '600px' }} isOpen={this.state.isOpen} title={"Edit Squawk Details"} canOutsideClickClose={false} onClose={() => this.close()} >
+      <Dialog iconName="inbox" style={{ width: '600px' }} isOpen={this.state.isOpen} title={"Edit Share Details"} canOutsideClickClose={false} onClose={() => this.close()} >
         <div className="pt-elevation-0" style={{ width: "100%", height: "100%", backgroundColor: "#F5F8FA" }}>
           <div style={{ margin: '15px' }}>
             <Row style={rowStyle} gutter={gutter}>

@@ -17,7 +17,7 @@ export const serverUrl =
 export const chromeAuthUrl = "https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=";
 
 export function capuchinVersion() {
-  return "0.9.8.2";
+  return "0.9.8.8";
 }
 
 export function sleep(millisecs: number) {
@@ -188,7 +188,14 @@ export function binaryIndexOf(searchElement, arr) {
   return -1;
 }
 
-export function defaultPaymentSchedule(): Dbt.integer[] {
-  return [2, 4, 8, 16, 32, 64, 128, 256, 512];   // res(o)nate schedule
+export function defaultPaymentSchedule(): Dbt.paymentSchedule {
+  return [-4, -2, 4, 8, 16, 32, 64, 128];
+}
+
+export function paymentScheduleFromLink(link: Dbt.Link): Dbt.paymentSchedule {
+  let { paymentSchedule } = link
+  if (!paymentSchedule) return null;
+  let max = link.amount;
+  return paymentSchedule.map(i => max + i < 0 ? -max : i)
 }
 

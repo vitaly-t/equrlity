@@ -53,7 +53,7 @@ it("should work using direct calls", async () => {
   //let publicKey = await Crypto.getPublicKeyJWK(pr);
 
   let preq1: Rpc.BookmarkLinkRequest = { comment: "great comment", tags: [], url: "https://www.example.com/anydamnthing", signature: "", title: "wow awesome link" };
-  let rsp1 = await pg.bookmarkAndPromoteLink(u1.userId, preq1);
+  let rsp1 = await pg.bookmarkAndShareLink(u1.userId, preq1);
   expect(rsp1.link).toBeDefined("promote link call failed");
   expect(cache.users.get(u1.userId).credits).toEqual(1000);
   expect(await countLinks()).toEqual(1);
@@ -62,7 +62,7 @@ it("should work using direct calls", async () => {
   expect(link1).toBeDefined("cache error on link1");
 
   let preq2: Rpc.BookmarkLinkRequest = { comment: "another great comment", tags: [], url: Utils.linkToUrl(rsp1.link.linkId, ''), signature: "", title: "promote me baby" };
-  let rsp2 = await pg.bookmarkAndPromoteLink(u2.userId, preq2);
+  let rsp2 = await pg.bookmarkAndShareLink(u2.userId, preq2);
   expect(await countLinks()).toEqual(2);
   expect(rsp2.link).toBeDefined("promote call failed");
   expect(cache.users.get(u2.userId).credits).toEqual(1000);
@@ -77,7 +77,7 @@ it("should work using direct calls", async () => {
 
   {  // new let namespace
     let preq3: Rpc.BookmarkLinkRequest = { comment: "groovy", tags: [], url: "https://www.example.com/somethingelse", signature: "", title: "yaa!!" };
-    let rsp = await pg.bookmarkAndPromoteLink(u1.userId, preq3);
+    let rsp = await pg.bookmarkAndShareLink(u1.userId, preq3);
     expect(await countLinks()).toEqual(3);
 
     expect(rsp.link).toBeDefined("add handlePromoteLink call failed");
@@ -100,7 +100,7 @@ it("should work using direct calls", async () => {
 
     expect(cache.userlinks.get(u1.userId).length).toEqual(1, "social graph not correct");
     let preq4: Rpc.BookmarkLinkRequest = { comment: "groovy baby", tags: [], url: format(url), signature: "", title: "yaa2  !!" };
-    let rsp2 = await pg.bookmarkAndPromoteLink(u3.userId, preq4);
+    let rsp2 = await pg.bookmarkAndShareLink(u3.userId, preq4);
     expect(rsp2.link).toBeDefined("Promote call failed");
     expect(cache.userlinks.get(u1.userId).length).toEqual(2, "social graph not extended");
     {
@@ -117,7 +117,7 @@ it("should work using direct calls", async () => {
 
     // redeem link  testing - re-grafting now removed.  just move balance out of link.
     let preq5: Rpc.BookmarkLinkRequest = { comment: "groovy baby", tags: [], url: Utils.linkToUrl(rsp.link.linkId, ''), signature: "", title: "yaal3!!" };
-    let rsp3 = await pg.bookmarkAndPromoteLink(u4.userId, preq5);
+    let rsp3 = await pg.bookmarkAndShareLink(u4.userId, preq5);
     expect(rsp3.link).toBeDefined("promote call failed");
     expect(rsp3.link.prevLink).toEqual(rsp.link.linkId);
 
@@ -149,8 +149,8 @@ it("should work for blobs", async () => {
 
 
   let sched = [-10, -5, 100];
-  let req: Rpc.PromoteContentRequest = { contentId: rsp.contentId, title: '', comment: '', tags: [], amount: 100, signature: '', paymentSchedule: sched };
-  let rsp2 = await pg.handlePromoteContent(u.userId, req);
+  let req: Rpc.ShareContentRequest = { contentId: rsp.contentId, title: '', comment: '', tags: [], amount: 100, signature: '', paymentSchedule: sched };
+  let rsp2 = await pg.handleShareContent(u.userId, req);
 
   let u2 = await pg.createUser();
   {

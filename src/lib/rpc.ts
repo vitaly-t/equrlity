@@ -60,19 +60,21 @@ import * as Dbt from './datatypes';
  * The available json-rpc methods of the PseudoQURL API.  
  */
 
-export type Method = "initialize" | "authenticate" | "promoteContent" | "bookmarkLink" | "loadLink" | "getRedirect" | "changeSettings"
+export type Method = "initialize" | "authenticate" | "shareContent" | "bookmarkLink" | "loadLink" | "getRedirect" | "changeSettings"
   | "getUserContents" | "loadContent" | "getUserSettings" | "getUserLinks" | "redeemLink" | "saveContent" | "saveLink" | "removeContent" | "transferCredits"
-  | "aditComment" | "dismissSquawks" | "updateFeed" | "cachePeaks" | "payForView";
+  | "aditComment" | "dismissFeeds" | "updateFeed" | "cachePeaks" | "payForView";
 
 export type UrlString = string;
 export type Integer = number;
 
 export type InitializeRequest = {
   publicKey: JsonWebKey;
+  last_feed?: string;
 }
 
 export type FeedItem = {
-  type: "squawk" | "comment";
+  type: "share" | "comment";
+  id: string;
   created: Dbt.timestamp;
   source: Dbt.userName;
   url: Dbt.urlString;
@@ -85,6 +87,8 @@ export type InitializeResponse = {
   profile_pic: Dbt.db_hash;
   redirectUrl?: UrlString;
   feed: FeedItem[];
+  allTags: Dbt.tag[];   // temporary (hopefully)
+  last_feed: string;
 }
 
 export type UpdateFeedRequest = {}
@@ -92,7 +96,7 @@ export type UpdateFeedResponse = {
   feed: FeedItem[];
 }
 
-export type PromoteContentRequest = {
+export type ShareContentRequest = {
   contentId: Dbt.contentId;
   title: string;
   comment: string;
@@ -102,7 +106,7 @@ export type PromoteContentRequest = {
   paymentSchedule: Integer[];
 }
 
-export type PromoteContentResponse = {
+export type ShareContentResponse = {
   link: Dbt.Link;
 }
 
@@ -122,6 +126,7 @@ export type LoadContentResponse = {
   streamNumber: number;
   peaks?: boolean;
   linkDepth: Dbt.integer;
+  credits: Dbt.integer;
 }
 
 export type AditCommentRequest = {
@@ -143,7 +148,7 @@ export type BookmarkLinkRequest = {
   comment: string;
   tags: string[];
   signature: string;
-  squawk?: boolean;
+  share?: boolean;
   amount?: number;
 }
 
@@ -224,9 +229,9 @@ export type AuthenticateRequest = { provider: string; }
 
 export type AuthenticateResponse = { ok: boolean; }
 
-export type DismissSquawksRequest = { urls: Dbt.urlString[]; save?: boolean; }
+export type DismissFeedsRequest = { urls: Dbt.urlString[]; save?: boolean; }
 
-export type DismissSquawksResponse = { ok: boolean; }
+export type DismissFeedsResponse = { ok: boolean; }
 
 export type CachePeaksRequest = { contentId: Dbt.contentId; peaks: Dbt.text; }
 
@@ -234,27 +239,27 @@ export type CachePeaksResponse = { ok: boolean; }
 
 export type PayForViewRequest = { linkId: Dbt.linkId; purchase?: boolean, amount: Dbt.integer }
 
-export type PayForViewResponse = { ok: boolean; content?: Dbt.Content }
+export type PayForViewResponse = { ok: boolean; }
 
-export type RequestBody = PromoteContentRequest | BookmarkLinkRequest | InitializeRequest | LoadLinkRequest | ChangeSettingsRequest
+export type RequestBody = ShareContentRequest | BookmarkLinkRequest | InitializeRequest | LoadLinkRequest | ChangeSettingsRequest
   | GetUserContentsRequest | GetUserLinksRequest | RedeemLinkRequest | SaveLinkRequest | SaveContentRequest | LoadContentRequest | RemoveContentRequest
-  | TransferCreditsRequest | AuthenticateRequest | AditCommentRequest | GetUserSettingsRequest | DismissSquawksRequest | UpdateFeedRequest
+  | TransferCreditsRequest | AuthenticateRequest | AditCommentRequest | GetUserSettingsRequest | DismissFeedsRequest | UpdateFeedRequest
   | CachePeaksRequest | PayForViewRequest;
 
-export type ResponseBody = PromoteContentResponse & BookmarkLinkResponse & InitializeResponse & LoadLinkResponse & ChangeSettingsResponse
+export type ResponseBody = ShareContentResponse & BookmarkLinkResponse & InitializeResponse & LoadLinkResponse & ChangeSettingsResponse
   & GetUserContentsResponse & GetUserLinksResponse & RedeemLinkResponse & SaveLinkResponse & SaveContentResponse & LoadContentResponse & RemoveContentResponse
-  & TransferCreditsResponse & AuthenticateResponse & AditCommentResponse & GetUserSettingsResponse & DismissSquawksResponse & UpdateFeedResponse
+  & TransferCreditsResponse & AuthenticateResponse & AditCommentResponse & GetUserSettingsResponse & DismissFeedsResponse & UpdateFeedResponse
   & CachePeaksResponse & PayForViewResponse;
 
 // internal to server.
-export type RecvRequestBody = PromoteContentRequest & BookmarkLinkRequest & InitializeRequest & LoadLinkRequest & ChangeSettingsRequest
+export type RecvRequestBody = ShareContentRequest & BookmarkLinkRequest & InitializeRequest & LoadLinkRequest & ChangeSettingsRequest
   & GetUserContentsRequest & GetUserLinksRequest & RedeemLinkRequest & SaveLinkRequest & SaveContentRequest & LoadContentRequest & RemoveContentRequest
-  & TransferCreditsRequest & AuthenticateRequest & AditCommentRequest & GetUserSettingsRequest & DismissSquawksRequest & UpdateFeedRequest
+  & TransferCreditsRequest & AuthenticateRequest & AditCommentRequest & GetUserSettingsRequest & DismissFeedsRequest & UpdateFeedRequest
   & CachePeaksRequest & PayForViewRequest;
 
-export type SendResponseBody = PromoteContentResponse | BookmarkLinkResponse | InitializeResponse | LoadLinkResponse | ChangeSettingsResponse
+export type SendResponseBody = ShareContentResponse | BookmarkLinkResponse | InitializeResponse | LoadLinkResponse | ChangeSettingsResponse
   | GetUserContentsResponse | GetUserLinksResponse | RedeemLinkResponse | SaveLinkResponse | SaveContentResponse | LoadContentResponse | RemoveContentResponse
-  | TransferCreditsResponse | AuthenticateResponse | AditCommentResponse | GetUserSettingsResponse | DismissSquawksResponse | UpdateFeedResponse
+  | TransferCreditsResponse | AuthenticateResponse | AditCommentResponse | GetUserSettingsResponse | DismissFeedsResponse | UpdateFeedResponse
   | CachePeaksResponse | PayForViewResponse;
 
 export type Handler<Request, Response> = (req: Request) => Promise<Response>;

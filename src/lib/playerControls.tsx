@@ -248,7 +248,7 @@ export class VolumeSlider extends React.Component<VolumeSliderProps, {}> {
 }
 
 export interface PlayBackControlsProps {
-  height: number, isPlaying: boolean, isMuted: boolean, volume: number, onVolumeChange: (v: number) => void,
+  height: number, isPlaying: boolean, isMuted: boolean, volume: number, onVolumeChange: (v: number) => void
   showPrevious: boolean, hasPrevious: boolean, onPrevious?: () => void,
   showNext: boolean, hasNext: boolean, onNext?: () => void,
   onPlay: () => void, onPause: () => void, onToggleMute: () => void

@@ -166,7 +166,7 @@ export class ContentsPage extends React.Component<ContentsPageProps, ContentsPag
     }
     else if (this.state.promotingContent) {
       let onClose = () => this.setState({ promotingContent: null });
-      contsdiv = <PromoteContent info={this.state.promotingContent} allTags={this.props.appState.allTags} onClose={onClose} />
+      contsdiv = <ShareContent info={this.state.promotingContent} allTags={this.props.appState.allTags} onClose={onClose} />
     }
     else if (this.state.editingContent) {
       let onClose = () => this.setState({ editingContent: null });
@@ -185,8 +185,8 @@ export class ContentsPage extends React.Component<ContentsPageProps, ContentsPag
 
         let btns = [];
 
-        let promote = () => { this.setState({ promotingContent: p }) };
-        btns.push(<Button key="promote" onClick={promote} text="Squawk" />);
+        let share = () => { this.setState({ promotingContent: p }) };
+        btns.push(<Button key="share" onClick={share} text="Share" />);
 
         let edit = () => { this.setState({ editingContent: p }) };
         btns.push(<Button key="edit" onClick={edit} text="Edit" />);
@@ -220,7 +220,6 @@ export class ContentsPage extends React.Component<ContentsPageProps, ContentsPag
             <td><Tags.TagGroup tags={[p.contentType]} onClick={(s) => this.addFilter(s)} /></td>
             <td><a href={url} target="_blank" >{url}</a></td>
             <td>{p.title}</td>
-            <td><Checkbox disabled checked={p.isPublic} /></td>
             <td>{tags}</td>
             <td>{pop}</td>
           </tr>
@@ -233,7 +232,6 @@ export class ContentsPage extends React.Component<ContentsPageProps, ContentsPag
               <th>Type</th>
               <th>Link</th>
               <th>Title</th>
-              <th>Public?</th>
               <th>Tags</th>
               <th>Actions</th>
             </tr>
@@ -298,11 +296,11 @@ export class ContentsPage extends React.Component<ContentsPageProps, ContentsPag
   }
 }
 
-interface PromoteContentProps { info: Dbt.Content, allTags: Tags.TagSelectOption[], onClose: () => void }
-interface PromoteContentState { title: string, comment: string, tags: string[], isOpen: boolean, amount: number, stringSchedule: string }
-class PromoteContent extends React.Component<PromoteContentProps, PromoteContentState> {
+interface ShareContentProps { info: Dbt.Content, allTags: Tags.TagSelectOption[], onClose: () => void }
+interface ShareContentState { title: string, comment: string, tags: string[], isOpen: boolean, amount: number, stringSchedule: string }
+class ShareContent extends React.Component<ShareContentProps, ShareContentState> {
 
-  constructor(props: PromoteContentProps) {
+  constructor(props: ShareContentProps) {
     super(props);
     let tags = props.info.tags || [];
     tags.unshift(props.info.contentType);
@@ -351,15 +349,15 @@ class PromoteContent extends React.Component<PromoteContentProps, PromoteContent
       }
     }
     let info = this.props.info;
-    let req: Rpc.PromoteContentRequest = { contentId: info.contentId, title, comment, tags, amount, signature: '', paymentSchedule };
-    Chrome.sendMessage({ eventType: "PromoteContent", req });
+    let req: Rpc.ShareContentRequest = { contentId: info.contentId, title, comment, tags, amount, signature: '', paymentSchedule };
+    Chrome.sendMessage({ eventType: "ShareContent", req });
     this.close();
   }
 
   public render() {
     if (!this.state.isOpen) return null;
     let pubdiv = null;
-    let ttl = "Promote Content"
+    let ttl = "Share Content"
     let invdiv = null;
     if (this.props.info.contentType !== 'bookmark') {
       let schedule = this.state.stringSchedule;
@@ -394,7 +392,7 @@ class PromoteContent extends React.Component<PromoteContentProps, PromoteContent
         <div className="pt-dialog-footer">
           <div className="pt-dialog-footer-actions">
             <Button text="Cancel" onClick={() => this.close()} />
-            <Button intent={Intent.PRIMARY} onClick={() => this.save()} text="Promote" />
+            <Button intent={Intent.PRIMARY} onClick={() => this.save()} text="Share" />
           </div>
         </div>
       </Dialog >
