@@ -44,11 +44,6 @@ export interface Render {
   appState: AppState;
 }
 
-export interface ChangeSettings {
-  eventType: "ChangeSettings";
-  settings: Rpc.ChangeSettingsRequest;
-}
-
 export interface LaunchPage {
   eventType: "LaunchPage";
   page: string;
@@ -74,10 +69,6 @@ export interface TransferCredits {
   req: Rpc.TransferCreditsRequest;
 }
 
-export interface GetUserLinks {
-  eventType: "GetUserLinks";
-}
-
 export interface DismissPromotion {
   eventType: "DismissPromotion";
   url: Dbt.urlString;
@@ -94,18 +85,13 @@ export interface DismissFeeds {
   save?: boolean;
 }
 
-export interface UpdateFeed {
-  eventType: "UpdateFeed";
-}
-
 export interface Thunk {
   eventType: "Thunk";
   fn: (st: AppState) => AppState;
 }
 
-export type Message = ShareContent | BookmarkLink | Initialize | Load | ActivateTab | Render | ChangeSettings
-  | LaunchPage | SaveContent | RemoveContent | AddContents | DismissFeeds | UpdateFeed
-  | GetUserLinks | DismissPromotion | TransferCredits | Thunk;
+export type Message = ShareContent | BookmarkLink | Initialize | Load | ActivateTab | Render
+  | LaunchPage | SaveContent | RemoveContent | AddContents | DismissFeeds | DismissPromotion | TransferCredits | Thunk;
 
 export function getTab(tabId: number): Promise<chrome.tabs.Tab> {
   return new Promise((resolve, reject) => {
@@ -134,40 +120,25 @@ async function currentTab(): Promise<chrome.tabs.Tab> {
 }
 
 function extractHeadersToState(st: AppState, rsp: AxiosResponse): AppState {
-  let credits = parseInt(rsp.headers['x-psq-credits']);
-  let moniker = rsp.headers['x-psq-moniker'];
+  //let credits = parseInt(rsp.headers['x-psq-credits']);
+  //let moniker = rsp.headers['x-psq-moniker'];
 
   let jwt = rsp.headers['x-psq-token'];
   if (!st.jwt && !jwt) throw new Error("Expected token but none received");
   jwt = jwt || st.jwt;
-  let email = rsp.headers['x-psq-email'] || st.email;
-  let authprov = rsp.headers['x-psq-authprov'] || st.authprov;
-  let homePage = rsp.headers['x-psq-homepage'] || st.homePage;
 
-  return { ...st, credits, moniker, jwt, email, authprov, homePage };
+  return { ...st, jwt };
 }
 
 export namespace AsyncHandlers {
 
-  export async function authenticate(userInfo: chrome.identity.UserInfo, authToken: string, publicKey: JsonWebKey): Promise<string> {
-    const response = await sendAuthRequest({ userInfo, publicKey }, "Bearer " + authToken);
+  export async function authenticate(provider: Dbt.authProvider, userInfo: chrome.identity.UserInfo, authToken: string, publicKey: JsonWebKey): Promise<string> {
+    const response = await sendAuthRequest({ provider, userInfo, publicKey }, "Bearer " + authToken);
     let result = "";
     if (response.status === 200) {
       result = response.data.jwt;
     }
     return result;
-  }
-
-  export async function updateFeed(state: AppState): Promise<(st: AppState) => AppState> {
-    const rsp = await Comms.sendUpdateFeed(state)
-    let thunk = (st: AppState) => {
-      st = extractHeadersToState(st, rsp);
-      let rslt: Rpc.UpdateFeedResponse = extractResult(rsp);
-      let { feed } = rslt
-      chrome.browserAction.setBadgeText({ text: feed.length.toString() });
-      return { ...st, feed }
-    }
-    return thunk;
   }
 
   export async function dismissFeeds(state: AppState, items: Rpc.FeedItem[], save?: boolean): Promise<(st: AppState) => AppState> {
@@ -189,10 +160,10 @@ export namespace AsyncHandlers {
       st = extractHeadersToState(st, response);
       let rslt: Rpc.ShareContentResponse = extractResult(response);
       if (rslt.link) {
-        let { investments } = st
-        let inv: Rpc.UserLinkItem = { link: rslt.link, linkDepth: 0, viewCount: 0, promotionsCount: 0, deliveriesCount: 0 };
-        investments = [inv, ...investments];
-        st = { ...st, investments };
+        let { shares } = st
+        let inv: Rpc.UserLinkItem = { link: rslt.link, linkDepth: 0, viewCount: 0 };
+        shares = [inv, ...shares];
+        st = { ...st, shares };
       }
       return st;
     };
@@ -234,9 +205,9 @@ export namespace AsyncHandlers {
         st = { ...st, contents };
       }
       if (rslt.link) {
-        let inv: Rpc.UserLinkItem = { link: rslt.link, linkDepth: 0, promotionsCount: 0, viewCount: 0, deliveriesCount: 0 }
-        let investments = [inv, ...st.investments];
-        st = { ...st, investments };
+        let inv: Rpc.UserLinkItem = { link: rslt.link, linkDepth: 0, viewCount: 0 }
+        let shares = [inv, ...st.shares];
+        st = { ...st, shares };
       }
       let { links } = st
       // links.set(url, rslt.content)
@@ -244,31 +215,6 @@ export namespace AsyncHandlers {
       return { ...st, links };
     };
     return thunk;
-  }
-
-  export async function getUserLinks(state: AppState): Promise<(st: AppState) => AppState> {
-    let response = await Comms.sendGetUserLinks(state);
-    return (st: AppState) => {
-      st = extractHeadersToState(st, response);
-      let rslt: Rpc.GetUserLinksResponse = extractResult(response);
-      let promotions = st.promotions;
-      let investments = rslt.links;
-      let { connectedUsers, reachableUserCount } = rslt;
-      if (rslt.promotions.length > 0) promotions = [...promotions, ...rslt.promotions];
-      st = { ...st, investments, promotions, connectedUsers, reachableUserCount };
-      return st;
-    };
-  }
-
-  export async function getUserContents(state: AppState): Promise<(st: AppState) => AppState> {
-    let response = await Comms.sendGetUserContents(state);
-    return (st: AppState) => {
-      st = extractHeadersToState(st, response);
-      let rslt: Rpc.GetUserContentsResponse = extractResult(response);
-      let { contents } = rslt;
-      st = { ...st, contents };
-      return st;
-    };
   }
 
   export async function load(state: AppState, curl_: string): Promise<(st: AppState) => AppState> {
@@ -287,48 +233,13 @@ export namespace AsyncHandlers {
       st = { ...st, activeUrl: curl };
       if (rslt.content) {
         let links = st.links;
-        //links.set(curl, rslt.content)
         links[curl] = rslt.content;
         chrome.browserAction.setBadgeBackgroundColor({ color: "#2EE6D6", tabId: activeTab.id });
-        //chrome.browserAction.getBadgeText({}, s => { if (!s) chrome.browserAction.setBadgeText({ text: "0", tabId: activeTab.id }); })
 
         st = { ...st, links };  // not really doing anything but shows correct form ...
       }
       return st;
     };
-    return thunk;
-  }
-
-  export async function changeSettings(state: AppState, settings: Rpc.ChangeSettingsRequest): Promise<(st: AppState) => AppState> {
-    const response = await Comms.sendChangeSettings(state, settings);
-    let thunk = (st: AppState) => {
-      st = extractHeadersToState(state, response);
-      let rslt: Rpc.ChangeSettingsResponse = extractResult(response);
-      if (rslt.ok) {
-        let { homePage, email, userName, profile_pic } = settings;
-        st = { ...st, homePage, email, moniker: userName, profile_pic };
-      }
-      return st;
-    }
-    return thunk;
-  }
-
-  export async function saveContent(state: AppState, req: Rpc.SaveContentRequest): Promise<(st: AppState) => AppState> {
-    const response = await Comms.sendSaveContent(state, req);
-    let thunk = (st: AppState) => {
-      st = extractHeadersToState(state, response);
-      let rslt: Rpc.SaveContentResponse = extractResult(response);
-      if (rslt.content) {
-        let { contents } = st;
-        let { content } = rslt;
-        let i = contents.findIndex(c => c.contentId === content.contentId);
-        contents = contents.slice();
-        if (i < 0) contents.unshift(content);
-        else contents[i] = content;
-        st = { ...st, contents };
-      }
-      return st;
-    }
     return thunk;
   }
 

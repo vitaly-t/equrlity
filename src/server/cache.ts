@@ -56,7 +56,7 @@ export function unSubscribe(sub: Subscription) {
   if (i >= 0) subscriptions.splice(i, 1);
 }
 
-function publish(updts: CacheUpdate[], now?: Date) {
+export function publish(updts: CacheUpdate[], now?: Date) {
   if (!now) {
     function _cmp(d, t) {
       return (!d && !t) ? null
@@ -131,6 +131,12 @@ export function deleteTag(v: Dbt.Tag) {
 
 export function allUserNames(userId: Dbt.userId): Dbt.userName[] {
   return Array.from(_users.values()).filter(u => u.userId !== userId).map(u => u.userName);
+}
+
+export function userIdNames(): Map<Dbt.userId, Dbt.userName> {
+  let rslt = new Map<Dbt.userId, Dbt.userName>();
+  for (const u of _users.values()) rslt.set(u.userId, u.userName);
+  return rslt;
 }
 
 let domain = '';
@@ -226,7 +232,7 @@ export async function update(entries: CacheUpdate[], now?: Date) {
   if (newTags.length > 0) {
     let created = new Date();
     let tags: Dbt.Tag[] = newTags.map(tag => { return { tag, created }; });
-    pg.insertRecords("tags", tags);
+    pg.upsertRecords("tags", tags);
     tags.forEach(tag => {
       entries.push({ table: "tags", record: tag });
       setTag(tag);

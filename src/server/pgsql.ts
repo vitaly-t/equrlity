@@ -17,6 +17,8 @@ import * as uuid from '../lib/uuid.js';
 
 import * as cache from './cache';
 import * as tasks from './pgtasks';
+import { sendMessagesToUser } from './ws-server';
+import * as SrvrMsg from '../lib/serverMessages';
 
 export let connectUrl: string =
   Utils.isTest() ? process.env.DEV_PSEUDOQURL_TEST_URL
@@ -378,7 +380,7 @@ export async function updateLink(link: Dbt.Link): Promise<void> {
 }
 
 export async function getLinksForUser(userId: Dbt.userId): Promise<Dbt.Link[]> {
-  return await db.task(t => tasks.getLinksForUser(t, userId));
+  return await db.task(t => tasks.getUserShares(t, userId));
 }
 
 export async function hasViewed(userId: Dbt.userId, linkId: Dbt.linkId): Promise<boolean> {
@@ -469,9 +471,9 @@ async function _getUserLinkItem(t: ITask<any>, linkId: Dbt.linkId): Promise<Rpc.
   let link = cache.links.get(linkId);
   let linkDepth = cache.getLinkDepth(link);
   let viewCount = await tasks.viewCount(t, linkId);
-  let promotionsCount = await tasks.promotionsCount(t, linkId);
-  let deliveriesCount = await tasks.deliveriesCount(t, linkId);
-  let rl: Rpc.UserLinkItem = { link, linkDepth, viewCount, promotionsCount, deliveriesCount };
+  //let promotionsCount = await tasks.promotionsCount(t, linkId);
+  //let deliveriesCount = await tasks.deliveriesCount(t, linkId);
+  let rl: Rpc.UserLinkItem = { link, linkDepth, viewCount /*, promotionsCount, deliveriesCount*/ };
   return rl;
 }
 
@@ -479,24 +481,24 @@ export async function getUserLinkItem(linkId: Dbt.linkId): Promise<Rpc.UserLinkI
   return await db.task(t => _getUserLinkItem(t, linkId));
 }
 
-async function _getUserLinks(t: ITask<any>, id: Dbt.userId): Promise<Rpc.UserLinkItem[]> {
-  let a = await tasks.getLinksForUser(t, id);
+async function _getUserShares(t: ITask<any>, id: Dbt.userId, last_feed?: Date): Promise<Rpc.UserLinkItem[]> {
+  let a = await tasks.getUserShares(t, id, last_feed);
   let rslt: Rpc.UserLinkItem[] = []
   for (const link of a) rslt.push(await _getUserLinkItem(t, link.linkId))
   return rslt;
 }
 
-export async function getUserLinks(id: Dbt.userId): Promise<Rpc.UserLinkItem[]> {
-  return await db.task(t => _getUserLinks(t, id));
+export async function getUserShares(id: Dbt.userId, last_feed?: Date): Promise<Rpc.UserLinkItem[]> {
+  return await db.task(t => _getUserShares(t, id, last_feed));
 }
 
-export async function getUserContents(id: Dbt.userId): Promise<Dbt.Content[]> {
-  return await db.task(t => tasks.getUserContents(t, id));
+export async function getUserContents(id: Dbt.userId, last_feed?: Date): Promise<Dbt.Content[]> {
+  return await db.task(t => tasks.getUserContents(t, id, last_feed));
 }
 
-export async function registerInvitation(ipAddress: string, linkId: Dbt.linkId): Promise<Dbt.Invitation> {
-  return await db.tx(t => tasks.registerInvitation(t, ipAddress, linkId));
-}
+//export async function registerInvitation(ipAddress: string, linkId: Dbt.linkId): Promise<Dbt.Invitation> {
+//  return await db.tx(t => tasks.registerInvitation(t, ipAddress, linkId));
+//}
 
 export async function insertContent(cont: Dbt.Content): Promise<Dbt.Content> {
   return await db.task(async t => {
@@ -660,6 +662,28 @@ export async function liveUserFeed(userId: Dbt.userId, updts: cache.CacheUpdate[
     let cmts = _convertCommentsToFeeds(userId, comments);
     return [...feeds, ...cmts];
   });
+}
+
+
+export async function newFollowingFeed(userId: Dbt.userId, following: Dbt.userId): Promise<Rpc.FeedItem[]> {
+  let usr = cache.users.get(userId)
+  let last_feed = OxiDate.addDays(new Date(), -180);  // last six months
+  let links: Dbt.Link[] = await db.any(`select * from links where "userId" = '${following}' and created > $1`, [last_feed]);
+  if (usr.blacklist) links = links.filter(l => l.tags.findIndex(t => usr.blacklist.indexOf(t) >= 0) < 0);
+  if (links.length === 0) return [];
+  let f = OxiGen.emptyRec<Dbt.Feed>("feeds");
+  let linkfeeds = links.map(l => { return { ...f, userId, linkId: l.linkId }; });
+  await upsertRecords<Dbt.Feed>("feeds", linkfeeds);
+  return _convertLinksToFeeds(userId, linkfeeds);
+}
+
+export async function sendNewFollowFeeds(userId: Dbt.userId, newFollows: Dbt.userId[]) {
+  let msgs: SrvrMsg.MessageItem[] = [];
+  for (const uid of newFollows) {
+    let feeds = await newFollowingFeed(userId, uid);
+    feeds.forEach(message => msgs.push({ type: "Feed", message }));
+  }
+  await sendMessagesToUser(userId, msgs);
 }
 
 export async function dismissFeeds(userId: Dbt.userId, urls: Dbt.urlString[], save: boolean): Promise<void> {

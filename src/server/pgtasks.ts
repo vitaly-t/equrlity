@@ -273,9 +273,9 @@ export async function removeLink(t: ITask<any>, link: Dbt.Link): Promise<void> {
   await deleteRecord<Dbt.Link>(t, "links", { linkId });
 }
 
-export async function getLinksForUser(t: ITask<any>, userId: Dbt.userId): Promise<Dbt.Link[]> {
-  let links = await t.any(`select * from links where "userId" = '${userId}' order by created desc`);
-  return links;
+export async function getUserShares(t: ITask<any>, userId: Dbt.userId, last_feed?: Date): Promise<Dbt.Link[]> {
+  if (last_feed) return await t.any(`select * from links where "userId" = '${userId}' and updated > $1 order by created desc`, [last_feed]);
+  return await t.any(`select * from links where "userId" = '${userId}' order by created desc`);
 }
 
 export async function hasViewed(t: ITask<any>, userId: Dbt.userId, linkId: Dbt.linkId): Promise<boolean> {
@@ -415,8 +415,9 @@ export async function createUser(t: ITask<any>, email?: string): Promise<Dbt.Use
   return await insertRecord<Dbt.User>(t, "users", usr);
 };
 
-export async function getUserContents(t: ITask<any>, id: Dbt.userId): Promise<Dbt.Content[]> {
-  return await t.any(`select * from contents where "userId" = '${id}' order by updated desc`);
+export async function getUserContents(t: ITask<any>, id: Dbt.userId, last_feed?: Date): Promise<Dbt.Content[]> {
+  if (last_feed) return await t.any(`select * from contents where "userId" = '${id}' and updated > $1 order by created desc`, [last_feed]);
+  return await t.any(`select * from contents where "userId" = '${id}' order by created desc`);
 }
 
 export async function insertContent(t: ITask<any>, cont: Dbt.Content): Promise<Dbt.Content> {

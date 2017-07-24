@@ -35,18 +35,31 @@ async function __init() {
     const keys: string[] = await localForage.keys();
     if (keys.indexOf('appState') >= 0) {
       let newst = await localForage.getItem<AppState>('appState');
+      let matchedTags = Object.create(null);
+      let links = Object.create(null);
+      if (!newst.user) {
+        // migrate legacy (pre 0.9.9)
+        let t: any = newst;
+        let { credits, profile_pic, last_feed, email } = t;
+        let user = OxiGen.emptyRec<Dbt.User>("users");
+        user = { ...user, email, credits, profile_pic, last_feed, userName: t.moniker, home_page: t.homePage };
+        st = { ...st, user, matchedTags, links };
+      }
       // allows for possible evolution (eg new properties) of appState structure in code.
-      st = { ...st, ...newst, matchedTags: Object.create(null), links: Object.create(null) };
-
+      else st = { ...st, ...newst, matchedTags, links };
     }
     if (st.jwt) handleMessage({ eventType: "Thunk", fn: (_ => st) });
     else {
       await createKeyPairIf(keys);
       const publicKey = await localForage.getItem<JsonWebKey>('publicKey');
       const privateKey = await localForage.getItem<JsonWebKey>('privateKey');
-      const userInfo: chrome.identity.UserInfo = Utils.isProduction() ? (await getProfile()) : { email: '', id: publicKey.toString() };
-      const chromeToken: string = Utils.isProduction() ? await getChromeAccessToken() : '';
-      const jwt = await AsyncHandlers.authenticate(userInfo, chromeToken, publicKey);
+      let jwt;
+      if (Utils.isProduction()) {
+        const userInfo = await getProfile();
+        const chromeToken = await getChromeAccessToken();
+        jwt = await AsyncHandlers.authenticate("chrome", userInfo, chromeToken, publicKey);
+      }
+      else jwt = await AsyncHandlers.authenticate("publicKey", { email: '', id: '' }, '', publicKey);
       if (!jwt) throw new Error("Unable to authenticate");
       handleMessage({ eventType: "Thunk", fn: ((st: AppState) => { return { ...st, publicKey, privateKey, jwt } }) });
     }
@@ -171,10 +184,6 @@ html ;
 `;
 //*/
 
-chrome.runtime.onStartup.addListener(initialize);
-
-chrome.runtime.onInstalled.addListener(initialize);
-
 chrome.runtime.onMessage.addListener(async (message, sender, cb) => {
   if (message.eventType === 'Render') {
     // unable to dispatch a message popup without also receiving it here :-(
@@ -254,10 +263,12 @@ function addResponseHeaders(details) {
   let { responseHeaders } = details;
   if (responseHeaders.findIndex(e => e.name === 'x-psq-moniker') < 0) {
     responseHeaders.push({ name: 'x-psq-privkey', value: JSON.stringify(__state.privateKey) });
-    responseHeaders.push({ name: 'x-psq-credits', value: __state.credits.toString() });
-    responseHeaders.push({ name: 'x-psq-moniker', value: __state.moniker });
-    responseHeaders.push({ name: 'x-psq-email', value: __state.email });
-    responseHeaders.push({ name: 'x-psq-homepage', value: __state.homePage });
+    if (__state.user) { // migration
+      responseHeaders.push({ name: 'x-psq-credits', value: __state.user.credits.toString() });
+      responseHeaders.push({ name: 'x-psq-moniker', value: __state.user.userName });
+      responseHeaders.push({ name: 'x-psq-email', value: __state.user.email });
+      responseHeaders.push({ name: 'x-psq-homepage', value: __state.user.home_page });
+    }
   }
   return { responseHeaders };
 }
@@ -278,16 +289,8 @@ export async function handleAsyncMessage(event: Message) {
   //console.log("Async Handling :" + event.eventType);
   try {
     switch (event.eventType) {
-      case "ChangeSettings": {
-        fn = await AsyncHandlers.changeSettings(st, event.settings);
-        break;
-      }
       case "BookmarkLink": {
         fn = await AsyncHandlers.bookmarkLink(st, event);
-        break;
-      }
-      case "SaveContent": {
-        fn = await AsyncHandlers.saveContent(st, event.req);
         break;
       }
       case "ShareContent": {
@@ -304,12 +307,6 @@ export async function handleAsyncMessage(event: Message) {
       }
       case "LaunchPage": {
         launchSystemTab(event.page);
-        if (event.page === 'contents') fn = await AsyncHandlers.getUserContents(st);
-        else if (event.page === 'links') fn = await AsyncHandlers.getUserLinks(st);
-        break;
-      }
-      case "GetUserLinks": {
-        fn = await AsyncHandlers.getUserLinks(st);
         break;
       }
       case "ActivateTab": {
@@ -319,10 +316,6 @@ export async function handleAsyncMessage(event: Message) {
       }
       case "TransferCredits": {
         fn = await AsyncHandlers.transferCredits(st, event.req);
-        break;
-      }
-      case "UpdateFeed": {
-        fn = await AsyncHandlers.updateFeed(st);
         break;
       }
       case "DismissFeeds": {
@@ -341,27 +334,57 @@ export async function handleAsyncMessage(event: Message) {
   }
 }
 
+function mergeContents(contents: Dbt.Content[], newConts: Dbt.Content[]): Dbt.Content[] {
+  newConts.sort((a, b) => (new Date(b.created)).getTime() - (new Date(a.created).getTime()));
+  for (const cont of newConts) {
+    let i = contents.findIndex(_ => _.contentId === cont.contentId);
+    if (i < 0) contents = [cont, ...contents];
+    else contents.splice(i, 1, cont);
+  }
+  return contents;
+}
+
+function mergeShares(shares: Rpc.UserLinkItem[], newShares: Rpc.UserLinkItem[]): Rpc.UserLinkItem[] {
+  newShares.sort((a, b) => (new Date(b.link.created)).getTime() - (new Date(a.link.created).getTime()));
+  for (const share of newShares) {
+    let i = shares.findIndex(_ => _.link.linkId === share.link.linkId);
+    if (i < 0) shares = [share, ...shares];
+    else shares.splice(i, 1, share);
+  }
+  return shares;
+}
+
+function mergeFeeds(feeds: Rpc.FeedItem[], newFeeds: Rpc.FeedItem[]): Rpc.FeedItem[] {
+  newFeeds.sort((a, b) => (new Date(b.created)).getTime() - (new Date(a.created).getTime()));
+  for (const f of newFeeds) {
+    let i = feeds.findIndex(_ => _.id === f.id);
+    if (i < 0) feeds = [f, ...feeds];
+    else feeds.splice(i, 1, f);
+  }
+  return feeds;
+}
+
+function mergeUserNames(userNames: SrvrMsg.UserIdName[]): Tags.TagSelectOption[] {
+  let rslt = [];
+  for (const n of userNames) rslt.push({ value: n.id, label: n.name });
+  return rslt;
+}
+
 export async function receiveServerMessages(srvmsg: SrvrMsg.ServerMessage) {
   let thunk = (st: AppState) => {
-    let { credits, moniker, email, homePage, timeStamp } = srvmsg.headers;
-    st = { ...st, credits, moniker, email, homePage, last_feed: timeStamp };
     let tags: Dbt.tag[] = [];
     for (const msg of srvmsg.messages) {
       switch (msg.type) {
         case "Init": {
-          let rslt: Rpc.InitializeResponse = msg.message;
-          let { profile_pic, last_feed, allTags } = rslt
-          let _tags = Tags.mergeTags(allTags, st.allTags);
-          //if (rslt.redirectUrl) chrome.tabs.update(activeTab.id, { url: rslt.redirectUrl });
-          let feed = st.feed;
-          rslt.feed.forEach(f => {
-            let i = feed.findIndex(_ => _.id === f.id);
-            if (i < 0) feed = [...feed, f];
-            else feed.splice(i, 1, f);
-          })
-          feed.sort((a, b) => (new Date(b.created)).getTime() - (new Date(a.created).getTime()));
+          let rslt: SrvrMsg.InitializeResponse = msg.message;
+          let { user, contents, feeds, shares } = rslt
+          let allTags = Tags.mergeTags(rslt.allTags, st.allTags);
+          contents = mergeContents(st.contents, contents);
+          shares = mergeShares(st.shares, shares);
+          let userNames = mergeUserNames(rslt.userNames);
+          let feed = mergeFeeds(st.feed, feeds);
           chrome.browserAction.setBadgeText({ text: feed.length.toString() });
-          st = { ...st, /*activeTab,*/ profile_pic, feed, last_feed, allTags: _tags };
+          st = { ...st, user, userNames, feed, contents, shares, allTags };
           break;
         }
         case "Feed": {
@@ -373,10 +396,9 @@ export async function receiveServerMessages(srvmsg: SrvrMsg.ServerMessage) {
             feed.splice(i, 1);
           }
           else {
-            if (i < 0) feed = [...feed, f];
+            if (i < 0) feed = [f, ...feed];
             else feed.splice(i, 1, f);
           }
-          feed.sort((a, b) => (new Date(b.created)).getTime() - (new Date(a.created).getTime()));
           chrome.browserAction.setBadgeText({ text: feed.length.toString() });
           st = { ...st, feed };
           break;
@@ -390,27 +412,33 @@ export async function receiveServerMessages(srvmsg: SrvrMsg.ServerMessage) {
             contents.splice(i, 1);
           }
           else {
-            if (i < 0) contents = [...contents, cont];
+            if (i < 0) contents = [cont, ...contents];
             else contents.splice(i, 1, cont);
           }
-          contents.sort((a, b) => (new Date(b.created)).getTime() - (new Date(a.created).getTime()));
+          //contents.sort((a, b) => (new Date(b.created)).getTime() - (new Date(a.created).getTime()));
           st = { ...st, contents };
           break;
         }
         case "Link": {
           let item: Rpc.UserLinkItem = msg.message;
-          let investments = st.investments;
-          let i = investments.findIndex(l => l.link.linkId === item.link.linkId);
+          let shares = st.shares;
+          let i = shares.findIndex(l => l.link.linkId === item.link.linkId);
           if (msg.remove) {
             if (i < 0) break;
-            investments.splice(i, 1);
+            shares.splice(i, 1);
           }
           else {
-            if (i < 0) investments = [...investments, item];
-            else investments.splice(i, 1, item);
+            if (i < 0) shares = [item, ...shares];
+            else shares.splice(i, 1, item);
           }
-          investments.sort((a, b) => (new Date(b.link.created)).getTime() - (new Date(a.link.created).getTime()));
-          st = { ...st, investments };
+          //investments.sort((a, b) => (new Date(b.link.created)).getTime() - (new Date(a.link.created).getTime()));
+          st = { ...st, shares };
+          break;
+        }
+        case "User": {
+          let user: Dbt.User = msg.message;
+          user = { ...st.user, ...user };
+          st = { ...st, user };
           break;
         }
         case "Tag": {
@@ -445,14 +473,6 @@ export function handleMessage(event: Message): AppState {
       case "Thunk":
         st = event.fn(st);
         break;
-      case "DismissPromotion":
-        let i = st.promotions.indexOf(event.url);
-        if (i >= 0) {
-          let promotions = st.promotions.slice(0)
-          promotions.splice(i, 1);
-          st = { ...st, promotions };
-        }
-        break;
       case "AddContents":
         let contents = [...event.contents, ...st.contents];
         st = { ...st, contents };
@@ -469,4 +489,6 @@ export function handleMessage(event: Message): AppState {
   }
   return st;
 }
+
+initialize();
 

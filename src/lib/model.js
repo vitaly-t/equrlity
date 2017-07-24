@@ -1,11 +1,12 @@
 export default {
   scalarTypes: {
     authId: {
-      sqlType: "varchar(128)"
+      sqlType: "varchar(256)"
     },
     authProvider: {
       sqlType: "varchar(36)",
       enum: [
+        "publicKey",
         "facebook",
         "github",
         "twitter",
@@ -152,7 +153,7 @@ export default {
       { name: "dismissed", type: "timestamp" },
     ],
     Tag: ["tag", "created"],
-    User: ["userId", "userName", "created", "updated",
+    User: ["userId", "userName", "email", "created", "updated",
       { name: "home_page", type: "urlString" },
       { name: "info", type: "text" },
       { name: "profile_pic", type: "db_hash" },

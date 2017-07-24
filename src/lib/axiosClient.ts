@@ -40,19 +40,24 @@ export async function sendAuthRequest(data: Object, authHeader: string): Promise
 }
 
 let id = 0;
-export async function sendApiRequest(method: Rpc.Method, params: any): Promise<AxiosResponse> {
+export async function sendApiRequest(method: Rpc.Method, params: any, errorHandler?: (msg: string) => void): Promise<AxiosResponse> {
   let xhr = apiRequest();
   id += 1;
   let data: Rpc.Request = { jsonrpc: "2.0", method, params, id };
   try {
-    return await xhr.post(Utils.serverUrl + "/rpc", data);
+    let rsp = await xhr.post(Utils.serverUrl + "/rpc", data);
+    if (rsp.data.error && errorHandler) errorHandler(rsp.data.error.message);
+    return rsp;
   }
   catch (e) {
-    if (!e.response) throw e;
-    let msg = "Invalid response from server";
-    try { msg = e.response.data.error.message; }
-    catch (e) { }
-    throw new Error(msg + " (" + e.response.status.toString() + ")");
+    if (e.response) {
+      let msg = "Invalid response from server";
+      try { msg = e.response.data.error.message; }
+      catch (e2) { }
+      e = new Error(msg + " (" + e.response.status.toString() + ")");
+    }
+    if (errorHandler) errorHandler(e.message);
+    else throw e;
   }
 }
 

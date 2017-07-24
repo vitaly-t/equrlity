@@ -62,7 +62,7 @@ import * as Dbt from './datatypes';
 
 export type Method = "initialize" | "authenticate" | "shareContent" | "bookmarkLink" | "loadLink" | "getRedirect" | "changeSettings"
   | "getUserContents" | "loadContent" | "getUserSettings" | "getUserLinks" | "redeemLink" | "saveContent" | "saveLink" | "removeContent" | "transferCredits"
-  | "aditComment" | "dismissFeeds" | "updateFeed" | "cachePeaks" | "payForView";
+  | "aditComment" | "dismissFeeds" | "cachePeaks" | "payForView";
 
 export type UrlString = string;
 export type Integer = number;
@@ -85,15 +85,10 @@ export type FeedItem = {
 export type InitializeResponse = {
   ok: boolean;
   profile_pic: Dbt.db_hash;
-  redirectUrl?: UrlString;
+  //redirectUrl?: UrlString;
   feed: FeedItem[];
   allTags: Dbt.tag[];   // temporary (hopefully)
   last_feed: string;
-}
-
-export type UpdateFeedRequest = {}
-export type UpdateFeedResponse = {
-  feed: FeedItem[];
 }
 
 export type ShareContentRequest = {
@@ -165,22 +160,7 @@ export type LoadLinkResponse = {
   content: Dbt.Content;
 }
 
-export type UserSettings = {
-  userName: string;
-  email: string;
-  homePage: Dbt.urlString;
-  info: string;
-  profile_pic?: Dbt.db_hash;
-  subscriptions: Dbt.tags;
-  blacklist: Dbt.tags;
-  following: Dbt.userName[];
-  allUsers?: Dbt.userName[];
-}
-
-export type GetUserSettingsRequest = {}
-export type GetUserSettingsResponse = UserSettings;
-
-export type ChangeSettingsRequest = UserSettings;
+export type ChangeSettingsRequest = Dbt.User;
 export type ChangeSettingsResponse = { ok: boolean; }
 
 export type GetUserContentsRequest = {}
@@ -190,19 +170,14 @@ export type GetUserContentsResponse = {
 
 export type GetUserLinksRequest = {}
 
-export type GetUserLinksResponse = {
-  links: UserLinkItem[];
-  promotions: Dbt.urlString[];
-  connectedUsers: Dbt.userName[];
-  reachableUserCount: Dbt.integer;
-}
-
 export type UserLinkItem = {
   link: Dbt.Link;
   linkDepth: Dbt.integer;
   viewCount: Dbt.integer;
-  promotionsCount: Dbt.integer;
-  deliveriesCount: Dbt.integer;
+}
+
+export type GetUserLinksResponse = {
+  links: UserLinkItem[];
 }
 
 export type SaveContentRequest = { content: Dbt.Content; }
@@ -243,24 +218,20 @@ export type PayForViewResponse = { ok: boolean; }
 
 export type RequestBody = ShareContentRequest | BookmarkLinkRequest | InitializeRequest | LoadLinkRequest | ChangeSettingsRequest
   | GetUserContentsRequest | GetUserLinksRequest | RedeemLinkRequest | SaveLinkRequest | SaveContentRequest | LoadContentRequest | RemoveContentRequest
-  | TransferCreditsRequest | AuthenticateRequest | AditCommentRequest | GetUserSettingsRequest | DismissFeedsRequest | UpdateFeedRequest
-  | CachePeaksRequest | PayForViewRequest;
+  | TransferCreditsRequest | AuthenticateRequest | AditCommentRequest | DismissFeedsRequest | CachePeaksRequest | PayForViewRequest;
 
 export type ResponseBody = ShareContentResponse & BookmarkLinkResponse & InitializeResponse & LoadLinkResponse & ChangeSettingsResponse
   & GetUserContentsResponse & GetUserLinksResponse & RedeemLinkResponse & SaveLinkResponse & SaveContentResponse & LoadContentResponse & RemoveContentResponse
-  & TransferCreditsResponse & AuthenticateResponse & AditCommentResponse & GetUserSettingsResponse & DismissFeedsResponse & UpdateFeedResponse
-  & CachePeaksResponse & PayForViewResponse;
+  & TransferCreditsResponse & AuthenticateResponse & AditCommentResponse & DismissFeedsResponse & CachePeaksResponse & PayForViewResponse;
 
 // internal to server.
 export type RecvRequestBody = ShareContentRequest & BookmarkLinkRequest & InitializeRequest & LoadLinkRequest & ChangeSettingsRequest
   & GetUserContentsRequest & GetUserLinksRequest & RedeemLinkRequest & SaveLinkRequest & SaveContentRequest & LoadContentRequest & RemoveContentRequest
-  & TransferCreditsRequest & AuthenticateRequest & AditCommentRequest & GetUserSettingsRequest & DismissFeedsRequest & UpdateFeedRequest
-  & CachePeaksRequest & PayForViewRequest;
+  & TransferCreditsRequest & AuthenticateRequest & AditCommentRequest & DismissFeedsRequest & CachePeaksRequest & PayForViewRequest;
 
 export type SendResponseBody = ShareContentResponse | BookmarkLinkResponse | InitializeResponse | LoadLinkResponse | ChangeSettingsResponse
   | GetUserContentsResponse | GetUserLinksResponse | RedeemLinkResponse | SaveLinkResponse | SaveContentResponse | LoadContentResponse | RemoveContentResponse
-  | TransferCreditsResponse | AuthenticateResponse | AditCommentResponse | GetUserSettingsResponse | DismissFeedsResponse | UpdateFeedResponse
-  | CachePeaksResponse | PayForViewResponse;
+  | TransferCreditsResponse | AuthenticateResponse | AditCommentResponse | DismissFeedsResponse | CachePeaksResponse | PayForViewResponse;
 
 export type Handler<Request, Response> = (req: Request) => Promise<Response>;
 

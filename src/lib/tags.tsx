@@ -57,7 +57,7 @@ export class TagGroup extends React.Component<TagGroupProps, {}> {
   }
 };
 
-export interface TagGroupEditorProps { tags: string[], tagClass?: string, allTags: TagSelectOption[], creatable: boolean, onChange: (vals: string[]) => void }
+export interface TagGroupEditorProps { tags: string[], tagClass?: string, allTags: TagSelectOption[], creatable: boolean, onChange: (labels: string[]) => void }
 export class TagGroupEditor extends React.Component<TagGroupEditorProps, {}> {
 
   removeTag(tag: string) {

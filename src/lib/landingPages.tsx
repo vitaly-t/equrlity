@@ -93,10 +93,10 @@ export const ContentLandingPage = (props: ContentLandingPageProps) => {
   );
 };
 
-export interface UserLandingPageProps { user: Dbt.User, email: string, isClient: boolean }
+export interface UserLandingPageProps { user: Dbt.User, isClient: boolean }
 export const UserLandingPage = (props: UserLandingPageProps) => {
   let qurlinfo = null;
-  let { user, email, isClient } = props;
+  let { user, isClient } = props;
   let userLink = user.home_page ? <a href={user.home_page} target="_blank">{user.home_page}</a> : "Not provided";
   let info = null;
   if (user.info) {
@@ -112,7 +112,7 @@ export const UserLandingPage = (props: UserLandingPageProps) => {
     <div style={pgStyle} >
       <h3>PseudoQURL contact information for: {user.userName}.</h3>
       <p>Home page: {userLink}</p>
-      <p>Email: {email ? email : 'Not provided'}</p>
+      <p>Email: {user.email ? user.email : 'Not provided'}</p>
       {info}
       {qurlinfo}
     </div>

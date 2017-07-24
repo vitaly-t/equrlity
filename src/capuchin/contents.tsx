@@ -125,12 +125,9 @@ export class ContentsPage extends React.Component<ContentsPageProps, ContentsPag
 
   setImageAsProfilePic = async (cont: Dbt.Content) => {
     if (cont.contentType !== 'image') throw new Error("not an image");
-    let response = await sendApiRequest("getUserSettings", {});
-    let rsp: Rpc.Response = response.data;
-    if (rsp.error) throw new Error("Server returned error: " + rsp.error.message);
-    let settings: Rpc.UserSettings = rsp.result;
-    settings = { ...settings, profile_pic: cont.db_hash }
-    Chrome.sendMessage({ eventType: "ChangeSettings", settings });
+    let { user } = this.props.appState;
+    user = { ...user, profile_pic: cont.db_hash }
+    sendApiRequest("changeSettings", user);
   }
 
   createPost() {
@@ -170,7 +167,7 @@ export class ContentsPage extends React.Component<ContentsPageProps, ContentsPag
     }
     else if (this.state.editingContent) {
       let onClose = () => this.setState({ editingContent: null });
-      contsdiv = <ContentEditor info={this.state.editingContent} allTags={this.props.appState.allTags} creator={this.props.appState.moniker} onClose={onClose} />
+      contsdiv = <ContentEditor info={this.state.editingContent} allTags={this.props.appState.allTags} creator={this.props.appState.user.userName} onClose={onClose} />
     }
     else if (st.contents.length > 0) {
       let tagfilter = (tags: string[], typ: string): boolean => {
@@ -202,7 +199,7 @@ export class ContentsPage extends React.Component<ContentsPageProps, ContentsPag
         btns.push(<Button key="remove" onClick={remove} text="Delete" />);
 
         if (p.contentType === 'image') {
-          let clss = p.db_hash === st.profile_pic ? 'pt-icon-tick' : '';
+          let clss = p.db_hash === st.user.profile_pic ? 'pt-icon-tick' : '';
           btns.push(<Button key="profilepic" className={clss} onClick={() => this.setImageAsProfilePic(p)} text="Use as Profile Pic" />);
         }
 

@@ -2,7 +2,7 @@
 
 
 export type authId = string;
-export type authProvider = "facebook" | "github" | "twitter" | "linkedin" | "chrome";
+export type authProvider = "publicKey" | "facebook" | "github" | "twitter" | "linkedin" | "chrome";
 export type binary = Buffer;
 export type contentType = "post" | "video" | "audio" | "image" | "bookmark";
 export type created = Date;
@@ -49,6 +49,7 @@ export interface Tag {
 export interface User {
   readonly userId: userId | null,
   readonly userName: userName | null,
+  readonly email: email | null,
   readonly created: created | null,
   readonly updated: updated | null,
   readonly home_page: urlString | null,

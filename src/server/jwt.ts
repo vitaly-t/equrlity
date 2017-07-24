@@ -6,7 +6,7 @@ import * as Dbt from '../lib/datatypes';
 const jwt_secret = process.env.JWT_PSEUDOQURL_KEY;
 const opts = { ignoreExpiration: true, key: 'userId' };
 
-type UserJwt = {
+export type UserJwt = {
   publicKey: Dbt.publicKey;
   email: Dbt.email;
   id: Dbt.userId;

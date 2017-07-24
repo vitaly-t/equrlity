@@ -1,6 +1,6 @@
 import * as React from 'react';
 import * as ReactDOM from "react-dom";
-import { Button, Dialog, Intent, Checkbox, Popover, PopoverInteractionKind, Position } from "@blueprintjs/core";
+import { Button, Dialog, Intent, Checkbox, Popover, PopoverInteractionKind, Position, Toaster } from "@blueprintjs/core";
 import { Url, format } from 'url';
 import axios, { AxiosResponse, AxiosError } from 'axios';
 import { Row, Col } from 'react-simple-flex-grid';
@@ -19,6 +19,11 @@ import { LinkEditor } from './linkEditor';
 import { FeedsPanel } from './feeds';
 import { AppState, postDeserialize } from "./AppState";
 import * as Chrome from './chrome';
+
+const toast = Toaster.create({
+  position: Position.TOP,
+});
+
 
 interface LinksPageProps { appState: AppState };
 interface LinksPageState { transferAmount: number, transferTo: string, editingItem: Rpc.UserLinkItem, filters: string[] };
@@ -50,7 +55,7 @@ export class LinksPage extends React.Component<LinksPageProps, LinksPageState> {
 
   render() {
     let st = this.props.appState;
-    let invs = st.investments;
+    let invs = st.shares;
     let invdiv = <p>You have no current Shares.</p>
     let btnStyle = { marginRight: "5px" };
     if (this.state.editingItem) {
@@ -73,7 +78,9 @@ export class LinksPage extends React.Component<LinksPageProps, LinksPageState> {
 
         let redeem = () => {
           let req: Rpc.RedeemLinkRequest = { linkId };
-          sendApiRequest('redeemLink', req);  // fire and forget!!!!
+          let errHndlr = (msg) => toast.show({ message: "Error: " + msg });
+
+          sendApiRequest('redeemLink', req, errHndlr);  // fire and forget!!!!
         };
         let edit = () => { this.setState({ editingItem: item }) };
         let btns = [];
@@ -169,7 +176,7 @@ export class LinksPage extends React.Component<LinksPageProps, LinksPageState> {
         {vsp}
         {invdiv}
         {vsp}
-        <h6>Your Current Wallet Balance is : {st.credits} credits.</h6>
+        <h6>Your Current Wallet Balance is : {st.user.credits} credits.</h6>
         {transferDiv}
         {vsp}
       </div>);

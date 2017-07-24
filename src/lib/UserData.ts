@@ -8,10 +8,8 @@ import { TagSelectOption } from '../lib/tags';
 export interface UserData {
   user: Dbt.User;
   contents: Dbt.Content[];
-  //auths: Dbt.Auth[];
-  squawks: Dbt.Link[];
+  shares: Dbt.Link[];
   feeds: Dbt.Feed[];
-  promotions: Dbt.Promotion[];
 }
 
 

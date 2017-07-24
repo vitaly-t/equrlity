@@ -36,7 +36,7 @@ import * as SrvrMsg from '../lib/serverMessages';
 import * as OxiGen from '../gen/oxigen';
 
 // local
-import * as jwt from './jwt';
+import * as Jwt from './jwt';
 import { serve } from './koa-static';
 //import * as favicon from 'koa-favicon';
 import clientIP from './clientIP.js';
@@ -176,7 +176,7 @@ app.use(async (ctx, next) => {
   }
 });
 
-app.use(jwt.jwt());
+app.use(Jwt.jwt());
 
 /*
 publicRouter.get('/download/pseudoqurl.crx', async function (ctx, next) {
@@ -214,7 +214,6 @@ publicRouter.get('/link/:id', async (ctx, next) => {
     ctx.body = await linkMediaPage(cont, linkId);
     return;
   }
-  pg.registerInvitation(ip, linkId);
   let url = link.isPublic && cont.contentType === 'bookmark' ? cont.url : null;
   let view = <LinkLandingPage url={url} userName={userName} />;
   let ins = ReactDOMServer.renderToStaticMarkup(view);
@@ -388,8 +387,7 @@ publicRouter.get('/user/:id', async (ctx, next) => {
   }
   */
   let isClient = isValidClient(ctx);
-  let email = isClient ? ctx['userId'].email : '';
-  let view = <UserLandingPage user={user} email={email} isClient={isClient} />;
+  let view = <UserLandingPage user={user} isClient={isClient} />;
   let ins = ReactDOMServer.renderToStaticMarkup(view);
   let body = htmlPage(ins);
   ctx.body = body;
@@ -406,8 +404,7 @@ publicRouter.get('/', async (ctx, next) => {
 });
 
 publicRouter.post('/auth', async (ctx, next) => {
-  let userInfo = ctx.request.body.userInfo;
-  let publicKey = ctx.request.body.publicKey;
+  let { provider, userInfo, publicKey } = ctx.request.body;
   let authValue = ctx.headers.authorization;
   let token;
   try {
@@ -434,13 +431,17 @@ publicRouter.post('/auth', async (ctx, next) => {
       return;
     }
   }
-  let user = await pg.getUserByAuthId(authId, "chrome");
+  if (!authId) {
+    authId = JSON.stringify(publicKey);
+    provider = "publicKey";
+  }
+  let user = await pg.getUserByAuthId(authId, provider);
   if (!user) {
     user = await pg.createUser(email);
-    await pg.createAuth(authId, user.userId, "chrome");
+    await pg.createAuth(authId, user.userId, provider);
   }
   let id = user.userId;
-  token = jwt.signJwt({ id, publicKey, email });
+  token = Jwt.signJwt({ id, publicKey, email });
   ctx.body = { jwt: token };
 }
 );
@@ -477,12 +478,14 @@ app.use(async function (ctx, next) {
   else _userId = { ...ctx['userId'] };
   await next();
 
-  let userId = ctx['userId'];
+  let userId: Jwt.UserJwt = ctx['userId'];
   let user: Dbt.User = getUser(userId.id);
   if (!user) throw new Error("system corruption detected");
-  let { publicKey, email, id } = userId;
+  let { publicKey, id } = userId;
+  let { email } = user;
   if (!_userId || _userId.publicKey !== publicKey || _userId.email !== email || _userId.id !== id) {
-    let token = jwt.signJwt(userId); //{expiresInMinutes: 60*24*14});
+    userId = { ...userId, email };
+    let token = Jwt.signJwt(userId); //{expiresInMinutes: 60*24*14});
     console.log("sending token");
     ctx.set('x-psq-token', token);
   }
@@ -502,15 +505,6 @@ app.use(async function (ctx, next) {
     let user = await pg.createUser();
     ctx['userId'] = { id: user.userId };
     ctx['user'] = user;
-    let inv = await pg.retrieveRecord<Dbt.Invitation>("invitations", { ipAddress });
-    if (inv) {
-      await pg.deleteRecord("invitations", inv);
-      if (cache.links.has(inv.linkId)) {
-        let link = cache.links.get(inv.linkId);
-        cache.connectUsers(user.userId, link.userId);
-        ctx['redirectUrl'] = cache.linkToUrl(inv.linkId);
-      }
-    }
   }
   else {
     let user = getUser(userId.id);
@@ -521,7 +515,7 @@ app.use(async function (ctx, next) {
     }
     ctx['user'] = user;
   }
-  ctx['token'] = jwt.signJwt(ctx['userId']); //{expiresInMinutes: 60*24*14});
+  ctx['token'] = Jwt.signJwt(ctx['userId']); //{expiresInMinutes: 60*24*14});
   await next();
 });
 
@@ -584,6 +578,7 @@ router.post('/rpc', async function (ctx: any) {
   let userId = ctx.userId.id;
   try {
     switch (method as Rpc.Method) {
+      /*
       case "updateFeed": {
         //let req: Rpc.UpdateFeedRequest = params;
         let usr = getUser(userId);
@@ -592,6 +587,7 @@ router.post('/rpc', async function (ctx: any) {
         ctx.body = { id, result };
         break;
       }
+      */
       case "shareContent": {
         let req: Rpc.ShareContentRequest = params;
         let { contentId, signature } = req;
@@ -620,14 +616,11 @@ router.post('/rpc', async function (ctx: any) {
       }
       case "changeSettings": {
         let req: Rpc.ChangeSettingsRequest = params;
-        let { userName, homePage, info, profile_pic, subscriptions, blacklist } = req;
+        let { userName, email, home_page, info, profile_pic, subscriptions, blacklist } = req;  // not credits!!
         let usr = getUser(userId);
         if (!usr) throw new Error("Internal error getting user details");
         if (userName && userName !== usr.userName) {
-          if (await pg.checkMonikerUsed(userName)) {
-            ctx.body = { id, error: { message: "Nickname not available" } };
-            return;
-          }
+          if (await pg.checkMonikerUsed(userName)) throw new Error("Nickname not available");
         }
         if (profile_pic && profile_pic !== usr.profile_pic) {
           if (!await pg.checkProfilePic(profile_pic, userId)) {
@@ -635,16 +628,15 @@ router.post('/rpc', async function (ctx: any) {
             return;
           }
         } else profile_pic = '';
-        let following = [];
-        req.following.forEach(nm => {
-          let u = cache.getUserByName(nm);
-          if (u) following.push(u.userId);
+        let following = !req.following ? [] : req.following.filter(id => {
+          let u = cache.users.get(id);
+          return (u && u.userId !== userId);
         });
-        let i = following.indexOf(userId);
-        if (i >= 0) following.splice(i, 1);
-        usr = { ...usr, userName, home_page: homePage, info, profile_pic, subscriptions, blacklist, following };
+        let newFollows = following.filter(id => usr.following.indexOf(id) < 0);
+        usr = { ...usr, userName, email, home_page, info, profile_pic, subscriptions, blacklist, following };
         let updts = await pg.upsertUser(usr);
         cache.update(updts);
+        if (newFollows.length > 0) pg.sendNewFollowFeeds(userId, newFollows);
         let result: Rpc.ChangeSettingsResponse = { ok: true };
         ctx.body = { id, result };
         break;
@@ -658,23 +650,8 @@ router.post('/rpc', async function (ctx: any) {
       }
       case "getUserLinks": {
         //let req: Rpc.GetUserLinksRequest = params;
-        let links = await pg.getUserLinks(userId);
-        let promotions = await pg.deliverNewPromotions(userId);
-        let connectedUsers = cache.getConnectedUserNames(userId);
-        let reachableUserCount = cache.getReachableUserIds(userId).length;
-        let result: Rpc.GetUserLinksResponse = { links, promotions, connectedUsers, reachableUserCount };
-        ctx.body = { id, result };
-        break;
-      }
-      case "getUserSettings": {
-        //let req: Rpc.GetUserSettingsRequest = params;
-        let user = cache.users.get(userId);
-        let email = ctx['userId'].email;
-        let homePage = user.home_page;
-        let { info, userName, profile_pic, subscriptions, blacklist } = user;
-        let following = cache.getUserFollowings(userId);
-        let allUsers = cache.allUserNames(userId);
-        let result: Rpc.GetUserSettingsResponse = { userName, email, homePage, info, profile_pic, subscriptions, blacklist, following, allUsers };
+        let links = await pg.getUserShares(userId);
+        let result: Rpc.GetUserLinksResponse = { links };
         ctx.body = { id, result };
         break;
       }

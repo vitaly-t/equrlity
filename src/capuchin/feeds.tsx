@@ -1,6 +1,6 @@
 import * as React from 'react';
 import * as ReactDOM from "react-dom";
-import { Button, Dialog, Intent, Checkbox, Popover, PopoverInteractionKind, Position } from "@blueprintjs/core";
+import { Button, Dialog, Intent, Checkbox, Popover, PopoverInteractionKind, Position, Toaster } from "@blueprintjs/core";
 import { Url, format } from 'url';
 import axios, { AxiosResponse, AxiosError } from 'axios';
 import { Row, Col } from 'react-simple-flex-grid';
@@ -18,6 +18,8 @@ import { sendApiRequest } from '../lib/axiosClient';
 import { LinkEditor } from './linkEditor';
 import { AppState, postDeserialize } from "./AppState";
 import * as Chrome from './chrome';
+
+const toast = Toaster.create({ position: Position.TOP });
 
 interface FeedsPanelProps { appState: AppState };
 interface FeedsPanelState { filters: string[], confirmDismissAll: boolean };
@@ -46,6 +48,10 @@ export class FeedsPanel extends React.Component<FeedsPanelProps, FeedsPanelState
 
   render() {
     let st = this.props.appState;
+    if (st.lastErrorMessage) {
+      toast.show({ message: st.lastErrorMessage });
+      Chrome.sendSyncMessage({ eventType: "Thunk", fn: st => st });  // clears error message;
+    }
     let btnStyle = { marginRight: "5px" };
     let links = st.feed;
     let linkdiv = <p>There are no current feed items.</p>

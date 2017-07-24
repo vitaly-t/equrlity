@@ -1,6 +1,6 @@
 import * as React from 'react';
 import * as ReactDOM from "react-dom";
-import { Button, Dialog, Intent } from "@blueprintjs/core";
+import { Button, Dialog, Toaster, Position, Intent } from "@blueprintjs/core";
 import { Url, format } from 'url';
 import axios, { AxiosResponse, AxiosError } from 'axios';
 import { Row, Col } from 'react-simple-flex-grid';
@@ -17,103 +17,88 @@ import { MarkdownEditor } from '../lib/markdownEditor';
 import { YesNoBox } from '../lib/dialogs';
 import { TagGroupEditor, TagSelectOption } from '../lib/tags';
 
-import { AppState, postDeserialize } from "./AppState";
+import { AppState, postDeserialize, userNameFromId, userIdFromName } from "./AppState";
 import { uploadRequest, sendApiRequest } from "../lib/axiosClient";
 import * as Chrome from './chrome';
 
+const toast = Toaster.create({ position: Position.TOP });
 
 interface SettingsPageProps { appState: AppState };
-interface SettingsPageState { settings: Rpc.UserSettings, prevSettings: Rpc.UserSettings, allUsers: TagSelectOption[] };
+interface SettingsPageState { user: Dbt.User };
 export class SettingsPage extends React.Component<SettingsPageProps, SettingsPageState> {
 
   constructor(props: SettingsPageProps) {
     super(props);
-    let settings: Rpc.UserSettings = {
-      userName: props.appState.moniker, email: props.appState.email, homePage: '', info: '', profile_pic: '',
-      subscriptions: [], blacklist: [], following: []
-    };
-    this.state = { settings, prevSettings: settings, allUsers: [] };
+    let { user } = this.props.appState;
+    this.state = { user };
   }
 
-  fetchUserSettings = async () => {
-    let response = await sendApiRequest("getUserSettings", {});
-    let rsp: Rpc.Response = response.data;
-    if (rsp.error) throw new Error("Server returned error: " + rsp.error.message);
-    let settings: Rpc.UserSettings = rsp.result;
-    let allUsers = settings.allUsers.map(u => { return { value: u, label: u }; });
-    this.setState({ settings, prevSettings: settings, allUsers });
-  }
-
-  componentDidMount() {
-    this.fetchUserSettings();
+  setUser(user: Dbt.User) {
+    this.setState({ user });
   }
 
   changeUserName(userName) {
-    let settings = { ...this.state.settings, userName }
-    this.setState({ settings });
+    this.setUser({ ...this.state.user, userName });
   }
 
   changeEmail(email) {
-    let settings = { ...this.state.settings, email }
-    this.setState({ settings });
+    this.setUser({ ...this.state.user, email });
   }
 
-  changeHomePage(homePage) {
-    let settings = { ...this.state.settings, homePage }
-    this.setState({ settings });
+  changeHomePage(home_page) {
+    this.setUser({ ...this.state.user, home_page });
   }
 
   changeInfo(info) {
-    let settings = { ...this.state.settings, info }
-    this.setState({ settings });
+    this.setUser({ ...this.state.user, info });
   }
 
   changeProfilePic(profile_pic) {
-    let settings = { ...this.state.settings, profile_pic }
-    this.setState({ settings });
+    this.setUser({ ...this.state.user, profile_pic });
   }
 
   changeSubscriptions(subscriptions) {
-    let settings = { ...this.state.settings, subscriptions }
-    this.setState({ settings });
+    this.setUser({ ...this.state.user, subscriptions });
   }
 
   changeBlacklist(blacklist) {
-    let settings = { ...this.state.settings, blacklist }
-    this.setState({ settings });
+    this.setUser({ ...this.state.user, blacklist });
   }
 
-  changeFollowing(following) {
-    let settings = { ...this.state.settings, following }
-    this.setState({ settings });
+  changeFollowing(labels) {
+    let following = labels.map(l => userIdFromName(this.props.appState, l));
+    this.setUser({ ...this.state.user, following });
   }
 
   isDirty(): boolean {
-    let { userName, email, homePage, info, profile_pic, subscriptions, blacklist, following } = this.state.settings;
-    let p = this.state.prevSettings;
-    return userName !== p.userName || email !== p.email || homePage !== p.homePage || info !== p.info
-      || profile_pic !== p.profile_pic || subscriptions !== p.subscriptions || blacklist !== p.blacklist || following !== p.following;
+    let u = this.state.user;
+    let p = this.props.appState.user;
+    function isDiff(a, b) {
+      if (!a && !b) return false;
+      if (!a || !b) return true;
+      if (a.length !== b.length) return true;
+      return a.findIndex(e => b.indexOf(e) < 0) >= 0;
+    }
+    return u.userName !== p.userName || u.email !== p.email || u.home_page !== p.home_page || u.info !== p.info || u.profile_pic !== p.profile_pic
+      || isDiff(u.subscriptions, p.subscriptions) || isDiff(u.blacklist, p.blacklist) || isDiff(u.following, p.following);
   }
 
   saveSettings = () => {
     console.log("saving settings");
-    let settings = this.state.settings;
-    this.setState({ prevSettings: settings });
-    Chrome.sendMessage({ eventType: "ChangeSettings", settings });
+    let settings = this.state.user;
+    let errHndlr = (msg) => toast.show({ message: "Error: " + msg });
+    sendApiRequest("changeSettings", settings, errHndlr);
+
   }
 
   render() {
     let st = this.props.appState;
-    let userNames = st.connectedUsers;
     let vsp = <div style={{ height: 20 }} />;
     let divStyle = { width: '100%', marginTop: 5, marginLeft: 5, padding: 6 };
     let lhcolStyle = { marginBottom: "5px" };
-    let { userName, email, homePage, info, profile_pic } = this.state.settings;
-
-    let userp = userNames.length > 0 ? <div><p>You are currently directly connected with another {userNames.length} user{userNames.length > 1 ? "s" : ""}.</p>
-      <p>Your social graph currently extends to {st.reachableUserCount} reachable users.</p>
-    </div>
-      : <p>You are not currently connected with any other users. Hence, no promotions can be issued on your behalf.</p>;
+    let user = this.state.user;
+    let { userName, email, home_page, info, profile_pic, subscriptions, blacklist } = user;
+    let following = user.following ? user.following.map(uid => userNameFromId(st, uid)) : [];
 
     /*
         let authdiv = <p>You are currently authenticated via {st.authprov}</p>;
@@ -152,19 +137,19 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
           </div>
           <div style={divStyle}>
             <div className="pt-text-muted" style={lhcolStyle} >HomePage: </div>
-            <input type="text" style={{ width: '60%' }} name="HomePage" id="homePageId" value={homePage} onChange={(e) => this.changeHomePage(e.target.value)} />
+            <input type="text" style={{ width: '60%' }} name="HomePage" id="homePageId" value={home_page} onChange={(e) => this.changeHomePage(e.target.value)} />
           </div>
           <div style={divStyle}>
             <div className="pt-text-muted" style={lhcolStyle} >Following: </div>
-            <TagGroupEditor tags={this.state.settings.following} tagClass="pt-intent-success pt-round pt-large" creatable={false} allTags={this.state.allUsers} onChange={(tags) => this.changeFollowing(tags)} />
+            <TagGroupEditor tags={following} tagClass="pt-intent-success pt-round pt-large" creatable={false} allTags={this.props.appState.userNames} onChange={(tags) => this.changeFollowing(tags)} />
           </div>
           <div style={divStyle}>
             <div className="pt-text-muted" style={lhcolStyle} >Subscriptions: </div>
-            <TagGroupEditor tags={this.state.settings.subscriptions} creatable={false} allTags={this.props.appState.allTags} onChange={(tags) => this.changeSubscriptions(tags)} />
+            <TagGroupEditor tags={subscriptions} creatable={false} allTags={this.props.appState.allTags} onChange={(tags) => this.changeSubscriptions(tags)} />
           </div>
           <div style={divStyle}>
             <div className="pt-text-muted" style={lhcolStyle} >Blacklist: </div>
-            <TagGroupEditor tags={this.state.settings.blacklist} creatable={false} allTags={this.props.appState.allTags} onChange={(tags) => this.changeBlacklist(tags)} />
+            <TagGroupEditor tags={blacklist} creatable={false} allTags={this.props.appState.allTags} onChange={(tags) => this.changeBlacklist(tags)} />
           </div>
           <div style={divStyle}>
             <div className="pt-text-muted" style={lhcolStyle} >Further Info: </div>
@@ -190,13 +175,9 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
         {vsp}
         <h4>Privacy Policy.</h4>
         <div style={divStyle}>
-          <p>To ensure your privacy, we do not store any information whatsoever about your account on our servers, other than an internally generated identifier,
-            your nickname, and your homepage (should you choose to provide one).  We retain your homepage to allow the system to present links in content pages, and also to
-            automatically redirect visitors there as appropriate - eg. if they don&apos;t have the extension installed.</p>
-          <p>We use web standard JWTs (Javascript Web Token - see <a href="https://jwt.io" target="_blank">https://jwt.io)</a>) to store any and all other identifying information inside your web browser's local storage, and ensure that
-            it never appears on disk on our servers. This means that
-            it is simply impossible for anybody hacking our servers to gain access to any information about you personally.  Nor can we ever be coerced by
-            any legal authority whatsoever to provide information which we simply do not have access to.
+          <p>We respect your privacy. The information we store about you on our servers consists of an internally generated identifier, your nickname,
+             your email address (if supplied) and your homepage (if supplied).  We retain your homepage to allow the system to present links in content pages, and also to
+            automatically redirect visitors there as appropriate - eg. if they don&apos;t have the extension installed.
           </p>
           <p>We do not use passwords at all.  </p>
           <p>For the time being the only client available is the Chrome browser extension, which can only be made available through the Google Store.

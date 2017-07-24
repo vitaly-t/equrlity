@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import * as ReactDOM from 'react-dom';
-import { Button, Dialog, Checkbox } from "@blueprintjs/core";
+import { Button, Dialog, Checkbox, Toaster, Position } from "@blueprintjs/core";
 import { Row, Col } from 'react-simple-flex-grid';
 import TextareaAutosize from 'react-textarea-autosize';
 
@@ -15,8 +15,13 @@ import * as Rpc from '../lib/rpc';
 import * as Dbt from '../lib/datatypes';
 import { sendApiRequest } from "../lib/axiosClient";
 
-
 import * as Chrome from './chrome';
+
+const toast = Toaster.create({
+  position: Position.TOP,
+});
+
+
 
 interface LinkEditorProps { info: Rpc.UserLinkItem, allTags: Tags.TagSelectOption[], onClose: () => void }
 interface LinkEditorState { title: string, comment: string, tags: string[], isError: boolean, isOpen: boolean, isPublic: boolean, amount: number };
@@ -45,7 +50,8 @@ export class LinkEditor extends React.Component<LinkEditorProps, LinkEditorState
     let link = this.props.info.link;
     link = { ...link, title, tags, comment, isPublic, amount };
     let req: Rpc.SaveLinkRequest = { link };
-    sendApiRequest("saveLink", req);
+    let errHndlr = (msg) => toast.show({ message: "Error: " + msg });
+    sendApiRequest("saveLink", req, errHndlr);
     this.close()
   }
 
@@ -90,12 +96,6 @@ export class LinkEditor extends React.Component<LinkEditorProps, LinkEditorState
               <Col span={12 - lspan}>
                 <TextareaAutosize style={{ width: '100%', minHeight: "100px", maxHeight: "600px" }} value={this.state.comment} onChange={e => this.changeComment(e)} />
               </Col>
-            </Row>
-            <Row style={rowStyle} gutter={gutter}>
-              <Col span={lspan}><span className="pt-text-muted" >Promotions:</span></Col>
-              <Col span={1}>{item.promotionsCount.toString()}</Col>
-              <Col span={lspan}><span className="pt-text-muted" >Deliveries:</span></Col>
-              <Col>{item.deliveriesCount.toString()}</Col>
             </Row>
             <Row style={rowStyle} gutter={gutter}>
               <Col span={lspan}><span className="pt-text-muted" >Created:</span></Col>

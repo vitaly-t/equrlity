@@ -8,33 +8,28 @@ import { TagSelectOption } from '../lib/tags';
 export interface AppState {
   publicKey: JsonWebKey | null;
   privateKey: JsonWebKey | null;
+  jwt: string;
+
+  // server sent
+  user: Dbt.User;
+  userNames: TagSelectOption[];
+  shares: Rpc.UserLinkItem[];
+  feed: Rpc.FeedItem[];
+  contents: Dbt.Content[];
+  allTags: TagSelectOption[];
+
+  // ephemeral
+  lastErrorMessage: string;
   links: any; // Map<string, Dbt.Content>;
   matchedTags: any // Map<string, Dbt.tags>;
   activeUrl: string | null;
-  homePage: Dbt.urlString;
-  moniker: string;
-  email: string;
-  profile_pic: Dbt.db_hash;
-  authprov: string;
-  credits: number;
-  jwt: string;
-  lastErrorMessage: string;
-  investments: Rpc.UserLinkItem[];
-  promotions: Dbt.urlString[];
-  feed: Rpc.FeedItem[];
-  connectedUsers: Dbt.userName[];
-  reachableUserCount: Dbt.integer;
-  contents: Dbt.Content[];
-  allTags: TagSelectOption[];
-  last_feed: string;
 }
 
 export function initState(): AppState {
   console.log("initState called");
   return {
-    publicKey: null, privateKey: null, links: Object.create(null), matchedTags: Object.create(null),
-    activeUrl: null, moniker: 'unknown', authprov: '', email: '', credits: 0, jwt: '', lastErrorMessage: '', homePage: '', profile_pic: '', feed: [],
-    investments: [], promotions: [], connectedUsers: [], reachableUserCount: 0, contents: [], allTags: [], last_feed: ''
+    publicKey: null, privateKey: null, links: Object.create(null), matchedTags: Object.create(null), userNames: [], user: null,
+    activeUrl: null, jwt: '', lastErrorMessage: '', feed: [], shares: [], contents: [], allTags: []
   };
 }
 
@@ -123,4 +118,14 @@ export function prepareUrl(curl: string): string | null {
   if (!url) return null;
   url.hash = '';
   return format(url);
+}
+
+export function userNameFromId(st: AppState, id: Dbt.userId) {
+  let i = st.userNames.findIndex(e => e.value === id);
+  return i >= 0 ? st.userNames[i].label : '???';
+}
+
+export function userIdFromName(st: AppState, nm: Dbt.userName) {
+  let i = st.userNames.findIndex(e => e.label === nm);
+  return i >= 0 ? st.userNames[i].value : null;
 }

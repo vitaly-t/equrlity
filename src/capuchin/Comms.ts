@@ -4,6 +4,7 @@ import { AppState, getBookmark } from './AppState';
 import * as Utils from '../lib/utils';
 import * as Dbt from '../lib/datatypes';
 import { signData, sendApiRequest } from '../lib/axiosClient';
+import * as OxiDate from '../lib/oxidate';
 
 
 export async function sendShareContent(st: AppState, req: Rpc.ShareContentRequest): Promise<AxiosResponse> {
@@ -25,11 +26,7 @@ export async function sendBookmarkLink(st: AppState, url: string, title: string,
 }
 
 export async function sendInitialize(st: AppState): Promise<AxiosResponse> {
-  return await sendApiRequest("initialize", { publicKey: st.publicKey, last_feed: st.last_feed });
-}
-
-export async function sendUpdateFeed(st: AppState): Promise<AxiosResponse> {
-  return await sendApiRequest("updateFeed", {});
+  return await sendApiRequest("initialize", { publicKey: st.publicKey, last_feed: st.user.last_feed });
 }
 
 export async function sendDismissFeeds(st: AppState, urls: Dbt.urlString[], save?: boolean): Promise<AxiosResponse> {
@@ -79,14 +76,18 @@ export function openWebSocket(st: AppState, messageHandler: (msg: any) => void, 
     if (_pingTimer) clearTimeout(_pingTimer);
     _pingTimer = setTimeout(() => {
       //console.log("pinging server");
+      /*
       if (ws.readyState !== 1) {
         errorHandler(new Error("Socket not ready for ping."));
       }
-      else ws.send('{"ping": true}');
+      else */
+      ws.send('{"ping": true}');
     }, 10000)
   }
   ws.onopen = (event) => {
-    ws.send(JSON.stringify({ jwt: st.jwt, publicKey: st.publicKey, last_feed: st.last_feed }));
+    let msg: any = { type: "Init", jwt: st.jwt, publicKey: st.publicKey }
+    if (st.user) msg.last_feed = st.user.last_feed;
+    ws.send(JSON.stringify(msg));
   };
   ws.onmessage = (event) => {
     if (typeof event.data === 'string') {
@@ -107,6 +108,10 @@ export function openWebSocket(st: AppState, messageHandler: (msg: any) => void, 
   }
   ws.onerror = (event: ErrorEvent) => {
     ws.close();
+    if (_pingTimer) {
+      clearTimeout(_pingTimer);
+      _pingTimer = 0;
+    }
     errorHandler(new Error("Websocket Error: " + event.message));
   }
   resetPinger();

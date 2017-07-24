@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import * as ReactDOM from 'react-dom';
-import { Button, Dialog, Checkbox } from "@blueprintjs/core";
+import { Button, Dialog, Checkbox, Toaster, Position } from "@blueprintjs/core";
 import { Row, Col } from 'react-simple-flex-grid';
 import TextareaAutosize from 'react-textarea-autosize';
 
@@ -14,9 +14,11 @@ import { ContentView, rowStyle, btnStyle, lhcolStyle } from "../lib/contentView"
 import * as Rpc from '../lib/rpc';
 import * as Dbt from '../lib/datatypes';
 import { MarkdownEditor } from '../lib/markdownEditor';
+import { sendApiRequest } from "../lib/axiosClient";
 
 import * as Chrome from './chrome';
 
+const toast = Toaster.create({ position: Position.TOP });
 
 interface ContentEditorProps { info: Dbt.Content, allTags: Tags.TagSelectOption[], creator: string, style?: any, onClose: () => void }
 interface ContentEditorState { url: Dbt.urlString, title: string, content: string, tags: string[], isError: boolean, prevContent: string, isOpen: boolean };
@@ -33,13 +35,14 @@ export class ContentEditor extends React.Component<ContentEditorProps, ContentEd
     this.state = { url, title, content, tags, isError: false, prevContent: content, isOpen: true };
   }
 
-  save() {
+  save = async () => {
     if (this.state.isError) return;
     let { title, tags, content, url } = this.state;
     let cont: Dbt.Content = { ...this.props.info, url, content, title, tags };
     let req: Rpc.SaveContentRequest = { content: cont };
-    Chrome.sendMessage({ eventType: "SaveContent", req });
-    this.close()
+    let rsp = await sendApiRequest("saveContent", req);
+    if (rsp.data.error) toast.show({ message: rsp.data.error.message });
+    else this.close()
   }
 
   close() {
