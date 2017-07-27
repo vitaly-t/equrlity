@@ -146,9 +146,9 @@ export namespace AsyncHandlers {
     Comms.sendDismissFeeds(state, urls, save);
     let thunk = (st: AppState) => {
       let ids = items.filter(i => i.id ? true : false).map(i => i.id);
-      let feed = st.feed.filter(f => f.id && ids.indexOf(f.id) < 0);
-      chrome.browserAction.setBadgeText({ text: feed.length.toString() });
-      st = { ...st, feed }
+      let feeds = st.feeds.filter(f => f.id && ids.indexOf(f.id) < 0);
+      chrome.browserAction.setBadgeText({ text: feeds.length.toString() });
+      st = { ...st, feeds }
       return st;
     }
     return thunk;

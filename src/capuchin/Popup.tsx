@@ -116,26 +116,19 @@ export class PopupPanel extends React.Component<PopupPanelProps, PopupPanelState
     let st = props.appState;
     let curl = st.activeUrl
 
-    let launch = (page) => Chrome.sendMessage({ eventType: "LaunchPage", page });
-    let linksAction = () => launch('links');
-    let usersAction = () => launch('users');
-    let contentsAction = () => launch('contents');
-    let settingsAction = () => launch('settings');
+    let launch = () => Chrome.sendMessage({ eventType: "LaunchPage", page: "home" });
     let gutter = 20;
     let btnStyle = { marginRight: 10 };
     let rowStyle = { marginBottom: 10 };
     let btns = [
-      <Button key="Settings" style={btnStyle} className="pt-intent-success" onClick={settingsAction} text="Settings" />,
-      <Button key="Shares" style={btnStyle} className="pt-intent-success" onClick={linksAction} text="Shares" />,
-      //<Button key="People" style={btnStyle} className="pt-intent-success" onClick={usersAction} text="People" />,
-      <Button key="Contents" style={btnStyle} className="pt-intent-success" onClick={contentsAction} text="Contents" />,
+      <Button key="Home" style={btnStyle} className="pt-intent-success" iconName="pt-icon-home" onClick={launch} text="Home" />,
     ]
     if (!curl) btns.unshift(<Button key="Close" style={btnStyle} onClick={() => window.close()} text="Close" />);
 
     if (st.lastErrorMessage) toast.show({ message: "Error: " + st.lastErrorMessage });
     return <div>
       <Row style={rowStyle} gutter={gutter} justify="space-between">
-        <Col span={3}><h2 style={{ color: "#48AFF0" }}><b><i>PseudoQURL</i></b></h2></Col>
+        <Col span={3}><h2 style={{ color: "#48AFF0" }}><b><i>eqURLity</i></b></h2></Col>
         <Col span={9}>
           <Row style={rowStyle} gutter={gutter} justify="end">{btns}</Row>
         </Col>

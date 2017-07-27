@@ -632,7 +632,7 @@ router.post('/rpc', async function (ctx: any) {
           let u = cache.users.get(id);
           return (u && u.userId !== userId);
         });
-        let newFollows = following.filter(id => usr.following.indexOf(id) < 0);
+        let newFollows = !usr.following ? following : following.filter(id => usr.following.indexOf(id) < 0);
         usr = { ...usr, userName, email, home_page, info, profile_pic, subscriptions, blacklist, following };
         let updts = await pg.upsertUser(usr);
         cache.update(updts);

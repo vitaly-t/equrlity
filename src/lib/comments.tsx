@@ -11,7 +11,7 @@ import * as Utils from '../lib/utils';
 import * as Constants from '../lib/constants';
 import * as OxiDate from '../lib/oxidate';
 import * as OxiGen from '../gen/oxigen';
-import { rowStyle, btnStyle, lhcolStyle } from "../lib/ContentView";
+import { rowStyle, btnStyle, lhcolStyle } from "../lib/constants";
 import * as Tags from '../lib/tags';
 import * as Comms from '../lib/axiosClient';
 import { MarkdownEditor } from '../lib/markdownEditor';

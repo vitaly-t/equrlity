@@ -382,25 +382,25 @@ export async function receiveServerMessages(srvmsg: SrvrMsg.ServerMessage) {
           contents = mergeContents(st.contents, contents);
           shares = mergeShares(st.shares, shares);
           let userNames = mergeUserNames(rslt.userNames);
-          let feed = mergeFeeds(st.feed, feeds);
+          let feed = mergeFeeds(st.feeds, feeds);
           chrome.browserAction.setBadgeText({ text: feed.length.toString() });
-          st = { ...st, user, userNames, feed, contents, shares, allTags };
+          st = { ...st, user, userNames, feeds, contents, shares, allTags };
           break;
         }
         case "Feed": {
           let f: Rpc.FeedItem = msg.message;
-          let feed = st.feed;
-          let i = feed.findIndex(_ => _.id === f.id);
+          let feeds = st.feeds;
+          let i = feeds.findIndex(_ => _.id === f.id);
           if (msg.remove) {
             if (i < 0) break;
-            feed.splice(i, 1);
+            feeds.splice(i, 1);
           }
           else {
-            if (i < 0) feed = [f, ...feed];
-            else feed.splice(i, 1, f);
+            if (i < 0) feeds = [f, ...feeds];
+            else feeds.splice(i, 1, f);
           }
-          chrome.browserAction.setBadgeText({ text: feed.length.toString() });
-          st = { ...st, feed };
+          chrome.browserAction.setBadgeText({ text: feeds.length.toString() });
+          st = { ...st, feeds };
           break;
         }
         case "Content": {

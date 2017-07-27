@@ -17,10 +17,7 @@ const md = new Remarkable({ html: true });
 
 import * as Blueprint from "@blueprintjs/core";
 //import '@blueprintjs/core/dist/blueprint.css';
-
-export const rowStyle = { width: '100%', marginTop: 2, marginLeft: 5, padding: 6 };
-export const btnStyle = { height: '24', marginTop: 2, marginLeft: 5, marginRight: 5, display: 'inline-block' };
-export const lhcolStyle = { width: '20%' };
+import { rowStyle, btnStyle, lhcolStyle } from '../lib/constants';
 
 interface ContentViewProps { info: Dbt.Content, owner: string };
 interface ContentViewState { };

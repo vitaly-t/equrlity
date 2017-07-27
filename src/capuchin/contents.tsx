@@ -1,6 +1,6 @@
 import * as React from 'react';
 import * as ReactDOM from "react-dom";
-import { Button, Dialog, Intent, ProgressBar, Checkbox, Position, Toaster, Popover, PopoverInteractionKind } from "@blueprintjs/core";
+import { Button, Dialog, Intent, ProgressBar, Checkbox, Position, IToaster, Popover, PopoverInteractionKind } from "@blueprintjs/core";
 import * as Dropzone from 'react-dropzone';
 import { Url, format } from 'url';
 import axios, { AxiosResponse, AxiosError } from 'axios';
@@ -12,7 +12,7 @@ import * as Utils from '../lib/utils';
 import * as Constants from '../lib/constants';
 import * as OxiDate from '../lib/oxidate';
 import * as OxiGen from '../gen/oxigen';
-import { rowStyle, btnStyle, lhcolStyle } from "../lib/contentView";
+import { rowStyle, btnStyle, lhcolStyle } from "../lib/constants";
 import * as Tags from '../lib/tags';
 import * as Hasher from '../lib/contentHasher';
 import { YesNoBox } from '../lib/dialogs';
@@ -22,32 +22,27 @@ import buildWaveform from '../lib/buildWaveform';
 import { AppState, postDeserialize } from "./AppState";
 import * as Chrome from './chrome';
 import { ContentEditor } from './contentEditor';
+import { PanelContext } from "./home";
 
 type UploadProgress = { fileName: string, progress: number }
 
 const gutter = 20;
 
-interface ContentsPageProps { appState: AppState };
-interface ContentsPageState { uploadProgress: UploadProgress[], cancelUpload: boolean, promotingContent?: Dbt.Content, editingContent?: Dbt.Content, confirmDeleteContent?: Dbt.Content, filters: string[] };
+interface ContentsPanelProps { appState: AppState, panelContext: PanelContext };
+interface ContentsPanelState { uploadProgress: UploadProgress[], cancelUpload: boolean, promotingContent?: Dbt.Content, editingContent?: Dbt.Content, confirmDeleteContent?: Dbt.Content };
 
-const toast = Toaster.create({
-  className: "contents-toaster",
-  position: Position.TOP,
-});
-
-
-export class ContentsPage extends React.Component<ContentsPageProps, ContentsPageState> {
+export class ContentsPanel extends React.Component<ContentsPanelProps, ContentsPanelState> {
 
   constructor(props) {
     super(props);
-    this.state = { uploadProgress: [], filters: [], cancelUpload: false };
+    this.state = { uploadProgress: [], cancelUpload: false };
   }
 
   setUploadProgress(nm: string, progress: number) {
     let uploadProgress = [...this.state.uploadProgress]
     let i = uploadProgress.findIndex(u => u.fileName === nm);
     if (i < 0) {
-      if (!this.state.cancelUpload) toast.show({ message: "Missing file: " + nm });
+      if (!this.state.cancelUpload) this.props.panelContext.toast.show({ message: "Missing file: " + nm });
     }
     else {
       if (progress === 1) uploadProgress.splice(i, 1);
@@ -83,6 +78,7 @@ export class ContentsPage extends React.Component<ContentsPageProps, ContentsPag
       data.append("sig", sig);
       data.append("peaks", peaks);
       data.append(f.name, f);
+      let toast = this.props.panelContext.toast;
       let CancelToken = axios.CancelToken;
       let source = CancelToken.source();
       let cancelToken = source.token
@@ -136,23 +132,10 @@ export class ContentsPage extends React.Component<ContentsPageProps, ContentsPag
     this.setState({ editingContent: cont });
   }
 
-  addFilter(f: string) {
-    let filters = this.state.filters;
-    if (filters.indexOf(f) < 0) {
-      filters = [...filters, f];
-      this.setState({ filters });
-    }
-  }
-
-  removeFilter(f: string) {
-    let filters = [...this.state.filters];
-    let i = filters.indexOf(f);
-    if (i >= 0) filters.splice(i, 1);
-    this.setState({ filters });
-  }
-
   render() {
     let st = this.props.appState;
+    let panelContext = this.props.panelContext
+    let { vsp } = panelContext;
     let contsdiv = <p>You do not currently have any uploaded contents.</p>
     if (this.state.confirmDeleteContent) {
       let msg = "Warning: Deleting a Content Item is irreversible. Are you sure you wish to Proceed?";
@@ -163,7 +146,7 @@ export class ContentsPage extends React.Component<ContentsPageProps, ContentsPag
     }
     else if (this.state.promotingContent) {
       let onClose = () => this.setState({ promotingContent: null });
-      contsdiv = <ShareContent info={this.state.promotingContent} allTags={this.props.appState.allTags} onClose={onClose} />
+      contsdiv = <ShareContent info={this.state.promotingContent} allTags={this.props.appState.allTags} onClose={onClose} toast={panelContext.toast} />
     }
     else if (this.state.editingContent) {
       let onClose = () => this.setState({ editingContent: null });
@@ -172,13 +155,13 @@ export class ContentsPage extends React.Component<ContentsPageProps, ContentsPag
     else if (st.contents.length > 0) {
       let tagfilter = (tags: string[], typ: string): boolean => {
         if (!tags) tags = [];
-        let fltrs = this.state.filters;
+        let fltrs = panelContext.filters();
         for (let f of fltrs) if (tags.indexOf(f) < 0 && f !== typ) return false;
         return true;
       }
       let rows = st.contents.filter(p => tagfilter(p.tags, p.contentType)).map(p => {
         let url = p.contentType === 'bookmark' ? p.url : Utils.contentToUrl(p.contentId)
-        let tags = <Tags.TagGroup tags={p.tags} onClick={(s) => this.addFilter(s)} />;
+        let tags = <Tags.TagGroup tags={p.tags} onClick={(s) => panelContext.addFilter(s)} />;
 
         let btns = [];
 
@@ -214,7 +197,7 @@ export class ContentsPage extends React.Component<ContentsPageProps, ContentsPag
         );
         return (
           <tr key={p.contentId} >
-            <td><Tags.TagGroup tags={[p.contentType]} onClick={(s) => this.addFilter(s)} /></td>
+            <td><Tags.TagGroup tags={[p.contentType]} onClick={(s) => panelContext.addFilter(s)} /></td>
             <td><a href={url} target="_blank" >{url}</a></td>
             <td>{p.title}</td>
             <td>{tags}</td>
@@ -238,16 +221,14 @@ export class ContentsPage extends React.Component<ContentsPageProps, ContentsPag
           </tbody>
         </table>);
     }
-    let vsp = <div style={{ height: 20 }} />;
 
     let fltrDiv = null;
-    if (this.state.filters.length > 0) {
-      let fltrs = <Tags.TagGroup tags={this.state.filters} onRemove={(s) => this.removeFilter(s)} />;
+    let filters = panelContext.filters();
+    if (filters.length > 0) {
+      let fltrs = <Tags.TagGroup tags={filters} onRemove={(s) => panelContext.removeFilter(s)} />;
       fltrDiv = <div>{vsp}<Row>Showing :  {fltrs}</Row></div>;
     }
 
-    let divStyle = { width: '100%', marginTop: 5, marginLeft: 5, padding: 6 };
-    let lhcolStyle = { width: '20%' };
     let uploadDiv;
     if (this.state.uploadProgress.length > 0) {
       let uplds = this.state.uploadProgress.map(u => <div><p>{u.fileName}:</p><ProgressBar value={u.progress} /></div>);
@@ -277,15 +258,12 @@ export class ContentsPage extends React.Component<ContentsPageProps, ContentsPag
     }
     return (
       <div>
-        <div>
-          <h4>Your Contents : </h4>
-          {fltrDiv}
-          {vsp}
-          {contsdiv}
-          {vsp}
-          <div style={divStyle}>
-            <Button className="pt-intent-primary" onClick={() => this.createPost()} text="Create New Post" />
-          </div>
+        {fltrDiv}
+        {vsp}
+        {contsdiv}
+        {vsp}
+        <div style={rowStyle}>
+          <Button className="pt-intent-primary" onClick={() => this.createPost()} text="Create New Post" />
         </div>
         {vsp}
         {uploadDiv}
@@ -293,7 +271,7 @@ export class ContentsPage extends React.Component<ContentsPageProps, ContentsPag
   }
 }
 
-interface ShareContentProps { info: Dbt.Content, allTags: Tags.TagSelectOption[], onClose: () => void }
+interface ShareContentProps { info: Dbt.Content, allTags: Tags.TagSelectOption[], onClose: () => void, toast: IToaster }
 interface ShareContentState { title: string, comment: string, tags: string[], isOpen: boolean, amount: number, stringSchedule: string }
 class ShareContent extends React.Component<ShareContentProps, ShareContentState> {
 
@@ -326,6 +304,7 @@ class ShareContent extends React.Component<ShareContentProps, ShareContentState>
   save() {
     let { title, tags, amount, comment, stringSchedule } = this.state;
     let paymentSchedule = [];
+    let toast = this.props.toast;
     if (this.isMediaType()) {
       let validSched = true
       paymentSchedule = stringSchedule.split(",").map(s => {
@@ -396,24 +375,4 @@ class ShareContent extends React.Component<ShareContentProps, ShareContentState>
     );
   }
 }
-
-function render(state: AppState) {
-  //console.log("render called for settings");
-  let elem = document.getElementById('app')
-  if (!elem) console.log("cannot get app element");
-  else {
-    ReactDOM.render(<ContentsPage appState={state} />, elem);
-  }
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-  chrome.runtime.sendMessage({ eventType: "GetState" }, st => render(postDeserialize(st)));
-});
-
-chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
-  if (message.eventType === "Render") {
-    let state: AppState = postDeserialize(message.appState);
-    render(state);
-  }
-});
 

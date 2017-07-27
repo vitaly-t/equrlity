@@ -1,9 +1,10 @@
 import { Url, format, parse } from 'url';
+import { IToaster } from "@blueprintjs/core";
+
 import * as Rpc from '../lib/rpc';
 import * as Dbt from '../lib/datatypes';
 import * as Utils from '../lib/utils';
 import { TagSelectOption } from '../lib/tags';
-
 
 export interface AppState {
   publicKey: JsonWebKey | null;
@@ -14,7 +15,7 @@ export interface AppState {
   user: Dbt.User;
   userNames: TagSelectOption[];
   shares: Rpc.UserLinkItem[];
-  feed: Rpc.FeedItem[];
+  feeds: Rpc.FeedItem[];
   contents: Dbt.Content[];
   allTags: TagSelectOption[];
 
@@ -23,13 +24,14 @@ export interface AppState {
   links: any; // Map<string, Dbt.Content>;
   matchedTags: any // Map<string, Dbt.tags>;
   activeUrl: string | null;
+
 }
 
 export function initState(): AppState {
   console.log("initState called");
   return {
     publicKey: null, privateKey: null, links: Object.create(null), matchedTags: Object.create(null), userNames: [], user: null,
-    activeUrl: null, jwt: '', lastErrorMessage: '', feed: [], shares: [], contents: [], allTags: []
+    activeUrl: null, jwt: '', lastErrorMessage: '', feeds: [], shares: [], contents: [], allTags: []
   };
 }
 

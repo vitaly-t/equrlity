@@ -1,6 +1,6 @@
 import * as React from 'react';
 import * as ReactDOM from "react-dom";
-import { Button, Dialog, Intent, Checkbox, Popover, PopoverInteractionKind, Position, Toaster } from "@blueprintjs/core";
+import { Button, Dialog, Intent, Checkbox, Popover, PopoverInteractionKind, Position, IToaster } from "@blueprintjs/core";
 import { Url, format } from 'url';
 import axios, { AxiosResponse, AxiosError } from 'axios';
 import { Row, Col } from 'react-simple-flex-grid';
@@ -10,51 +10,33 @@ import * as Rpc from '../lib/rpc';
 import * as Utils from '../lib/utils';
 import * as Constants from '../lib/constants';
 import * as OxiDate from '../lib/oxidate';
-import { rowStyle, btnStyle, lhcolStyle } from "../lib/contentView";
+import { rowStyle, btnStyle, lhcolStyle } from "../lib/constants";
 import * as Tags from '../lib/tags';
 import { YesNoBox } from '../lib/dialogs';
 import { sendApiRequest } from '../lib/axiosClient';
 
 import { LinkEditor } from './linkEditor';
-import { FeedsPanel } from './feeds';
 import { AppState, postDeserialize } from "./AppState";
+import { PanelContext } from "./home";
 import * as Chrome from './chrome';
 
-const toast = Toaster.create({
-  position: Position.TOP,
-});
+interface SharesPanelProps { appState: AppState, panelContext: PanelContext };
+interface SharesPanelState { transferAmount: number, transferTo: string, editingItem: Rpc.UserLinkItem };
 
+export class SharesPanel extends React.Component<SharesPanelProps, SharesPanelState> {
 
-interface LinksPageProps { appState: AppState };
-interface LinksPageState { transferAmount: number, transferTo: string, editingItem: Rpc.UserLinkItem, filters: string[] };
-
-export class LinksPage extends React.Component<LinksPageProps, LinksPageState> {
-
-  constructor(props: LinksPageProps) {
+  constructor(props: SharesPanelProps) {
     super(props);
-    this.state = { transferAmount: 0, transferTo: '', editingItem: null, filters: [] };
+    this.state = { transferAmount: 0, transferTo: '', editingItem: null };
   }
 
   changeTransferAmount(value: string) { this.setState({ transferAmount: parseInt(value) }); }
   changeTransferTo(value: string) { this.setState({ transferTo: value }); }
 
-  addFilter(f: string) {
-    let filters = this.state.filters;
-    if (filters.indexOf(f) < 0) {
-      filters = [...filters, f];
-      this.setState({ filters });
-    }
-  }
-
-  removeFilter(f: string) {
-    let filters = [...this.state.filters];
-    let i = filters.indexOf(f);
-    if (i >= 0) filters.splice(i, 1);
-    this.setState({ filters });
-  }
-
   render() {
     let st = this.props.appState;
+    let panelContext = this.props.panelContext;
+    let { vsp, toast } = panelContext;
     let invs = st.shares;
     let invdiv = <p>You have no current Shares.</p>
     let btnStyle = { marginRight: "5px" };
@@ -65,7 +47,7 @@ export class LinksPage extends React.Component<LinksPageProps, LinksPageState> {
     else if (invs.length > 0) {
       let tagfilter = (tags: string[]): boolean => {
         if (!tags) tags = [];
-        let fltrs = this.state.filters;
+        let fltrs = panelContext.filters();
         for (let f of fltrs) if (tags.indexOf(f) < 0) return false;
         return true;
       }
@@ -74,7 +56,7 @@ export class LinksPage extends React.Component<LinksPageProps, LinksPageState> {
         let l = item.link
         let linkId = l.linkId;
         let url = Utils.linkToUrl(linkId, l.title);
-        let tags = <Tags.TagGroup tags={l.tags} onClick={s => this.addFilter(s)} />;
+        let tags = <Tags.TagGroup tags={l.tags} onClick={s => panelContext.addFilter(s)} />;
 
         let redeem = () => {
           let req: Rpc.RedeemLinkRequest = { linkId };
@@ -133,16 +115,14 @@ export class LinksPage extends React.Component<LinksPageProps, LinksPageState> {
       );
     }
 
-    let vsp = <div style={{ height: "20px" }} />;
 
     let fltrDiv = null;
-    if (this.state.filters.length > 0) {
-      let fltrs = <Tags.TagGroup tags={this.state.filters} onRemove={(s) => this.removeFilter(s)} />;
+    let filters = panelContext.filters();
+    if (filters.length > 0) {
+      let fltrs = <Tags.TagGroup tags={filters} onRemove={(s) => panelContext.removeFilter(s)} />;
       fltrDiv = <div>{vsp}<Row>Showing :  {fltrs}</Row></div>;
     }
 
-    let divStyle = { width: '100%', marginTop: 5, marginLeft: 5, padding: 6 };
-    let lhcolStyle = { width: '20%' };
     let transfer = () => {
       let amount = this.state.transferAmount;
       let transferTo = this.state.transferTo;
@@ -157,7 +137,7 @@ export class LinksPage extends React.Component<LinksPageProps, LinksPageState> {
       <div>
         {vsp}
         <p>If you wish, you can transfer credits to another user.</p>
-        <div style={divStyle} >
+        <div style={rowStyle} >
           <div style={{ display: 'inline' }}>Amount to Transfer: </div>
           <input type="number" style={{ display: 'inline', height: 24, marginLeft: 20, marginTop: 6, width: '100px' }}
             value={this.state.transferAmount} onChange={e => this.changeTransferAmount(e.target.value)} />
@@ -169,9 +149,7 @@ export class LinksPage extends React.Component<LinksPageProps, LinksPageState> {
       </div>);
 
     return (
-      <div style={{ margin: "16px" }}>
-        <FeedsPanel appState={st} />
-        <h4>Shares: </h4>
+      <div>
         {fltrDiv}
         {vsp}
         {invdiv}
@@ -182,23 +160,4 @@ export class LinksPage extends React.Component<LinksPageProps, LinksPageState> {
       </div>);
   }
 }
-
-function render(state: AppState) {
-  let elem = document.getElementById('app')
-  if (!elem) console.log("cannot get app element");
-  else {
-    ReactDOM.render(<LinksPage appState={state} />, elem);
-  }
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-  chrome.runtime.sendMessage({ eventType: "GetState" }, st => render(postDeserialize(st)));
-});
-
-chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
-  if (message.eventType === "Render") {
-    let state: AppState = postDeserialize(message.appState);
-    render(state);
-  }
-});
 

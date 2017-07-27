@@ -10,7 +10,7 @@ import * as OxiDate from '../lib/oxidate';
 import * as utils from '../lib/utils';
 import * as uuid from '../lib/uuid.js';
 import * as Tags from '../lib/tags';
-import { rowStyle, btnStyle, lhcolStyle } from "../lib/contentView";
+import { rowStyle, btnStyle, lhcolStyle } from "../lib/constants";
 import * as Rpc from '../lib/rpc';
 import * as Dbt from '../lib/datatypes';
 import { sendApiRequest } from "../lib/axiosClient";

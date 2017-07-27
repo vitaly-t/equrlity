@@ -1,6 +1,6 @@
 import * as React from 'react';
 import * as ReactDOM from "react-dom";
-import { Button, Dialog, Intent, Checkbox, Popover, PopoverInteractionKind, Position, Toaster } from "@blueprintjs/core";
+import { Button, Dialog, Intent, Checkbox, Popover, PopoverInteractionKind, Position, IToaster } from "@blueprintjs/core";
 import { Url, format } from 'url';
 import axios, { AxiosResponse, AxiosError } from 'axios';
 import { Row, Col } from 'react-simple-flex-grid';
@@ -10,56 +10,40 @@ import * as Rpc from '../lib/rpc';
 import * as Utils from '../lib/utils';
 import * as Constants from '../lib/constants';
 import * as OxiDate from '../lib/oxidate';
-import { rowStyle, btnStyle, lhcolStyle } from "../lib/contentView";
+import { rowStyle, btnStyle, lhcolStyle } from "../lib/constants";
 import * as Tags from '../lib/tags';
 import { YesNoBox } from '../lib/dialogs';
 import { sendApiRequest } from '../lib/axiosClient';
 
 import { LinkEditor } from './linkEditor';
 import { AppState, postDeserialize } from "./AppState";
+import { PanelContext } from "./home";
 import * as Chrome from './chrome';
 
-const toast = Toaster.create({ position: Position.TOP });
-
-interface FeedsPanelProps { appState: AppState };
-interface FeedsPanelState { filters: string[], confirmDismissAll: boolean };
+interface FeedsPanelProps { appState: AppState, panelContext: PanelContext };
+interface FeedsPanelState { confirmDismissAll: boolean };
 
 export class FeedsPanel extends React.Component<FeedsPanelProps, FeedsPanelState> {
 
   constructor(props: FeedsPanelProps) {
     super(props);
-    this.state = { filters: [], confirmDismissAll: false };
-  }
-
-  addFilter(f: string) {
-    let filters = this.state.filters;
-    if (filters.indexOf(f) < 0) {
-      filters = [...filters, f];
-      this.setState({ filters });
-    }
-  }
-
-  removeFilter(f: string) {
-    let filters = [...this.state.filters];
-    let i = filters.indexOf(f);
-    if (i >= 0) filters.splice(i, 1);
-    this.setState({ filters });
+    this.state = { confirmDismissAll: false };
   }
 
   render() {
     let st = this.props.appState;
+    let panelContext = this.props.panelContext
     if (st.lastErrorMessage) {
-      toast.show({ message: st.lastErrorMessage });
+      panelContext.toast.show({ message: st.lastErrorMessage });
       Chrome.sendSyncMessage({ eventType: "Thunk", fn: st => st });  // clears error message;
     }
-    let btnStyle = { marginRight: "5px" };
-    let links = st.feed;
+    let links = st.feeds;
     let linkdiv = <p>There are no current feed items.</p>
     let filteredLinks: Rpc.FeedItem[] = []
     if (links.length > 0) {
       let tagfilter = (tags: string[], source: string): boolean => {
         if (!tags) tags = [];
-        let fltrs = this.state.filters;
+        let fltrs = panelContext.filters();
         for (let f of fltrs) if (tags.indexOf(f) < 0 && f !== source) return false;
         return true;
       }
@@ -69,7 +53,7 @@ export class FeedsPanel extends React.Component<FeedsPanelProps, FeedsPanelState
         let dismiss = () => { Chrome.sendMessage({ eventType: "DismissFeeds", feeds: [f] }); };
         let save = () => { Chrome.sendMessage({ eventType: "DismissFeeds", feeds: [f], save: true }); };
         let onclick = () => { chrome.tabs.create({ active: true, url }); };
-        let tags = <Tags.TagGroup tags={f.tags} onClick={(s) => this.addFilter(s)} />;
+        let tags = <Tags.TagGroup tags={f.tags} onClick={(s) => panelContext.addFilter(s)} />;
 
         let btngrp = (
           <div className="pt-button-group pt-vertical pt-align-left pt-large">
@@ -87,7 +71,7 @@ export class FeedsPanel extends React.Component<FeedsPanelProps, FeedsPanelState
           <tr key={url} >
             <td>{type}</td>
             <td><a href="" onClick={onclick} >{url}</a></td>
-            <td><Tags.TagGroup tags={[source]} onClick={(s) => this.addFilter(s)} /></td>
+            <td><Tags.TagGroup tags={[source]} onClick={(s) => panelContext.addFilter(s)} /></td>
             <td>{comment}</td>
             <td>{tags}</td>
             <td>{pop}</td>
@@ -117,7 +101,6 @@ export class FeedsPanel extends React.Component<FeedsPanelProps, FeedsPanelState
       this.setState({ confirmDismissAll: true });
     }
     let saveAll = () => {
-      this.setState({ filters: [] });
       Chrome.sendMessage({ eventType: "DismissFeeds", feeds: filteredLinks, save: true });
     }
     let vsp = <div style={{ height: "20px" }} />;
@@ -127,17 +110,17 @@ export class FeedsPanel extends React.Component<FeedsPanelProps, FeedsPanelState
       let onClose = () => this.setState({ confirmDismissAll: false });
       let onYes = () => {
         let urls = filteredLinks.map(r => r.url)
-        this.setState({ filters: [] });
         Chrome.sendMessage({ eventType: "DismissFeeds", feeds: filteredLinks });
       };
       fltrDiv = <YesNoBox message={msg} onYes={onYes} onClose={onClose} />
     }
     else {
       let cols = [];
+      let filters = panelContext.filters();
       cols.push(<Col key="saveAll" ><Button disabled={filteredLinks.length === 0} className="pt-intent-success" style={btnStyle} onClick={saveAll} text="Bookmark All" /></Col>)
       cols.push(<Col key="dismissAll" ><Button disabled={filteredLinks.length === 0} className="pt-intent-danger" style={btnStyle} onClick={dismissAll} text="Dismiss All" /></Col>)
-      if (this.state.filters.length > 0) {
-        let feedFltrs = <Tags.TagGroup tags={this.state.filters} onRemove={(s) => this.removeFilter(s)} />;
+      if (filters.length > 0) {
+        let feedFltrs = <Tags.TagGroup tags={filters} onRemove={(s) => panelContext.removeFilter(s)} />;
         cols.push(<Col key="feedFilters" ><Row>Showing :  {feedFltrs}</Row></Col>);
       }
       fltrDiv = <Row>{cols}</Row>;
@@ -148,8 +131,6 @@ export class FeedsPanel extends React.Component<FeedsPanelProps, FeedsPanelState
 
     return (
       <div>
-        <h4>Feed: </h4>
-        {vsp}
         {fltrDiv}
         {vsp}
         {linkdiv}

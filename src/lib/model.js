@@ -69,6 +69,16 @@ export default {
       max: 100,
       min: 0
     },
+    storageProvider: {
+      sqlType: "varchar(36)",
+      enum: [
+        "blob",    // access by [server:]blobid ???
+        "dropbox",  // access by url ..
+        "ipfs",
+        //"storj",
+        //"maidsafe", 
+      ]
+    },
     tag: {
       tsType: "string",
       sqlType: "varchar(20)"

@@ -1,6 +1,6 @@
 import * as React from 'react';
 import * as ReactDOM from "react-dom";
-import { Button, Dialog, Toaster, Position, Intent } from "@blueprintjs/core";
+import { Button, Dialog, IToaster, Position, Intent } from "@blueprintjs/core";
 import { Url, format } from 'url';
 import axios, { AxiosResponse, AxiosError } from 'axios';
 import { Row, Col } from 'react-simple-flex-grid';
@@ -11,7 +11,7 @@ import * as Rpc from '../lib/rpc';
 import * as Utils from '../lib/utils';
 import * as Constants from '../lib/constants';
 import * as OxiDate from '../lib/oxidate';
-import { rowStyle, btnStyle, lhcolStyle } from "../lib/contentView";
+import { rowStyle, btnStyle, lhcolStyle } from "../lib/constants";
 import * as Tags from '../lib/tags';
 import { MarkdownEditor } from '../lib/markdownEditor';
 import { YesNoBox } from '../lib/dialogs';
@@ -20,14 +20,13 @@ import { TagGroupEditor, TagSelectOption } from '../lib/tags';
 import { AppState, postDeserialize, userNameFromId, userIdFromName } from "./AppState";
 import { uploadRequest, sendApiRequest } from "../lib/axiosClient";
 import * as Chrome from './chrome';
+import { PanelContext } from './home';
 
-const toast = Toaster.create({ position: Position.TOP });
+interface SettingsPanelProps { appState: AppState, panelContext: PanelContext };
+interface SettingsPanelState { user: Dbt.User };
+export class SettingsPanel extends React.Component<SettingsPanelProps, SettingsPanelState> {
 
-interface SettingsPageProps { appState: AppState };
-interface SettingsPageState { user: Dbt.User };
-export class SettingsPage extends React.Component<SettingsPageProps, SettingsPageState> {
-
-  constructor(props: SettingsPageProps) {
+  constructor(props: SettingsPanelProps) {
     super(props);
     let { user } = this.props.appState;
     this.state = { user };
@@ -70,6 +69,10 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
     this.setUser({ ...this.state.user, following });
   }
 
+  componentWillReceiveProps(nextProps) {
+    this.setUser(nextProps.appState.user);
+  }
+
   isDirty(): boolean {
     let u = this.state.user;
     let p = this.props.appState.user;
@@ -86,7 +89,7 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
   saveSettings = () => {
     console.log("saving settings");
     let settings = this.state.user;
-    let errHndlr = (msg) => toast.show({ message: "Error: " + msg });
+    let errHndlr = (msg) => this.props.panelContext.toast.show({ message: "Error: " + msg });
     sendApiRequest("changeSettings", settings, errHndlr);
 
   }
@@ -125,19 +128,18 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
 
     return (
       <div>
-        <h4>Your Settings:</h4>
         <div className="pt-elevation-0" style={{ width: "100%", height: "100%", marginTop: 5, marginLeft: 5, padding: 6, backgroundColor: "#F5F8FA" }}>
           <div style={divStyle}>
             <div className="pt-text-muted" style={lhcolStyle} >Public Name: </div>
-            <input type="text" style={{ width: '60%' }} name="NickName" id="nickId" value={userName} onChange={(e) => this.changeUserName(e.target.value)} />
+            <input type="text" style={{ width: '60%' }} name="NickName" id="nickId" value={userName || ''} onChange={(e) => this.changeUserName(e.target.value)} />
           </div>
           <div style={divStyle}>
             <div className="pt-text-muted" style={lhcolStyle} >Email: </div>
-            <input type="email" style={{ width: '60%' }} name="Email" id="emailId" value={email} onChange={(e) => this.changeEmail(e.target.value)} />
+            <input type="email" style={{ width: '60%' }} name="Email" id="emailId" value={email || ''} onChange={(e) => this.changeEmail(e.target.value)} />
           </div>
           <div style={divStyle}>
             <div className="pt-text-muted" style={lhcolStyle} >HomePage: </div>
-            <input type="text" style={{ width: '60%' }} name="HomePage" id="homePageId" value={home_page} onChange={(e) => this.changeHomePage(e.target.value)} />
+            <input type="text" style={{ width: '60%' }} name="HomePage" id="homePageId" value={home_page || ''} onChange={(e) => this.changeHomePage(e.target.value)} />
           </div>
           <div style={divStyle}>
             <div className="pt-text-muted" style={lhcolStyle} >Following: </div>
@@ -157,11 +159,12 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
           </div>
           <div style={divStyle}>
             <div className="pt-text-muted" style={lhcolStyle} >Profile Picture: </div>
-            <input type="text" style={{ width: '60%' }} name="ProfilePic" id="profilePicId" value={profile_pic} onChange={(e) => this.changeProfilePic(e.target.value)} />
-          </div>
-          {profile_pic && <div className="pt-elevation-2" style={divStyle}><img src={`${Utils.serverUrl}/user/${userName}/img`} /></div>}
-          <div style={divStyle}>
-            <Button className="pt-intent-primary" disabled={!this.isDirty()} onClick={this.saveSettings} text="Save Settings" />
+            {profile_pic ? <div className="pt-elevation-2" style={divStyle}><img src={`${Utils.serverUrl}/user/${userName}/img`} /></div>
+              : <p>You do not currently have a profile picture. To create one, upload an image from the content page, and then use the drop down menu of the
+               image content item to select it as your profile picture.</p>}
+            <div style={divStyle}>
+              <Button className="pt-intent-primary" disabled={!this.isDirty()} onClick={this.saveSettings} text="Save Settings" />
+            </div>
           </div>
         </div>
         {vsp}
@@ -188,24 +191,4 @@ export class SettingsPage extends React.Component<SettingsPageProps, SettingsPag
       </div>);
   }
 }
-
-function render(state: AppState) {
-  //console.log("render called for settings");
-  let elem = document.getElementById('app')
-  if (!elem) console.log("cannot get app element");
-  else {
-    ReactDOM.render(<SettingsPage appState={state} />, elem);
-  }
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-  chrome.runtime.sendMessage({ eventType: "GetState" }, st => render(postDeserialize(st)));
-});
-
-chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
-  if (message.eventType === "Render") {
-    let state: AppState = postDeserialize(message.appState);
-    render(state);
-  }
-});
 

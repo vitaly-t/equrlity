@@ -47,7 +47,7 @@ let entry = {
   main: './src/capuchin/main.tsx',
   background: './src/capuchin/background.ts',
 }
-for (const pg of ['settings', 'contents', 'links']) {
+for (const pg of ['home']) {
   entry[pg] = `./src/capuchin/${pg}.tsx`;
   fs.writeFileSync(outPath + '/' + pg + '.html', htmlPage(pg));
 }

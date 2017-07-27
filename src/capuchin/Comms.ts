@@ -85,7 +85,9 @@ export function openWebSocket(st: AppState, messageHandler: (msg: any) => void, 
     }, 10000)
   }
   ws.onopen = (event) => {
-    let msg: any = { type: "Init", jwt: st.jwt, publicKey: st.publicKey }
+    let linkIds = st.shares.map(s => s.link.linkId);
+    let contentIds = st.contents.map(c => c.contentId);
+    let msg: any = { type: "Init", jwt: st.jwt, publicKey: st.publicKey, linkIds, contentIds }
     if (st.user) msg.last_feed = st.user.last_feed;
     ws.send(JSON.stringify(msg));
   };
