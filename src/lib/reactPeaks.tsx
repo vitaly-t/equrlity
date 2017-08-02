@@ -85,7 +85,7 @@ export class PeaksPlayer extends React.Component<PeaksPlayerProps, PeaksPlayerSt
     return (
       <div style={{ width: '100%' }} >
         <div style={{ width: '100%', height: '210px', marginRight: '10px' }} ref={c => this.peaksEl = c} />
-        <audio id="audioSource" controls={false} preload="auto" ref={c => { this.audioEl = c; }} src={this.props.src} type={this.props.type} />
+        <audio id="audioSource" controls={false} preload="auto" ref={c => { this.audioEl = c; }} src={this.props.src} />
         {!this.state.isReady ? <h2 style={{ height: "40px", color: "#48AFF0" }}><b><i>... loading ...</i></b></h2>
           : !canPlay ? null : <PlayBackControls
             height={40}

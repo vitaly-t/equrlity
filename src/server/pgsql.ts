@@ -664,7 +664,6 @@ export async function liveUserFeed(userId: Dbt.userId, updts: cache.CacheUpdate[
   });
 }
 
-
 export async function newFollowingFeed(userId: Dbt.userId, following: Dbt.userId): Promise<Rpc.FeedItem[]> {
   let usr = cache.users.get(userId)
   let last_feed = OxiDate.addDays(new Date(), -180);  // last six months
@@ -732,4 +731,18 @@ export async function getNextStreamNumber(viewerId: Dbt.userId, viewedLinkId: Db
   return rslt;
 }
 
+export async function getInitialData(user: Dbt.User, last_feed?: Date): Promise<Rpc.InitializeResponse> {
+  let _userNames = cache.userIdNames();
+  let unms: Rpc.UserIdName[] = Array.from(_userNames.entries())
+    .filter(([id, name]) => id !== user.userId)
+    .map(([id, name]) => { return { id, name }; });
+
+  let now = new Date();
+  let feeds = await updateUserFeed(user.userId, last_feed);
+  let contents = await getUserContents(user.userId, last_feed);
+  let shares = await getUserShares(user.userId, last_feed);
+  let allTags = cache.allTags();
+  let result: Rpc.InitializeResponse = { user, userNames: unms, contents, shares, feeds, allTags };
+  return result;
+}
 

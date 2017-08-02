@@ -10,6 +10,7 @@ import * as Utils from '../lib/utils';
 import * as Constants from '../lib/constants';
 import * as OxiDate from '../lib/oxidate';
 import * as OxiGen from '../gen/oxigen';
+import { sendApiRequest } from '../lib/axiosClient';
 
 import { AppState, postDeserialize } from "./AppState";
 import * as Chrome from './chrome';
@@ -80,22 +81,24 @@ export class HomePage extends React.Component<HomePageProps, HomePageState> {
 
   render() {
     let btns = [];
+    let reload = () => {
+      let { publicKey } = this.props.appState;
+      let req: Rpc.InitializeRequest = { publicKey };
+      sendApiRequest("initialize", req);
+    }
     btns.push(<Tooltip content={<span>Refresh local data from Server.</span>} inline={true} position={Position.LEFT}>
-      <Button key="Reload" text="Reload" />
+      <Button key="Reload" text="Reload" onClick={() => reload()} />
     </Tooltip>);
 
-    /*
-        let btngrp = (
-          <div className="pt-button-group pt-vertical pt-align-left pt-large">
-            {btns}
-          </div>
-        );
-        let pop = (<Popover content={btngrp} popoverClassName="pt-minimal" interactionKind={PopoverInteractionKind.HOVER} position={Position.BOTTOM} >
-          <Button iconName="pt-icon-cog" text="" />
-        </Popover>
-        );
-    */
-    let pop;
+    let btngrp = (
+      <div className="pt-button-group pt-vertical pt-align-left pt-large">
+        {btns}
+      </div>
+    );
+    let pop = (<Popover content={btngrp} popoverClassName="pt-minimal" interactionKind={PopoverInteractionKind.HOVER} position={Position.BOTTOM} >
+      <Button iconName="pt-icon-cog" text="" />
+    </Popover>
+    );
 
     return <div>
       <nav className="pt-navbar pt-dark pt-fixed-top">

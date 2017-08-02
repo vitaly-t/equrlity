@@ -32,6 +32,7 @@ export class LinkEditor extends React.Component<LinkEditorProps, LinkEditorState
     super(props);
     let p = props.info.link;
     let { title, tags, comment, isPublic, amount } = p
+    amount = amount || 0;
     this.state = { title, comment, tags, isPublic, isError: false, isOpen: true, amount };
   }
 
@@ -115,7 +116,7 @@ export class LinkEditor extends React.Component<LinkEditorProps, LinkEditorState
               <Col span={lspan}><span className="pt-text-muted" >Credits:</span></Col>
               <Col span={2}>
                 {canInvest ? <input type="number" style={{ display: 'inline', width: '70px' }} value={this.state.amount} onChange={e => this.changeAmount(e)} />
-                  : this.state.amount.toString()}
+                  : this.state.amount}
               </Col>
               {schedule && <Col><span className="pt-text-muted" >Schedule: </span>{schedule}</Col>}
             </Row>

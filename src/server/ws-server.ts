@@ -11,6 +11,7 @@ type CacheSub = { ws: any, sub: Cache.Subscription }
 let _socketSubs: CacheSub[] = [];
 let _userNames: Map<Dbt.userId, Dbt.userName>;
 let _userSockets = new Map<Dbt.userId, any[]>();
+let _sockets = new Map<string, any>();
 
 const interval = setInterval(() => {
   _socketSubs.forEach(({ ws, sub }) => {
@@ -19,7 +20,7 @@ const interval = setInterval(() => {
       Cache.unSubscribe(sub);
       if (_userSockets.has(ws.userId)) {
         let wss = _userSockets.get(ws.userId);
-        let i = wss.indexOf(wss);
+        let i = wss.indexOf(ws);
         if (i >= 0) wss.splice(i, 1);
       }
     }
@@ -35,6 +36,11 @@ export async function sendMessagesToUser(userId: Dbt.userId, messages: SrvrMsg.M
   if (!_userSockets.has(userId)) return;
   let wss = _userSockets.get(userId);
   wss.forEach(ws => sendMessages(ws, userId, messages));
+}
+
+export async function sendMessagesToConnection(pk: string, userId: Dbt.userId, messages: SrvrMsg.MessageItem[]) {
+  if (!_sockets.has(pk)) return;
+  sendMessages(_sockets.get(pk), userId, messages);
 }
 
 async function sendMessages(ws: any, userId: Dbt.userId, messages: SrvrMsg.MessageItem[], last_feed?: Date) {
@@ -79,20 +85,17 @@ async function initConnection(ws: any, message: string) {
   ws.userId = user.userId;
   if (!_userSockets.has(user.userId)) _userSockets.set(user.userId, [ws]);
   else _userSockets.get(user.userId).push(ws);
+  let pk = JSON.stringify(userJwt.publicKey);
+  if (_sockets.has(pk)) {
+    let tws = _sockets.get(pk);
+    tws.isActive = false;
+  }
+  _sockets.set(pk, ws);
 
   _userNames = Cache.userIdNames();
-  let unms: SrvrMsg.UserIdName[] = Array.from(_userNames.entries())
-    .filter(([id, name]) => id !== user.userId)
-    .map(([id, name]) => { return { id, name }; });
-
-  let profile_pic = user.profile_pic
   let now = new Date();
   let last_feed = req.last_feed ? new Date(req.last_feed) : user.last_feed;
-  let feeds = await Pg.updateUserFeed(user.userId, last_feed);
-  let contents = await Pg.getUserContents(user.userId, last_feed);
-  let shares = await Pg.getUserShares(user.userId, last_feed);
-  let allTags = Cache.allTags();
-  let result: SrvrMsg.InitializeResponse = { user, userNames: unms, contents, shares, feeds, allTags };
+  let result: Rpc.InitializeResponse = await Pg.getInitialData(user, last_feed);
 
   let msg: SrvrMsg.MessageItem = { type: "Init", message: result };
   let msgs = [msg];

@@ -72,6 +72,20 @@ export type InitializeRequest = {
   last_feed?: string;
 }
 
+export type UserIdName = {
+  id: Dbt.userId;
+  name: Dbt.userName;
+}
+
+export type InitializeResponse = {
+  user: Dbt.User;
+  userNames: UserIdName[];
+  feeds: FeedItem[];
+  contents: Dbt.Content[];
+  shares: UserLinkItem[];
+  allTags: Dbt.tag[];   // temporary (hopefully)
+}
+
 export type FeedItem = {
   type: "share" | "comment";
   id: string;
@@ -80,15 +94,6 @@ export type FeedItem = {
   url: Dbt.urlString;
   tags: Dbt.tags;
   comment: string;
-}
-
-export type InitializeResponse = {
-  ok: boolean;
-  profile_pic: Dbt.db_hash;
-  //redirectUrl?: UrlString;
-  feed: FeedItem[];
-  allTags: Dbt.tag[];   // temporary (hopefully)
-  last_feed: string;
 }
 
 export type ShareContentRequest = {

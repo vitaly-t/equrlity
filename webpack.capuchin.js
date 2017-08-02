@@ -8,7 +8,7 @@ const { TextEncoder, TextDecoder } = require('text-encoding');
 const nodeEnv = process.env.NODE_ENV;
 const isProd = nodeEnv === 'production';
 let appName = 'capuchin';
-let manifestName = 'pseudoqurl'
+let manifestName = 'eqURLity'
 if (!isProd && process.env.CAPUCHIN_NAME) {
   appName = process.env.CAPUCHIN_NAME
   manifestName += '-' + appName

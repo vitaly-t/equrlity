@@ -18,6 +18,7 @@ import * as Hasher from '../lib/contentHasher';
 import { YesNoBox } from '../lib/dialogs';
 import { uploadRequest, signData, sendApiRequest } from "../lib/axiosClient";
 import buildWaveform from '../lib/buildWaveform';
+import { TrackInfoEditor, TrackInfoViewer } from '../lib/trackinfo';
 
 import { AppState, postDeserialize } from "./AppState";
 import * as Chrome from './chrome';
@@ -150,7 +151,7 @@ export class ContentsPanel extends React.Component<ContentsPanelProps, ContentsP
     }
     else if (this.state.editingContent) {
       let onClose = () => this.setState({ editingContent: null });
-      contsdiv = <ContentEditor info={this.state.editingContent} allTags={this.props.appState.allTags} creator={this.props.appState.user.userName} onClose={onClose} />
+      contsdiv = <ContentEditor content={this.state.editingContent} allTags={this.props.appState.allTags} onClose={onClose} />
     }
     else if (st.contents.length > 0) {
       let tagfilter = (tags: string[], typ: string): boolean => {

@@ -15,27 +15,3 @@ export type ServerMessage = {
   messages: MessageItem[]
 }
 
-export type UserIdName = {
-  id: Dbt.userId;
-  name: Dbt.userName;
-}
-
-export type FeedItem = {
-  type: "share" | "comment";
-  id: string;
-  created: Dbt.timestamp;
-  source: Dbt.userName;
-  url: Dbt.urlString;
-  tags: Dbt.tags;
-  comment: string;
-}
-
-export type InitializeResponse = {
-  user: Dbt.User;
-  userNames: UserIdName[];
-  feeds: FeedItem[];
-  contents: Dbt.Content[];
-  shares: Rpc.UserLinkItem[];
-  allTags: Dbt.tag[];   // temporary (hopefully)
-}
-

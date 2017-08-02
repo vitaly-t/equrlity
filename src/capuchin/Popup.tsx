@@ -1,12 +1,13 @@
 import * as React from 'react';
 import { Url, format } from 'url';
-import { Row, Col } from 'react-simple-flex-grid';
-import TextareaAutosize from 'react-textarea-autosize';
+import { Col } from 'react-simple-flex-grid';
 import { Button, Intent, Toaster, Position, Popover, PopoverInteractionKind } from "@blueprintjs/core";
 
 import * as Rpc from '../lib/rpc';
 import * as Dbt from '../lib/datatypes';
 import * as Tags from '../lib/tags';
+import * as Constants from '../lib/constants';
+import { Panel, Row, Label, TextAuto } from '../lib/components';
 
 import * as Chrome from './chrome';
 import { AppState, isWaiting, getBookmark, prepareUrl } from "./AppState";
@@ -15,6 +16,8 @@ const toast = Toaster.create({
   className: "popup-toaster",
   position: Position.TOP,
 });
+
+
 
 export interface BookmarkPanelProps { appState: AppState };
 export interface BookmarkPanelState { url: Dbt.urlString, title: string, comment: string, tags: string[] };
@@ -53,11 +56,9 @@ export class BookmarkPanel extends React.Component<BookmarkPanelProps, BookmarkP
     let st = props.appState;
     let curl = st.activeUrl
 
-    let gutter = 20;
+    let { btnStyle, rowStyle, gutter } = Constants;
     let lspan = 2;
     let rspan = 10;
-    let btnStyle = { marginRight: 10 };
-    let rowStyle = { marginBottom: 10 };
     let saveaction = (share: boolean) => {
       let { title, comment, tags, url } = this.state;
       Chrome.sendMessage({ eventType: "BookmarkLink", url, title, comment, tags, share });
@@ -69,32 +70,30 @@ export class BookmarkPanel extends React.Component<BookmarkPanelProps, BookmarkP
       <Button key="Save" style={btnStyle} className="pt-intent-primary" onClick={() => saveaction(false)} text="Save" />
     ]
 
-    return (<div className="pt-elevation-0" style={{ width: "100%", height: "100%", backgroundColor: "#F5F8FA" }}>
-      <div style={{ margin: "16px" }}>
-        <Row style={rowStyle} gutter={gutter} justify="center">
-          <h4 className="pt-text-muted" style={{ marginTop: "16px" }}>Bookmark Details</h4>
-        </Row>
-        <Row style={rowStyle} gutter={gutter} align="top">
-          <Col span={lspan}> <span className="pt-text-muted" >URL:</span></Col>
-          <Col span={rspan}><TextareaAutosize disabled={!curl} className="pt-elevation-2" style={{ width: '100%' }} value={this.state.url} /></Col>
-        </Row>
-        <Row style={rowStyle} gutter={gutter} align="top">
-          <Col span={lspan}> <span className="pt-text-muted" >Title:</span></Col>
-          <Col span={rspan}><TextareaAutosize className="pt-elevation-2" style={{ width: '100%' }} value={this.state.title} onChange={(e) => this.changeTitle(e.target.value)} /></Col>
-        </Row>
-        <Row style={rowStyle} gutter={gutter} align="top">
-          <Col span={lspan}> <span className="pt-text-muted" >Comment:</span></Col>
-          <Col span={rspan}><TextareaAutosize className="pt-elevation-2" style={{ width: '100%' }} value={this.state.comment} onChange={(e) => this.changeComment(e.target.value)} /></Col>
-        </Row>
-        <Row style={rowStyle} gutter={gutter} align="top">
-          <Col span={lspan}> <span className="pt-text-muted" >Tags:</span></Col>
-          <Col span={rspan}><Tags.TagGroupEditor tags={this.state.tags} creatable={true} allTags={this.props.appState.allTags} onChange={(tags) => this.changeTags(tags)} /></Col>
-        </Row>
-        <Row style={rowStyle} gutter={gutter} justify="end" align="top">
-          {btns}
-        </Row>
-      </div>
-    </div>);
+    return (<Panel>
+      <Row justify="center">
+        <h4 className="pt-text-muted" style={{ marginTop: "16px" }}>Bookmark Details</h4>
+      </Row>
+      <Row>
+        <Label span={lspan}>URL:</Label>
+        <Col span={rspan}><TextAuto disabled={true} value={this.state.url} /></Col>
+      </Row>
+      <Row>
+        <Label span={lspan}>Title:</Label>
+        <Col span={rspan}><TextAuto value={this.state.title} onChange={v => this.changeTitle(v)} /></Col>
+      </Row>
+      <Row>
+        <Label span={lspan}>Comment:</Label>
+        <Col span={rspan}><TextAuto value={this.state.comment} onChange={v => this.changeComment(v)} /></Col>
+      </Row>
+      <Row>
+        <Label span={lspan}>Tags:</Label>
+        <Col span={rspan}><Tags.TagGroupEditor tags={this.state.tags} creatable={true} allTags={this.props.appState.allTags} onChange={(tags) => this.changeTags(tags)} /></Col>
+      </Row>
+      <Row justify="end">
+        {btns}
+      </Row>
+    </Panel>);
   }
 }
 
@@ -108,7 +107,7 @@ export class PopupPanel extends React.Component<PopupPanelProps, PopupPanelState
 
   // grass skirts afire - see if this fixed the Mac rendering problem.
   componentDidMount() {
-    setTimeout(() => this.setState({ macfix: true }), 50);
+    setTimeout(() => this.setState({ macfix: true }), 100);
   }
 
   render() {
@@ -117,9 +116,7 @@ export class PopupPanel extends React.Component<PopupPanelProps, PopupPanelState
     let curl = st.activeUrl
 
     let launch = () => Chrome.sendMessage({ eventType: "LaunchPage", page: "home" });
-    let gutter = 20;
-    let btnStyle = { marginRight: 10 };
-    let rowStyle = { marginBottom: 10 };
+    let { btnStyle, rowStyle, gutter, bannerTextColor } = Constants;
     let btns = [
       <Button key="Home" style={btnStyle} className="pt-intent-success" iconName="pt-icon-home" onClick={launch} text="Home" />,
     ]
@@ -127,8 +124,8 @@ export class PopupPanel extends React.Component<PopupPanelProps, PopupPanelState
 
     if (st.lastErrorMessage) toast.show({ message: "Error: " + st.lastErrorMessage });
     return <div>
-      <Row style={rowStyle} gutter={gutter} justify="space-between">
-        <Col span={3}><h2 style={{ color: "#48AFF0" }}><b><i>eqURLity</i></b></h2></Col>
+      <Row style={rowStyle} gutter={gutter} justify="space-between" align="center" >
+        <Col span={3}><h2 style={{ color: bannerTextColor }}><b><i>eqURLity</i></b></h2></Col>
         <Col span={9}>
           <Row style={rowStyle} gutter={gutter} justify="end">{btns}</Row>
         </Col>

@@ -18,7 +18,6 @@ import * as cors from 'kcors';
 import * as koaBody from 'koa-body';
 import * as range from 'koa-range';
 import { createReadStream } from 'streamifier';
-import websockify from './koa-ws';
 
 // lib
 import * as OxiDate from '../lib/oxidate';
@@ -42,6 +41,7 @@ import { serve } from './koa-static';
 import clientIP from './clientIP.js';
 import * as pg from './pgsql';
 import * as cache from './cache';
+import websockify from './koa-ws';
 import * as Wss from './ws-server';
 
 pg.init();
@@ -578,6 +578,17 @@ router.post('/rpc', async function (ctx: any) {
   let userId = ctx.userId.id;
   try {
     switch (method as Rpc.Method) {
+      case "initialize": {
+        let req: Rpc.InitializeRequest = params;
+        let user = cache.users.get(userId);
+        let last_feed = req.last_feed ? new Date(req.last_feed) : null;
+        let message: Rpc.InitializeResponse = await pg.getInitialData(user, last_feed);
+        Wss.sendMessagesToConnection(JSON.stringify(req.publicKey), userId, [{ type: "Init", message }]);
+        let result = { ok: true };
+        ctx.body = { id, result };
+        break;
+
+      }
       /*
       case "updateFeed": {
         //let req: Rpc.UpdateFeedRequest = params;

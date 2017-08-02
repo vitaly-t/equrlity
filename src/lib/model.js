@@ -57,6 +57,7 @@ export default {
       sqlType: "varchar(30)"
     },
     json: {
+      tsType: "any",
       sqlType: "jsonb"
     },
     hashId: {
@@ -144,6 +145,7 @@ export default {
     Content: ["contentId", "contentType", "title", "userId", "db_hash", "content", "created", "updated", "isPublic", "tags",
       { name: "url", type: "urlString" },
       { name: "mime_ext", type: "varchar(8)" },
+      { name: "info", type: "json" },
     ],
     Comment: ["commentId", "contentId", "userId", "comment", "created", "updated",
       { name: "parent", type: "commentId" },
@@ -151,7 +153,7 @@ export default {
     Invitation: ["ipAddress", "linkId", "created", "updated"],
     Link: ["linkId", "userId", "contentId", "title", "created", "updated", "comment", "isPublic", "tags", "paymentSchedule",
       { name: "prevLink", type: "linkId" },
-      { name: "amount", type: "integer" },
+      { name: "amount", type: "integer", notNull: true, default: 0 },
     ],
     PurchasedLink: ["linkId", "userId", "created", "updated",
       { name: "totalPayment", type: "payment" }

@@ -1,6 +1,6 @@
 {
-  "name": "pseudoqurl",
-  "version": "0.9.8",
+  "name": "equrlity",
+  "version": "0.9.9",
   "description": "Intention Economy prototype",
   "main": "index.ts",
   "scripts": {
@@ -27,7 +27,7 @@
   "author": "Gary Stephenson",
   "license": "MIT",
   "dependencies": {
-    "@blueprintjs/core": "^1.21.0",
+    "@blueprintjs/core": "^1.23.1",
     "asn1.js": "^4.9.1",
     "auto-prefixer": "^0.4.2",
     "autoprefixer": "^6.7.4",
@@ -95,7 +95,7 @@
     "@types/passport-facebook": "^1.0.29",
     "@types/passport-local": "^1.0.29",
     "@types/passport-twitter": "^1.0.30",
-    "@types/react": "^15.0.33",
+    "@types/react": "^15.0.39",
     "@types/react-dom": "^15.5.1",
     "@types/text-encoding": "0.0.30",
     "@types/videojs": "^5.16.2",

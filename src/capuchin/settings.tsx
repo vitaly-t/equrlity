@@ -96,7 +96,7 @@ export class SettingsPanel extends React.Component<SettingsPanelProps, SettingsP
 
   render() {
     let st = this.props.appState;
-    let vsp = <div style={{ height: 20 }} />;
+    let vsp = this.props.panelContext.vsp
     let divStyle = { width: '100%', marginTop: 5, marginLeft: 5, padding: 6 };
     let lhcolStyle = { marginBottom: "5px" };
     let user = this.state.user;

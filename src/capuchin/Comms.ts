@@ -25,10 +25,6 @@ export async function sendBookmarkLink(st: AppState, url: string, title: string,
   return await sendApiRequest("bookmarkLink", req);
 }
 
-export async function sendInitialize(st: AppState): Promise<AxiosResponse> {
-  return await sendApiRequest("initialize", { publicKey: st.publicKey, last_feed: st.user.last_feed });
-}
-
 export async function sendDismissFeeds(st: AppState, urls: Dbt.urlString[], save?: boolean): Promise<AxiosResponse> {
   save = save || false;
   return await sendApiRequest("dismissFeeds", { urls, save });
@@ -70,18 +66,27 @@ export function openWebSocket(st: AppState, messageHandler: (msg: any) => void, 
   //console.log("opening Websocket");
   if (!st.jwt) throw new Error("missing jwt");
   let url = Utils.serverUrl.replace('http', 'ws');
-  var ws = new WebSocket(url);
+  let ws = new WebSocket(url);
   let _pingTimer;
+  let handleError = (msg: string) => {
+    ws.close();
+    if (_pingTimer) {
+      clearTimeout(_pingTimer);
+      _pingTimer = 0;
+    }
+    errorHandler(new Error("Websocket Error: " + msg));
+  }
   function resetPinger() {
     if (_pingTimer) clearTimeout(_pingTimer);
     _pingTimer = setTimeout(() => {
       //console.log("pinging server");
-      /*
       if (ws.readyState !== 1) {
         errorHandler(new Error("Socket not ready for ping."));
       }
-      else */
-      ws.send('{"ping": true}');
+      else {
+        try { ws.send('{"ping": true}'); }
+        catch (e) { handleError(e.message); }
+      }
     }, 10000)
   }
   ws.onopen = (event) => {
@@ -108,13 +113,6 @@ export function openWebSocket(st: AppState, messageHandler: (msg: any) => void, 
       }
     }
   }
-  ws.onerror = (event: ErrorEvent) => {
-    ws.close();
-    if (_pingTimer) {
-      clearTimeout(_pingTimer);
-      _pingTimer = 0;
-    }
-    errorHandler(new Error("Websocket Error: " + event.message));
-  }
+  ws.onerror = (event: ErrorEvent) => { handleError(event.message) };
   resetPinger();
 }

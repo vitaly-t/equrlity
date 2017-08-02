@@ -62,7 +62,7 @@ export class MediaPage extends React.Component<MediaPageProps, MediaPageState> {
   purchaseCost() {
     let { paymentSchedule, streamNumber, linkDepth } = this.state;
     let purchaseCost = linkDepth;
-    if (streamNumber > 0) {
+    if (paymentSchedule && streamNumber > 0) {
       let i = streamNumber - 1;
       while (i < paymentSchedule.length) {
         purchaseCost += paymentSchedule[i];

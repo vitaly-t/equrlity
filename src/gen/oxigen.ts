@@ -21,7 +21,7 @@ export interface IColumn {
   type: IScalarType,
   multiValued?: boolean,
   notNull?: boolean,
-  default?: string
+  default?: string | number | boolean   // dates???
 }
 
 export interface TupleType {
@@ -286,20 +286,30 @@ export function genCreateTableStatement(tbl: ITable): string {
   return stmt;
 }
 
-export function defaultValue(typ: IScalarType): any {
-  if (typ.enum) return [];
-  switch (typ.name) {
-    case "string": return "";
-    case "number": return typ.max ? typ.min : 0;
-    case "date": return new Date();
-    case "boolean": return false;
+export function defaultValue(col: IColumn): any {
+  let typ = col.type;
+  if (col.default) {
+    if (typ.tsType === "date") return new Date(col.default);
+    return col.default;
   }
+  if (typ.multiValued) return [];
+  if (col.notNull) {
+    if (typ.enum) return typ.enum[0];
+    switch (typ.tsType) {
+      case "string": return "";
+      case "number": return 0;
+      case "date": return new Date();
+      case "boolean": return false;
+      default: return undefined;
+    }
+  }
+  return undefined;
 }
 
 export function emptyRec<T>(tblnm: string): T {
   let tbl = dbSchema.tables.get(tblnm);
   let rslt = Object.create(null);
-  tbl.rowType.heading.forEach(c => rslt[c.name] = undefined);
+  tbl.rowType.heading.forEach(c => rslt[c.name] = defaultValue(c));
   return rslt;
 }
 

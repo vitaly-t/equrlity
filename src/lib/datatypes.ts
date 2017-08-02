@@ -11,9 +11,10 @@ export type db_hash = string;
 export type email = string;
 export type integer = number;
 export type ipAddress = string;
-export type json = string;
+export type json = any;
 export type hashId = string;
 export type percentage = number;
+export type storageProvider = "blob" | "dropbox" | "ipfs";
 export type tag = string;
 export type text = string;
 export type timestamp = Date;
@@ -91,7 +92,8 @@ export interface Content {
   readonly isPublic: isPublic | null,
   readonly tags: tags | null,
   readonly url: urlString | null,
-  readonly mime_ext: varchar_8 | null
+  readonly mime_ext: varchar_8 | null,
+  readonly info: json | null
 };
 
 export interface Comment {
@@ -116,7 +118,7 @@ export interface Link {
   readonly tags: tags | null,
   readonly paymentSchedule: paymentSchedule | null,
   readonly prevLink: linkId | null,
-  readonly amount: integer | null
+  readonly amount: integer
 };
 
 export interface Invitation {

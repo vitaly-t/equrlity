@@ -364,7 +364,7 @@ function mergeFeeds(feeds: Rpc.FeedItem[], newFeeds: Rpc.FeedItem[]): Rpc.FeedIt
   return feeds;
 }
 
-function mergeUserNames(userNames: SrvrMsg.UserIdName[]): Tags.TagSelectOption[] {
+function mergeUserNames(userNames: Rpc.UserIdName[]): Tags.TagSelectOption[] {
   let rslt = [];
   for (const n of userNames) rslt.push({ value: n.id, label: n.name });
   return rslt;
@@ -376,11 +376,15 @@ export async function receiveServerMessages(srvmsg: SrvrMsg.ServerMessage) {
     for (const msg of srvmsg.messages) {
       switch (msg.type) {
         case "Init": {
-          let rslt: SrvrMsg.InitializeResponse = msg.message;
+          let rslt: Rpc.InitializeResponse = msg.message;
           let { user, contents, feeds, shares } = rslt
           let allTags = Tags.mergeTags(rslt.allTags, st.allTags);
           contents = mergeContents(st.contents, contents);
+          // should not be necessary
+          contents.sort((a, b) => (new Date(b.created)).getTime() - (new Date(a.created).getTime()));
           shares = mergeShares(st.shares, shares);
+          // should not be necessary
+          shares.sort((a, b) => (new Date(b.link.created)).getTime() - (new Date(a.link.created).getTime()));
           let userNames = mergeUserNames(rslt.userNames);
           let feed = mergeFeeds(st.feeds, feeds);
           chrome.browserAction.setBadgeText({ text: feed.length.toString() });
@@ -415,7 +419,6 @@ export async function receiveServerMessages(srvmsg: SrvrMsg.ServerMessage) {
             if (i < 0) contents = [cont, ...contents];
             else contents.splice(i, 1, cont);
           }
-          //contents.sort((a, b) => (new Date(b.created)).getTime() - (new Date(a.created).getTime()));
           st = { ...st, contents };
           break;
         }
@@ -431,7 +434,6 @@ export async function receiveServerMessages(srvmsg: SrvrMsg.ServerMessage) {
             if (i < 0) shares = [item, ...shares];
             else shares.splice(i, 1, item);
           }
-          //investments.sort((a, b) => (new Date(b.link.created)).getTime() - (new Date(a.link.created).getTime()));
           st = { ...st, shares };
           break;
         }
