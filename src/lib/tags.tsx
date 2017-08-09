@@ -5,8 +5,12 @@ import { Row } from 'react-simple-flex-grid';
 
 export type TagSelectOption = { value: string, label: string }
 
-export function mergeTags(tags: string[], _allTags: TagSelectOption[]): TagSelectOption[] {
+export function mergeTags(tags: string[], _allTags?: TagSelectOption[]): TagSelectOption[] {
   //  assumes _allTags is sorted
+  if (!_allTags) {
+    tags.sort();
+    return tags.map(c => { return { label: c, value: c }; });
+  }
   let allTags = _allTags;
   let fnd = false;
   tags = tags || [];

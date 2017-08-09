@@ -3,14 +3,13 @@
 import * as React from 'react';
 import * as ReactDOM from 'react-dom';
 import { Button, Dialog, Checkbox, Toaster, Position } from "@blueprintjs/core";
-import { Row, Col } from 'react-simple-flex-grid';
-import TextareaAutosize from 'react-textarea-autosize';
 
 import * as OxiDate from '../lib/oxidate';
 import * as utils from '../lib/utils';
 import * as uuid from '../lib/uuid.js';
 import * as Tags from '../lib/tags';
-import { rowStyle, btnStyle, lhcolStyle } from "../lib/constants";
+import { btnStyle } from "../lib/constants";
+import { Panel, Label, TextAuto, Row, Col } from "../lib/components";
 import * as Rpc from '../lib/rpc';
 import * as Dbt from '../lib/datatypes';
 import { sendApiRequest } from "../lib/axiosClient";
@@ -82,50 +81,50 @@ export class LinkEditor extends React.Component<LinkEditorProps, LinkEditorState
     }
     let lspan = 2;
     return (
-      <Dialog iconName="inbox" style={{ width: '600px' }} isOpen={this.state.isOpen} title={"Edit Share Details"} canOutsideClickClose={false} onClose={() => this.close()} >
-        <div className="pt-elevation-0" style={{ width: "100%", height: "100%", backgroundColor: "#F5F8FA" }}>
-          <div style={{ margin: '15px' }}>
-            <Row style={rowStyle} gutter={gutter}>
-              <Col span={lspan}><span className="pt-text-muted" >Title:</span></Col>
-              <Col span={7}>
-                <input type="text" style={{ width: '100%' }} value={this.state.title} onChange={e => this.changeTitle(e)} />
-              </Col>
-              <Col><Checkbox label="Public?" className="pt-text-muted" checked={this.state.isPublic} onChange={e => this.setState({ isPublic: !this.state.isPublic })} /></Col>
-            </Row>
-            <Row style={rowStyle} gutter={gutter}>
-              <Col span={lspan}><span className="pt-text-muted" >Comment:</span></Col>
-              <Col span={12 - lspan}>
-                <TextareaAutosize style={{ width: '100%', minHeight: "100px", maxHeight: "600px" }} value={this.state.comment} onChange={e => this.changeComment(e)} />
-              </Col>
-            </Row>
-            <Row style={rowStyle} gutter={gutter}>
-              <Col span={lspan}><span className="pt-text-muted" >Created:</span></Col>
-              <Col>{created}</Col>
-            </Row>
-            {updated !== created && <Row style={rowStyle} gutter={gutter}>
-              <Col span={lspan}><span className="pt-text-muted" >Updated:</span></Col>}
+      <Dialog iconName="share" style={{ width: '600px' }} isOpen={this.state.isOpen} title={"Edit Share Details"} canOutsideClickClose={false} onClose={() => this.close()} >
+        <Panel>
+          <Row>
+            <Label span={lspan} >Title:</Label>
+            <Col span={7}>
+              <input type="text" style={{ width: '100%' }} value={this.state.title} onChange={e => this.changeTitle(e)} />
+            </Col>
+            <Col><Checkbox label="Public?" className="pt-text-muted" checked={this.state.isPublic} onChange={e => this.setState({ isPublic: !this.state.isPublic })} /></Col>
+          </Row>
+          <Row>
+            <Label span={lspan}>Comment:</Label>
+            <Col span={12 - lspan}>
+              <textarea className="pt-input pt-fill" style={{ height: "100px" }} value={this.state.comment} onChange={e => this.changeComment(e)} />
+            </Col>
+          </Row>
+          <Row>
+            <Label span={lspan}>Created:</Label>
+            <Col>{created}</Col>
+          </Row>
+          {updated !== created && <Row>
+            <Label span={lspan}>Updated:</Label>}
             <Col>{updated}</Col>}
           </Row>}
-            <Row style={rowStyle} gutter={gutter} align="center">
-              <Col span={lspan}><span className="pt-text-muted" >Tags:</span></Col>
-              <Col span={10}>
-                <Tags.TagGroupEditor tags={this.state.tags} creatable={true} allTags={this.props.allTags} onChange={tags => this.changeTags(tags)} />
-              </Col>
-            </Row>
-            <Row style={rowStyle} gutter={gutter} >
-              <Col span={lspan}><span className="pt-text-muted" >Credits:</span></Col>
+          <Row align="center">
+            <Label span={lspan}>Tags:</Label>
+            <Col span={10}>
+              <Tags.TagGroupEditor tags={this.state.tags} creatable={true} allTags={this.props.allTags} onChange={tags => this.changeTags(tags)} />
+            </Col>
+          </Row>
+          {!this.state.isPublic &&
+            <Row>
+              <Label span={lspan}>Credits:</Label>
               <Col span={2}>
                 {canInvest ? <input type="number" style={{ display: 'inline', width: '70px' }} value={this.state.amount} onChange={e => this.changeAmount(e)} />
                   : this.state.amount}
               </Col>
               {schedule && <Col><span className="pt-text-muted" >Schedule: </span>{schedule}</Col>}
             </Row>
-            <Row style={rowStyle} gutter={gutter} justify="end" align="top">
-              <Button key='cancel' style={btnStyle} onClick={() => this.cancel()} text="Cancel" />
-              <Button key='save' className="pt-intent-primary" style={btnStyle} onClick={() => this.save()} text="Save" />
-            </Row>
-          </div>
-        </div>
+          }
+          <Row justify="end" align="top">
+            <Button key='cancel' style={btnStyle} onClick={() => this.cancel()} text="Cancel" />
+            <Button key='save' className="pt-intent-primary" style={btnStyle} onClick={() => this.save()} text="Save" />
+          </Row>
+        </Panel>
       </Dialog>
 
     );

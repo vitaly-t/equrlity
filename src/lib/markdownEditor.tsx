@@ -3,8 +3,8 @@ import * as React from 'react';
 import * as ReactDOM from "react-dom";
 
 import { Button, Dialog } from "@blueprintjs/core";
-import { Row, Col } from 'react-simple-flex-grid';
-import TextareaAutosize from 'react-textarea-autosize';
+import { btnStyle } from '../lib/constants';
+import { Panel, Row, Col } from '../lib/components';
 
 import * as Remarkable from 'remarkable';
 
@@ -54,9 +54,6 @@ export class MarkdownEditor extends React.Component<MarkdownEditorProps, Markdow
     if (this.state.previewing) {
       return <MarkdownPreview text={this.props.value || ''} onClose={() => this.setState({ previewing: false })} allowHtml={this.props.allowHtml} />
     }
-    let gutter = 10;
-    let btnStyle = { marginLeft: gutter / 2 };
-    let rowStyle = { margin: gutter / 2 };
 
     let isDirty = this.props.isDirty;
     let btns = [];
@@ -68,15 +65,15 @@ export class MarkdownEditor extends React.Component<MarkdownEditorProps, Markdow
       btns.push(<Button key="Save" style={btnStyle} disabled={!isDirty} className="pt-intent-primary" onClick={() => this.props.onSave()} text="Save" />);
     };
     let ttl = null;
-    if (this.props.title) ttl = <Row gutter={gutter} align='bottom' style={rowStyle}><h5 style={{ marginTop: "10px" }}>{this.props.title}</h5></Row>;
+    if (this.props.title) ttl = <Row><h5 style={{ marginTop: "10px" }}>{this.props.title}</h5></Row>;
 
-    return <div className="pt-elevation-0" style={{ width: "100%", height: "100%", backgroundColor: "#F5F8FA" }}>
+    return <Panel>
       {ttl}
-      <Row gutter={gutter} style={rowStyle} >
-        <TextareaAutosize className="pt-elevation-2" style={{ margin: "5px", width: "100%", minHeight: "100px", maxHeight: "600px", backgroundColor: "white" }}
+      <Row>
+        <textarea className="pt-elevation-2 pt-input pt-fill" style={{ marginTop: "10px", marginRight: "10px", height: "100px", backgroundColor: "white" }}
           value={this.props.value || ''} onChange={e => this.props.onChange(e.target.value)} />
       </Row>
-      <Row gutter={gutter} style={rowStyle}  >
+      <Row>
         <Col span={3}>
           <a href="https://github.com/adam-p/markdown-here/wiki/Markdown-Cheatsheet" target="_blank">markdown cheatsheet</a>
         </Col>
@@ -84,7 +81,7 @@ export class MarkdownEditor extends React.Component<MarkdownEditorProps, Markdow
           <Row justify="end">{btns}</Row>
         </Col>
       </Row>
-    </div>
+    </Panel>
 
   }
 }

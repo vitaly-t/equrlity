@@ -595,7 +595,7 @@ async function _updateUserFeeds(t: ITask<any>, userId: Dbt.userId, links: Dbt.Li
   return feeds;
 }
 
-function _convertLinksToFeeds(userId: Dbt.userId, feeds: Dbt.Feed[]): Rpc.FeedItem[] {
+function _convertLinksToFeeds(feeds: Dbt.Feed[]): Rpc.FeedItem[] {
   let rslt: Rpc.FeedItem[] = [];
   for (const f of feeds) {
     let l: Dbt.Link = cache.links.get(f.linkId);
@@ -616,7 +616,7 @@ export async function updateUserFeed(userId: Dbt.userId, last_feed: Date): Promi
     let links: Dbt.Link[] = await t.any('select * from links where created > $1', [last_feed]);
     await _updateUserFeeds(t, userId, links);
     let feeds: Dbt.Feed[] = await t.any(`select * from feeds where "userId" = '${userId}' and dismissed is null order by created desc`);
-    let linkItems = _convertLinksToFeeds(userId, feeds);
+    let linkItems = _convertLinksToFeeds(feeds);
     let commentItems = await getCommentsFeed(userId, last_feed);
     return [...linkItems, ...commentItems];
   });
@@ -658,7 +658,7 @@ export async function liveUserFeed(userId: Dbt.userId, updts: cache.CacheUpdate[
   if (links.length === 0 && comments.length === 0) return [];
   return await db.tx(async t => {
     let linkfeeds = await _updateUserFeeds(t, userId, links);
-    let feeds = _convertLinksToFeeds(userId, linkfeeds);
+    let feeds = _convertLinksToFeeds(linkfeeds);
     let cmts = _convertCommentsToFeeds(userId, comments);
     return [...feeds, ...cmts];
   });
@@ -673,7 +673,7 @@ export async function newFollowingFeed(userId: Dbt.userId, following: Dbt.userId
   let f = OxiGen.emptyRec<Dbt.Feed>("feeds");
   let linkfeeds = links.map(l => { return { ...f, userId, linkId: l.linkId }; });
   await upsertRecords<Dbt.Feed>("feeds", linkfeeds);
-  return _convertLinksToFeeds(userId, linkfeeds);
+  return _convertLinksToFeeds(linkfeeds);
 }
 
 export async function sendNewFollowFeeds(userId: Dbt.userId, newFollows: Dbt.userId[]) {
@@ -687,6 +687,33 @@ export async function sendNewFollowFeeds(userId: Dbt.userId, newFollows: Dbt.use
 
 export async function dismissFeeds(userId: Dbt.userId, urls: Dbt.urlString[], save: boolean): Promise<void> {
   return await db.tx(t => tasks.dismissFeeds(t, userId, urls, save));
+}
+
+function _linksToFeeds(links: Dbt.Link[]): Rpc.FeedItem[] {
+  return links.map(l => {
+    let { created, tags, comment } = l;
+    let item: Rpc.FeedItem = {
+      type: "share",
+      created, tags, comment, id: l.linkId,
+      source: cache.users.get(l.userId).userName,
+      url: Utils.linkToUrl(l.linkId, l.title),
+    };
+    return item;
+  });
+}
+
+export async function publicFeed(last_feed?: Date): Promise<Rpc.FeedItem[]> {
+  let now = new Date();
+  last_feed = last_feed || OxiDate.addDays(new Date(), -30);  // last month
+  let links: Dbt.Link[] = await db.any(`select * from links where "isPublic" and created > $1 order by created desc`, [last_feed]);
+  return _linksToFeeds(links);
+}
+
+export async function memberFeed(userId: Dbt.userId, last_feed?: Date): Promise<Rpc.FeedItem[]> {
+  let now = new Date();
+  last_feed = last_feed || OxiDate.addDays(new Date(), -30);  // last month
+  let links: Dbt.Link[] = await db.any(`select * from links where "userId" != '${userId}' and created > $1 order by created desc`, [last_feed]);
+  return _linksToFeeds(links);
 }
 
 export async function generateFeeds() {
@@ -705,6 +732,9 @@ export async function generateFeeds() {
     }
   }
 }
+
+
+
 
 export async function calcChargeForNextStream(viewerId: Dbt.userId, viewedLinkId: Dbt.linkId): Promise<Dbt.integer> {
   let links = cache.getChainFromLinkId(viewedLinkId);

@@ -3,15 +3,13 @@
 import * as React from 'react';
 import * as ReactDOM from 'react-dom';
 import { Button, Dialog, Checkbox, Toaster, Position } from "@blueprintjs/core";
-import { Col } from 'react-simple-flex-grid';
-import TextareaAutosize from 'react-textarea-autosize';
 
 import * as OxiDate from '../lib/oxidate';
 import * as utils from '../lib/utils';
 import * as uuid from '../lib/uuid.js';
 import * as Tags from '../lib/tags';
 import { btnStyle, gutter } from "../lib/constants";
-import { Panel, Label, Row, TextAuto } from "../lib/components";
+import { Panel, Label, Row, Col, TextAuto } from "../lib/components";
 import { ContentView } from "../lib/contentview";
 import * as Rpc from '../lib/rpc';
 import * as Dbt from '../lib/datatypes';

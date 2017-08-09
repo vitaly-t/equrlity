@@ -49,7 +49,7 @@ export class FeedsPanel extends React.Component<FeedsPanelProps, FeedsPanelState
       }
       filteredLinks = links.filter(f => tagfilter(f.tags, f.source));
       let linkrows = filteredLinks.map(f => {
-        let { url, comment, source, type } = f
+        let { url, comment, source, type, created } = f
         let dismiss = () => { Chrome.sendMessage({ eventType: "DismissFeeds", feeds: [f] }); };
         let save = () => { Chrome.sendMessage({ eventType: "DismissFeeds", feeds: [f], save: true }); };
         let onclick = () => { chrome.tabs.create({ active: true, url }); };
@@ -70,6 +70,7 @@ export class FeedsPanel extends React.Component<FeedsPanelProps, FeedsPanelState
         return (
           <tr key={url} >
             <td>{type}</td>
+            <td>{OxiDate.timeAgo(new Date(created))}</td>
             <td><a href="" onClick={onclick} >{url}</a></td>
             <td><Tags.TagGroup tags={[source]} onClick={(s) => panelContext.addFilter(s)} /></td>
             <td>{comment}</td>
@@ -83,6 +84,7 @@ export class FeedsPanel extends React.Component<FeedsPanelProps, FeedsPanelState
           <thead>
             <tr>
               <th>Type</th>
+              <th>Created</th>
               <th>Link</th>
               <th>Source</th>
               <th>Comment</th>
@@ -119,10 +121,10 @@ export class FeedsPanel extends React.Component<FeedsPanelProps, FeedsPanelState
       let filters = panelContext.filters();
       cols.push(<Col key="saveAll" ><Button disabled={filteredLinks.length === 0} className="pt-intent-success" style={btnStyle} onClick={saveAll} text="Bookmark All" /></Col>)
       cols.push(<Col key="dismissAll" ><Button disabled={filteredLinks.length === 0} className="pt-intent-danger" style={btnStyle} onClick={dismissAll} text="Dismiss All" /></Col>)
-      if (filters.length > 0) {
-        let feedFltrs = <Tags.TagGroup tags={filters} onRemove={(s) => panelContext.removeFilter(s)} />;
-        cols.push(<Col key="feedFilters" ><Row>Showing :  {feedFltrs}</Row></Col>);
-      }
+      let fltrs = <Tags.TagGroupEditor creatable={false} tags={filters} allTags={st.allTags} onChange={filters => panelContext.setFilters(filters)} />;
+      cols.push(<Col key="feedFilters" >
+        <Row align="top" ><span>Showing : </span><div style={{ display: 'inline-block' }}>{fltrs}</div></Row>
+      </Col>);
       fltrDiv = <Row>{cols}</Row>;
     }
 

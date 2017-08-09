@@ -2,7 +2,6 @@ import * as React from 'react';
 import { Button, Intent, Tooltip, Position, Popover, PopoverInteractionKind, EditableText } from "@blueprintjs/core";
 import * as Select from 'react-select';
 import { Col } from 'react-simple-flex-grid';
-import TextareaAutosize from 'react-textarea-autosize';
 
 import { Panel, Row, Label, TextAuto } from '../lib/components';
 import * as Constants from '../lib/constants';
@@ -39,19 +38,15 @@ interface TrackInfoViewerProps { trackInfo: TrackInfo }
 export class TrackInfoViewer extends React.Component<TrackInfoViewerProps, {}> {
 
   render() {
-    let { btnStyle, rowStyle, gutter, bannerTextColor } = Constants;
     let info = this.props.trackInfo;
     let lspan = 2;
     let rspan = 10;
 
-    return (<Panel>
-      <Row justify="center">
-        <h4 className="pt-text-muted" >Credits</h4>
-      </Row>
+    return (<div>
       <Row>
         <Label span={lspan}>Artist:</Label>
         <Col span={rspan}>{info.artist}</Col>
-      </Row>}
+      </Row>
       {info.album && <Row>
         <Label span={lspan}>Album:</Label>
         <Col span={rspan}>{info.album}</Col>
@@ -64,7 +59,7 @@ export class TrackInfoViewer extends React.Component<TrackInfoViewerProps, {}> {
         <Label span={lspan}>{"Performer" + (info.performers.length > 1 ? "s" : "")}:</Label>
         <Col span={rspan}>{info.performers.map(p => <p>{p.person + " : " + p.instrument}</p>)}</Col>
       </Row>}
-    </Panel>);
+    </div>);
   }
 
 }
@@ -101,7 +96,9 @@ export class TrackInfoEditor extends React.Component<TrackInfoEditorProps, Track
     let performers = [];
     s.replace(',', '\n').split('\n').forEach(p => {
       let [person, instrument] = p.split(':').map(s => s.trim());
-      if (person && instrument) performers.push({ person, instrument });
+      person = person || "???";
+      instrument = instrument || "???";
+      performers.push({ person, instrument });
     });
     let trackInfo = { ...this.props.trackInfo, performers }
     this.props.onChange(trackInfo);
@@ -117,7 +114,7 @@ export class TrackInfoEditor extends React.Component<TrackInfoEditorProps, Track
   }
 
   render() {
-    let { btnStyle, rowStyle, gutter, bannerTextColor } = Constants;
+    let { btnStyle } = Constants;
     let info = this.props.trackInfo;
     let lspan = this.props.lspan;
     let rspan = this.props.rspan || 12 - lspan;

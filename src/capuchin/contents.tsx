@@ -4,7 +4,6 @@ import { Button, Dialog, Intent, ProgressBar, Checkbox, Position, IToaster, Popo
 import * as Dropzone from 'react-dropzone';
 import { Url, format } from 'url';
 import axios, { AxiosResponse, AxiosError } from 'axios';
-import { Row, Col } from 'react-simple-flex-grid';
 
 import * as Dbt from '../lib/datatypes';
 import * as Rpc from '../lib/rpc';
@@ -13,6 +12,7 @@ import * as Constants from '../lib/constants';
 import * as OxiDate from '../lib/oxidate';
 import * as OxiGen from '../gen/oxigen';
 import { rowStyle, btnStyle, lhcolStyle } from "../lib/constants";
+import { Panel, Row, Col, Label } from "../lib/components";
 import * as Tags from '../lib/tags';
 import * as Hasher from '../lib/contentHasher';
 import { YesNoBox } from '../lib/dialogs';
@@ -198,6 +198,7 @@ export class ContentsPanel extends React.Component<ContentsPanelProps, ContentsP
         );
         return (
           <tr key={p.contentId} >
+            <td>{OxiDate.timeAgo(new Date(p.created))}</td>
             <td><Tags.TagGroup tags={[p.contentType]} onClick={(s) => panelContext.addFilter(s)} /></td>
             <td><a href={url} target="_blank" >{url}</a></td>
             <td>{p.title}</td>
@@ -210,6 +211,7 @@ export class ContentsPanel extends React.Component<ContentsPanelProps, ContentsP
         <table className="pt-table pt-striped pt-bordered" >
           <thead>
             <tr>
+              <th>Created</th>
               <th>Type</th>
               <th>Link</th>
               <th>Title</th>
@@ -225,10 +227,11 @@ export class ContentsPanel extends React.Component<ContentsPanelProps, ContentsP
 
     let fltrDiv = null;
     let filters = panelContext.filters();
-    if (filters.length > 0) {
-      let fltrs = <Tags.TagGroup tags={filters} onRemove={(s) => panelContext.removeFilter(s)} />;
-      fltrDiv = <div>{vsp}<Row>Showing :  {fltrs}</Row></div>;
-    }
+    let fltrs = <Tags.TagGroupEditor creatable={false} tags={filters} allTags={st.allTags} onChange={filters => panelContext.setFilters(filters)} />;
+    fltrDiv = <div>
+      {vsp}
+      <Row align="top" ><span>Showing : </span><div style={{ display: 'inline-block' }}>{fltrs}</div></Row>
+    </div>;
 
     let uploadDiv;
     if (this.state.uploadProgress.length > 0) {
@@ -273,7 +276,7 @@ export class ContentsPanel extends React.Component<ContentsPanelProps, ContentsP
 }
 
 interface ShareContentProps { info: Dbt.Content, allTags: Tags.TagSelectOption[], onClose: () => void, toast: IToaster }
-interface ShareContentState { title: string, comment: string, tags: string[], isOpen: boolean, amount: number, stringSchedule: string }
+interface ShareContentState { title: string, comment: string, tags: string[], isOpen: boolean, amount: number, stringSchedule: string, isPublic: boolean }
 class ShareContent extends React.Component<ShareContentProps, ShareContentState> {
 
   constructor(props: ShareContentProps) {
@@ -282,7 +285,7 @@ class ShareContent extends React.Component<ShareContentProps, ShareContentState>
     tags.unshift(props.info.contentType);
     let paymentSchedule = this.isMediaType() ? Utils.defaultPaymentSchedule() : [];
     let stringSchedule = paymentSchedule.map(i => i.toString()).join();
-    this.state = { isOpen: true, amount: 0, title: props.info.title, tags, comment: '', stringSchedule };
+    this.state = { isOpen: true, amount: 0, title: props.info.title, tags, comment: '', stringSchedule, isPublic: false };
   }
 
   isMediaType() { return ['audio', 'video'].indexOf(this.props.info.contentType) >= 0; }
@@ -290,6 +293,7 @@ class ShareContent extends React.Component<ShareContentProps, ShareContentState>
   changeTitle(e) { this.setState({ title: e.target.value }); }
   changeTags(e) { this.setState({ tags: e.target.value }); }
   changeComment(e) { this.setState({ comment: e.target.value }); }
+  changeIsPublic(e) { this.setState({ isPublic: !this.state.isPublic }); }
   changeInvestment(e) {
     let amount = parseInt(e.target.value);
     if (!isNaN(amount) && amount >= 0) this.setState({ amount });
@@ -335,43 +339,48 @@ class ShareContent extends React.Component<ShareContentProps, ShareContentState>
     if (!this.state.isOpen) return null;
     let pubdiv = null;
     let ttl = "Share Content"
-    let invdiv = null;
-    if (this.props.info.contentType !== 'bookmark') {
-      let schedule = this.state.stringSchedule;
-      invdiv = (<div>
-        <div style={rowStyle} >
-          <div style={lhcolStyle}>Schedule:</div>
-          <input type="text" style={{ marginTop: 6, height: "30px", width: '100%' }} value={schedule} onChange={e => this.changePaymentSchedule(e)} />
-        </div>
-        <div style={rowStyle} >
-          <div style={{ display: 'inline' }}>Investment amount:</div>
-          <input type="number" style={{ display: 'inline', height: "24px", marginTop: "6px", width: '100px' }} value={this.state.amount} onChange={e => this.changeInvestment(e)} />
-        </div>
-      </div>);
-    }
+    let lspan = 2;
+    let schedule;
+    if (!this.state.isPublic && this.props.info.contentType !== 'bookmark') schedule = this.state.stringSchedule;
     return (
-      <Dialog iconName="inbox" isOpen={this.state.isOpen} title={ttl} onClose={() => this.close()} >
-        <div className="pt-dialog-body">
-          <div style={rowStyle} >
-            <div style={lhcolStyle}>Title:</div>
-            <input type="text" style={{ marginTop: 6, height: "30px", width: '100%' }} value={this.state.title} onChange={e => this.changeTitle(e)} />
-          </div>
-          <div style={rowStyle} >
-            <div style={lhcolStyle}>Comment:</div>
-            <input type="text" style={{ marginTop: 6, height: "30px", width: '100%' }} value={this.state.comment} onChange={e => this.changeComment(e)} />
-          </div>
-          <div style={rowStyle} >
-            <div style={lhcolStyle}>Tags:</div>
-            <Tags.TagGroupEditor tags={this.state.tags} creatable={true} allTags={this.props.allTags} onChange={(tags) => this.changeTags(tags)} />
-          </div>
-        </div>
-        {invdiv}
-        <div className="pt-dialog-footer">
-          <div className="pt-dialog-footer-actions">
-            <Button text="Cancel" onClick={() => this.close()} />
-            <Button intent={Intent.PRIMARY} onClick={() => this.save()} text="Share" />
-          </div>
-        </div>
+      <Dialog iconName="share" style={{ width: '600px' }} isOpen={this.state.isOpen} title={ttl} onClose={() => this.close()} >
+        <Panel>
+          <Row>
+            <Label span={lspan} >Title:</Label>
+            <Col span={7}>
+              <input type="text" style={{ width: '100%' }} value={this.state.title} onChange={e => this.changeTitle(e)} />
+            </Col>
+            <Col><Checkbox label="Public?" className="pt-text-muted" checked={this.state.isPublic} onChange={e => this.setState({ isPublic: !this.state.isPublic })} /></Col>
+          </Row>
+          <Row>
+            <Label span={lspan}>Comment:</Label>
+            <Col span={12 - lspan}>
+              <textarea className="pt-input pt-fill" style={{ height: "100px" }} value={this.state.comment} onChange={e => this.changeComment(e)} />
+            </Col>
+          </Row>
+          <Row align="center">
+            <Label span={lspan}>Tags:</Label>
+            <Col span={10}>
+              <Tags.TagGroupEditor tags={this.state.tags} creatable={true} allTags={this.props.allTags} onChange={tags => this.changeTags(tags)} />
+            </Col>
+          </Row>
+          {!this.state.isPublic &&
+            <Row>
+              <Label span={lspan}>Credits:</Label>
+              <Col span={2}>
+                <input type="number" style={{ width: '70px' }} value={this.state.amount} onChange={e => this.changeInvestment(e)} />
+              </Col>
+              <Label span={2}>Schedule: </Label>
+              <Col span={6}>
+                <input type="text" style={{ width: '100%' }} value={schedule} onChange={e => this.changePaymentSchedule(e)} />
+              </Col>
+            </Row>
+          }
+          <Row justify="end">
+            <Button style={btnStyle} text="Cancel" onClick={() => this.close()} />
+            <Button style={btnStyle} intent={Intent.PRIMARY} onClick={() => this.save()} text="Share" />
+          </Row>
+        </Panel>
       </Dialog >
     );
   }

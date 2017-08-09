@@ -8,6 +8,7 @@ import * as Dbt from '../lib/datatypes';
 import * as Rpc from '../lib/rpc';
 import * as Utils from '../lib/utils';
 import * as Constants from '../lib/constants';
+import { NavBar } from '../lib/components';
 import * as OxiDate from '../lib/oxidate';
 import * as OxiGen from '../gen/oxigen';
 import { sendApiRequest } from '../lib/axiosClient';
@@ -30,6 +31,7 @@ const toast = Toaster.create({
 export type PanelContext = {
   toast: IToaster;
   filters: () => string[];
+  setFilters: (a: string[]) => void;
   addFilter: (t: string) => void;
   removeFilter: (t: string) => void;
   vsp: JSX.Element;
@@ -46,9 +48,13 @@ export class HomePage extends React.Component<HomePageProps, HomePageState> {
     let vsp = <div style={{ height: "20px" }} />;
 
     let panelContext = {
-      toast, filters: () => this.state.filters, addFilter: s => this.addFilter(s), removeFilter: s => this.removeFilter(s), vsp
+      toast, filters: () => this.state.filters, setFilters: a => this.setFilters(a), addFilter: s => this.addFilter(s), removeFilter: s => this.removeFilter(s), vsp
     }
     this.state = { panel: "Feeds", filters: [], panelContext };
+  }
+
+  setFilters(filters: string[]) {
+    this.setState({ filters });
   }
 
   addFilter(f: string) {
@@ -81,8 +87,8 @@ export class HomePage extends React.Component<HomePageProps, HomePageState> {
 
   render() {
     let btns = [];
+    let { publicKey, user } = this.props.appState;
     let reload = () => {
-      let { publicKey } = this.props.appState;
       let req: Rpc.InitializeRequest = { publicKey };
       sendApiRequest("initialize", req);
     }
@@ -96,23 +102,20 @@ export class HomePage extends React.Component<HomePageProps, HomePageState> {
       </div>
     );
     let pop = (<Popover content={btngrp} popoverClassName="pt-minimal" interactionKind={PopoverInteractionKind.HOVER} position={Position.BOTTOM} >
-      <Button iconName="pt-icon-cog" text="" />
+      <button className="pt-button pt-minimal pt-icon-cog" />
     </Popover>
     );
 
+    let navbtns = [
+      <button className="pt-button pt-minimal pt-icon-notifications" onClick={() => this.setPanel("Feeds")} >Feeds</button>,
+      <button className="pt-button pt-minimal pt-icon-document-share" onClick={() => this.setPanel("Shares")} >Shares</button>,
+      <button className="pt-button pt-minimal pt-icon-document" onClick={() => this.setPanel("Contents")} >Contents</button>,
+      <button className="pt-button pt-minimal pt-icon-user" onClick={() => this.setPanel("Settings")} >{user.userName}</button>,
+      pop
+    ];
+
     return <div>
-      <nav className="pt-navbar pt-dark pt-fixed-top">
-        <div className="pt-navbar-group pt-align-left">
-          <div className="pt-navbar-heading"><h2 style={{ color: "#48AFF0" }}><b><i>eqURLity</i></b></h2></div>
-        </div>
-        <div className="pt-navbar-group pt-align-right">
-          <button className="pt-button pt-minimal pt-icon-notifications" onClick={() => this.setPanel("Feeds")} >Feeds</button>
-          <button className="pt-button pt-minimal pt-icon-document-share" onClick={() => this.setPanel("Shares")} >Shares</button>
-          <button className="pt-button pt-minimal pt-icon-document" onClick={() => this.setPanel("Contents")} >Contents</button>
-          <button className="pt-button pt-minimal pt-icon-user" onClick={() => this.setPanel("Settings")} >Settings</button>
-          {pop}
-        </div>
-      </nav>
+      <NavBar buttons={navbtns} />
       <div style={{ marginTop: "60px" }} >
         < h3 > {this.state.panel}</h3>
         {this.getPanel()}

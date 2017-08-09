@@ -25,9 +25,10 @@ import * as uuid from '../lib/uuid.js';
 import { promisify } from '../lib/promisify';
 import * as Utils from '../lib/utils';
 import * as Dbt from '../lib/datatypes'
+import * as Tags from '../lib/tags';
 import * as Rpc from '../lib/rpc';
 import { ContentView } from '../lib/contentView';
-import { LinkLandingPage, HomePage, ContentLandingPage, UserLandingPage } from '../lib/landingPages';
+import { LinkLandingPage, ContentLandingPage, UserLandingPage, AboutPage, HowItWorksPage } from '../lib/landingPages';
 import { validateContentSignature } from '../lib/Crypto';
 import * as SrvrMsg from '../lib/serverMessages';
 
@@ -106,6 +107,27 @@ function linkMediaPage(cont: Dbt.Content, linkId: Dbt.linkId): string {
 <body>
   <script type="text/javascript" src="/dist/media_bndl.js"></script>
   <div id="app" data-link-id="${linkId}" data-content-id="${cont.contentId}" data-mime-type="${mime_type}"></div>
+</body>
+</html>  
+`;
+  return body;
+}
+
+function homePage(isClient: boolean, feeds: Rpc.FeedItem[], allTags: string[]): string {
+  let props = JSON.stringify({ isClient, feeds, allTags });
+
+  let body = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <link href="/node_modules/@blueprintjs/core/dist/blueprint.css" rel="stylesheet" />
+  <link href="/node_modules/react-select/dist/react-select.css" rel="stylesheet" />
+  <link href="/node_modules/react-simple-flex-grid/lib/main.css" rel="stylesheet" />
+</head>
+<body>
+  <script type="text/javascript" src="/dist/homepage_bndl.js"></script>
+  <div id="app" data-props='${props}' ></div>
 </body>
 </html>  
 `;
@@ -393,14 +415,33 @@ publicRouter.get('/user/:id', async (ctx, next) => {
   ctx.body = body;
 });
 
-
-// need to serve this route before static files are enabled??
-publicRouter.get('/', async (ctx, next) => {
-  let view = <HomePage />;
+publicRouter.get('/how-it-works', async (ctx, next) => {
+  let isClient = isValidClient(ctx);
+  let view = <HowItWorksPage isClient={isClient} />;
   let ins = ReactDOMServer.renderToStaticMarkup(view);
   let body = htmlPage(ins);
   ctx.body = body;
+});
 
+publicRouter.get('/about', async (ctx, next) => {
+  let isClient = isValidClient(ctx);
+  let view = <AboutPage isClient={isClient} />;
+  let ins = ReactDOMServer.renderToStaticMarkup(view);
+  let body = htmlPage(ins);
+  ctx.body = body;
+});
+
+publicRouter.get('/', async (ctx, next) => {
+  let isClient = isValidClient(ctx);
+  let links;
+  if (isClient) {
+    let userId: Jwt.UserJwt = ctx['userId'];
+    links = await pg.memberFeed(userId.id);
+  }
+  else links = await pg.publicFeed();
+  let allTags = cache.allTags();
+  let body = homePage(isClient, links, allTags);
+  ctx.body = body;
 });
 
 publicRouter.post('/auth', async (ctx, next) => {
@@ -825,6 +866,7 @@ app.use(router.middleware())
 if (Utils.isStaging()) console.log("Using staging mode");
 
 //pg.buildMissingWaveforms();
+//pg.generateFeeds();
 
 const port = parseInt(process.env.PORT, 10) || 8080;
 

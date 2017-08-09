@@ -4,12 +4,14 @@ import * as Utils from "../lib/utils";
 import { Url, parse } from 'url';
 import * as Rpc from '../lib/rpc';
 import * as Dbt from '../lib/datatypes'
+import * as Tags from '../lib/tags';
 import * as uuid from '../lib/uuid';
+import { IReadonlyMap } from '../lib/cacheTypes';
+export { IReadonlyMap } from '../lib/cacheTypes';
+
 import * as pg from './pgsql';
 
 // ahem ... cache (almost) the whole db in memory 
-
-export interface IReadonlyMap<K, V> { get: (key: K) => V, has: (key: K) => boolean }
 
 const _users = new Map<Dbt.userId, Dbt.User>();
 const _contents = new Map<Dbt.contentId, Dbt.Content>();
@@ -18,6 +20,11 @@ const _comments = new Map<Dbt.commentId, Dbt.Comment>();
 const _userlinks = new Map<Dbt.userId, Dbt.userId[]>();
 const _followers = new Map<Dbt.userId, Set<Dbt.userId>>();
 const _tags = new Map<Dbt.tag, Dbt.Tag>();
+
+let _allTagOptions: Tags.TagSelectOption[] = null;
+export function allTagOptions(): Tags.TagSelectOption[] {
+  return _allTagOptions;
+}
 
 export const users: IReadonlyMap<Dbt.userId, Dbt.User> = _users;
 export const contents: IReadonlyMap<Dbt.contentId, Dbt.Content> = _contents;
@@ -121,6 +128,7 @@ export function setTag(v: Dbt.Tag) {
   let pub = !_tags.has(v.tag);
   _tags.set(v.tag, v);
   if (pub) publish([{ table: "tags", record: v }]);
+  _allTagOptions = Tags.mergeTags([v.tag], _allTagOptions);
 }
 
 // probably not needed
@@ -160,7 +168,9 @@ export function init(userRows: Dbt.User[], contentRows: Dbt.Content[], linkRows:
 
   _tags.clear();
   tagRows.forEach(r => _tags.set(r.tag, r));
+  _allTagOptions = Tags.mergeTags(allTags());
 
+  /*
   if (Utils.isDev()) {  // connect all users
     let ids = Array.from(_users.keys());
     let l = ids.length;
@@ -178,6 +188,7 @@ export function init(userRows: Dbt.User[], contentRows: Dbt.Content[], linkRows:
       }
     });
   }
+  */
 
   // maybe later ...
   //let userlinks: Array<Dbt.UserLink> = await db.any("select * from userlinks");

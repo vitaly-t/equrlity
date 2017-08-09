@@ -79,12 +79,13 @@ export function openWebSocket(st: AppState, messageHandler: (msg: any) => void, 
   function resetPinger() {
     if (_pingTimer) clearTimeout(_pingTimer);
     _pingTimer = setTimeout(() => {
-      //console.log("pinging server");
-      if (ws.readyState !== 1) {
-        errorHandler(new Error("Socket not ready for ping."));
-      }
+      _pingTimer = 0;
+      if (ws.readyState !== 1) errorHandler(new Error("Socket not ready for ping."));
       else {
-        try { ws.send('{"ping": true}'); }
+        try {
+          ws.send('{"ping": true}');
+          resetPinger();
+        }
         catch (e) { handleError(e.message); }
       }
     }, 10000)
@@ -98,19 +99,10 @@ export function openWebSocket(st: AppState, messageHandler: (msg: any) => void, 
   };
   ws.onmessage = (event) => {
     if (typeof event.data === 'string') {
-      //console.log("string received")
       let msg;
-      try {
-        msg = JSON.parse(event.data);
-        resetPinger();
-      }
-      catch (e) {
-        errorHandler(new Error('Invalid JSON received on websocket: ' + event.data));
-      }
-      if (msg) {
-        if (!msg.pong) messageHandler(msg);
-        //else console.log("pong received");
-      }
+      try { msg = JSON.parse(event.data); }
+      catch (e) { handleError('Invalid JSON received on websocket: ' + event.data); }
+      if (msg && !msg.pong) messageHandler(msg);
     }
   }
   ws.onerror = (event: ErrorEvent) => { handleError(event.message) };

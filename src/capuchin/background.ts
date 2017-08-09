@@ -73,7 +73,7 @@ async function initialize() {
     clearTimeout(_initTimer);
     chrome.browserAction.setBadgeText({ text: "0" });
     chrome.browserAction.setBadgeBackgroundColor({ color: defaultBadgeColor });
-    _initTimer = null;
+    _initTimer = 0;
   }
   let st = currentState();
   try {

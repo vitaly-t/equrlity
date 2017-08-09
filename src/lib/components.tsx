@@ -3,6 +3,9 @@ import * as Flex from 'react-simple-flex-grid';
 import { EditableText, Tooltip, Position } from '@blueprintjs/core';
 
 import * as Constants from '../lib/constants';
+import * as Utils from '../lib/utils';
+
+export { Col } from 'react-simple-flex-grid';
 
 export const Panel: React.StatelessComponent<{}> = ({ children }) => (
   <div className="pt-elevation-0" style={{ width: "100%", height: "100%", backgroundColor: Constants.panelBackgroundColor }}>
@@ -47,4 +50,18 @@ export const TextAuto: React.StatelessComponent<TextAutoProps> = props => {
   disabled = disabled || false;
   onChange = onChange || (v => { return; })
   return <EditableText multiline disabled={disabled} value={value} onChange={onChange} />
+}
+
+export interface NavBarProps { buttons: any[], subtitle?: string }
+export const NavBar: React.StatelessComponent<NavBarProps> = props => {
+  let ttl = <a href={Utils.serverUrl} target="_blank" >eqURLity</a>
+  return <nav className="pt-navbar pt-dark pt-fixed-top">
+    <div className="pt-navbar-group pt-align-left">
+      <div className="pt-navbar-heading"><h2 style={{ color: Constants.bannerTextColor }}><b><i>{ttl}</i></b></h2></div>
+      <div>{props.subtitle}</div>
+    </div>
+    <div className="pt-navbar-group pt-align-right">
+      {props.buttons}
+    </div>
+  </nav>
 }

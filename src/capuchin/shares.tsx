@@ -81,6 +81,7 @@ export class SharesPanel extends React.Component<SharesPanelProps, SharesPanelSt
 
         return (
           <tr key={l.linkId} >
+            <td>{OxiDate.timeAgo(new Date(l.created))}</td>
             <td><a href={url} target="_blank" >{url}</a></td>
             <td>{l.contentId}</td>
             <td><Checkbox disabled checked={l.isPublic} /></td>
@@ -97,6 +98,7 @@ export class SharesPanel extends React.Component<SharesPanelProps, SharesPanelSt
         <table className="pt-table pt-striped pt-bordered" >
           <thead>
             <tr>
+              <th>Created</th>
               <th>URL</th>
               <th>Content ID</th>
               <th>Public?</th>
@@ -115,13 +117,13 @@ export class SharesPanel extends React.Component<SharesPanelProps, SharesPanelSt
       );
     }
 
-
     let fltrDiv = null;
     let filters = panelContext.filters();
-    if (filters.length > 0) {
-      let fltrs = <Tags.TagGroup tags={filters} onRemove={(s) => panelContext.removeFilter(s)} />;
-      fltrDiv = <div>{vsp}<Row>Showing :  {fltrs}</Row></div>;
-    }
+    let fltrs = <Tags.TagGroupEditor creatable={false} tags={filters} allTags={st.allTags} onChange={filters => panelContext.setFilters(filters)} />;
+    fltrDiv = <div>
+      {vsp}
+      <Row align="top" ><span>Showing : </span><div style={{ display: 'inline-block' }}>{fltrs}</div></Row>
+    </div>;
 
     let transfer = () => {
       let amount = this.state.transferAmount;

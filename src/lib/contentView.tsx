@@ -9,6 +9,7 @@ import * as ReactDOM from 'react-dom';
 import * as Rpc from '../lib/rpc';
 import * as Dbt from '../lib/datatypes';
 import * as Utils from '../lib/utils';
+import { TrackInfo, TrackInfoViewer } from '../lib/trackinfo';
 
 import { TagGroup } from './tags';
 
@@ -31,7 +32,12 @@ export class ContentView extends React.Component<ContentViewProps, ContentViewSt
     let tags = info.tags
     let hpg = Utils.homePageUrl(owner);
     let tagbtns = <TagGroup tags={tags} />;
-    let hdr = (info.contentType === "post") ? null : <h3>{info.title}</h3>;
+    let hdr = (info.contentType === "post") ? null
+      : (info.contentType === "audio" && info.info) ? <div>
+        <h3>{info.title}</h3>
+        <TrackInfoViewer trackInfo={info.info} />
+      </div>
+        : <h3>{info.title}</h3>;
     return (
       <div>
         {hdr}

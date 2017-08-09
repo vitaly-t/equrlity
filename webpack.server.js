@@ -12,6 +12,7 @@ module.exports = function () {
   return {
     entry: {
       media: './src/bundles/media.tsx',
+      homepage: './src/bundles/homepage.tsx',
     },
     output: {
       path: outPath,
