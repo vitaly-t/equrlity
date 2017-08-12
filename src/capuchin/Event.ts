@@ -15,11 +15,6 @@ export interface Initialize {
   eventType: "Initialize";
 }
 
-export interface ShareContent {
-  eventType: "ShareContent";
-  req: Rpc.ShareContentRequest;
-}
-
 export interface BookmarkLink {
   eventType: "BookmarkLink";
   url: Dbt.urlString;
@@ -64,16 +59,6 @@ export interface AddContents {
   contents: Dbt.Content[];
 }
 
-export interface TransferCredits {
-  eventType: "TransferCredits";
-  req: Rpc.TransferCreditsRequest;
-}
-
-export interface DismissPromotion {
-  eventType: "DismissPromotion";
-  url: Dbt.urlString;
-}
-
 export interface SaveTags {
   eventType: "SaveTags";
   tags: string[];
@@ -90,8 +75,8 @@ export interface Thunk {
   fn: (st: AppState) => AppState;
 }
 
-export type Message = ShareContent | BookmarkLink | Initialize | Load | ActivateTab | Render
-  | LaunchPage | SaveContent | RemoveContent | AddContents | DismissFeeds | DismissPromotion | TransferCredits | Thunk;
+export type Message = BookmarkLink | Initialize | Load | ActivateTab | Render
+  | LaunchPage | SaveContent | RemoveContent | AddContents | DismissFeeds | Thunk;
 
 export function getTab(tabId: number): Promise<chrome.tabs.Tab> {
   return new Promise((resolve, reject) => {
@@ -142,7 +127,7 @@ export namespace AsyncHandlers {
   }
 
   export async function dismissFeeds(state: AppState, items: Rpc.FeedItem[], save?: boolean): Promise<(st: AppState) => AppState> {
-    let urls = items.filter(i => i.type === "share").map(i => i.url);
+    let urls = items.filter(i => i.type !== "comment").map(i => i.url);
     Comms.sendDismissFeeds(state, urls, save);
     let thunk = (st: AppState) => {
       let ids = items.filter(i => i.id ? true : false).map(i => i.id);
@@ -151,22 +136,6 @@ export namespace AsyncHandlers {
       st = { ...st, feeds }
       return st;
     }
-    return thunk;
-  }
-
-  export async function shareContent(state: AppState, req: Rpc.ShareContentRequest): Promise<(st: AppState) => AppState> {
-    let response = await Comms.sendShareContent(state, req)
-    let thunk = (st: AppState) => {
-      st = extractHeadersToState(st, response);
-      let rslt: Rpc.ShareContentResponse = extractResult(response);
-      if (rslt.link) {
-        let { shares } = st
-        let inv: Rpc.UserLinkItem = { link: rslt.link, linkDepth: 0, viewCount: 0 };
-        shares = [inv, ...shares];
-        st = { ...st, shares };
-      }
-      return st;
-    };
     return thunk;
   }
 
@@ -205,7 +174,7 @@ export namespace AsyncHandlers {
         st = { ...st, contents };
       }
       if (rslt.link) {
-        let inv: Rpc.UserLinkItem = { link: rslt.link, linkDepth: 0, viewCount: 0 }
+        let inv: Rpc.UserLinkItem = { link: rslt.link, linkDepth: 0, viewCount: 0, type: "bookmark" };
         let shares = [inv, ...st.shares];
         st = { ...st, shares };
       }
@@ -240,19 +209,6 @@ export namespace AsyncHandlers {
       }
       return st;
     };
-    return thunk;
-  }
-
-  export async function transferCredits(state: AppState, req: Rpc.TransferCreditsRequest): Promise<(st: AppState) => AppState> {
-    const response = await Comms.sendTransferCredits(state, req);
-    let thunk = (st: AppState) => {
-      st = extractHeadersToState(state, response);
-      let rslt: Rpc.TransferCreditsResponse = extractResult(response);
-      if (!rslt.ok) {
-        // do something clever...
-      }
-      return st;
-    }
     return thunk;
   }
 

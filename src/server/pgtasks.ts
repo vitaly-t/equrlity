@@ -99,9 +99,10 @@ export async function getAllAnonymousMonikers(t: ITask<any>): Promise<Dbt.userNa
   return rslt.map(u => u.userName);
 };
 
-const upsert_user_sql = OxiGen.genUpsertStatement(oxb.tables.get("users"));
-export async function upsertUser(t: ITask<any>, usr: Dbt.User): Promise<CacheUpdate[]> {
-  let rslt: Dbt.User[] = await t.any(upsert_user_sql, usr);
+//TODO: needs to report errors. 
+const update_user_sql = OxiGen.genUpdateStatement(oxb.tables.get("users"));
+export async function updateUser(t: ITask<any>, usr: Dbt.User): Promise<CacheUpdate[]> {
+  let rslt: Dbt.User[] = await t.any(update_user_sql, usr);
   return rslt.map(record => { return { table: "users" as CachedTable, record }; });
 }
 
@@ -119,7 +120,7 @@ export async function adjustUserBalance(t: ITask<any>, usr: Dbt.User, adj: Dbt.i
   let credits = usr.credits + adj;
   if (credits < 0) throw new Error("Negative balances not allowed");
   let newusr = { ...usr, credits }
-  let rslt = await upsertUser(t, newusr);
+  let rslt = await updateUser(t, newusr);
   return rslt;
 }
 
@@ -390,7 +391,8 @@ export async function purchaseContent(t: ITask<any>, links: Dbt.Link[], viewerId
 
     let contentId = link.contentId;
     let cont = await retrieveRecord<Dbt.Content>(t, "contents", { contentId });
-    cont = { ...cont, userId: viewerId, contentId: '' };
+    let source = cont.source || cont.userId;
+    cont = { ...cont, userId: viewerId, contentId: '', source };
     cont = await insertContent(t, cont);
     rslt.push({ table: "contents" as CachedTable, record: cont });
   }

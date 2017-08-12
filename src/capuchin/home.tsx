@@ -18,6 +18,7 @@ import * as Chrome from './chrome';
 
 import { FeedsPanel } from './feeds';
 import { SharesPanel } from './shares';
+import { PurchasesPanel } from './purchases';
 import { ContentsPanel } from './contents';
 import { SettingsPanel } from './settings';
 
@@ -37,7 +38,7 @@ export type PanelContext = {
   vsp: JSX.Element;
 }
 
-type Panel = "Feeds" | "Shares" | "Contents" | "Settings"
+type Panel = "Feeds" | "Shares" | "Purchases" | "Contents" | "Settings"
 interface HomePageProps { appState: AppState };
 interface HomePageState { panel: Panel, filters: string[], panelContext: PanelContext };
 
@@ -75,13 +76,14 @@ export class HomePage extends React.Component<HomePageProps, HomePageState> {
   setPanel(panel: Panel) { this.setState({ panel }) };
 
   getPanel() {
-    let st = this.props.appState;
-    let panelContext = this.state.panelContext
+    let appState = this.props.appState;
+    let panelContext = this.state.panelContext;
     switch (this.state.panel) {
-      case "Feeds": return <FeedsPanel appState={st} panelContext={panelContext} />;
-      case "Shares": return <SharesPanel appState={st} panelContext={panelContext} />;
-      case "Contents": return <ContentsPanel appState={st} panelContext={panelContext} />;
-      case "Settings": return <SettingsPanel appState={st} panelContext={panelContext} />;
+      case "Feeds": return <FeedsPanel appState={appState} panelContext={panelContext} />;
+      case "Shares": return <SharesPanel appState={appState} panelContext={panelContext} />;
+      case "Purchases": return <PurchasesPanel appState={appState} panelContext={panelContext} />;
+      case "Contents": return <ContentsPanel appState={appState} panelContext={panelContext} />;
+      case "Settings": return <SettingsPanel appState={appState} panelContext={panelContext} />;
     }
   }
 
@@ -109,6 +111,7 @@ export class HomePage extends React.Component<HomePageProps, HomePageState> {
     let navbtns = [
       <button className="pt-button pt-minimal pt-icon-notifications" onClick={() => this.setPanel("Feeds")} >Feeds</button>,
       <button className="pt-button pt-minimal pt-icon-document-share" onClick={() => this.setPanel("Shares")} >Shares</button>,
+      <button className="pt-button pt-minimal pt-icon-saved" onClick={() => this.setPanel("Purchases")} >Purchases</button>,
       <button className="pt-button pt-minimal pt-icon-document" onClick={() => this.setPanel("Contents")} >Contents</button>,
       <button className="pt-button pt-minimal pt-icon-user" onClick={() => this.setPanel("Settings")} >{user.userName}</button>,
       pop

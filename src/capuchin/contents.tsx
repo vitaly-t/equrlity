@@ -21,6 +21,7 @@ import buildWaveform from '../lib/buildWaveform';
 import { TrackInfoEditor, TrackInfoViewer } from '../lib/trackinfo';
 
 import { AppState, postDeserialize } from "./AppState";
+import * as Comms from './Comms';
 import * as Chrome from './chrome';
 import { ContentEditor } from './contentEditor';
 import { PanelContext } from "./home";
@@ -147,7 +148,7 @@ export class ContentsPanel extends React.Component<ContentsPanelProps, ContentsP
     }
     else if (this.state.promotingContent) {
       let onClose = () => this.setState({ promotingContent: null });
-      contsdiv = <ShareContent info={this.state.promotingContent} allTags={this.props.appState.allTags} onClose={onClose} toast={panelContext.toast} />
+      contsdiv = <ShareContent info={this.state.promotingContent} appState={this.props.appState} onClose={onClose} toast={panelContext.toast} />
     }
     else if (this.state.editingContent) {
       let onClose = () => this.setState({ editingContent: null });
@@ -225,13 +226,8 @@ export class ContentsPanel extends React.Component<ContentsPanelProps, ContentsP
         </table>);
     }
 
-    let fltrDiv = null;
     let filters = panelContext.filters();
     let fltrs = <Tags.TagGroupEditor creatable={false} tags={filters} allTags={st.allTags} onChange={filters => panelContext.setFilters(filters)} />;
-    fltrDiv = <div>
-      {vsp}
-      <Row align="top" ><span>Showing : </span><div style={{ display: 'inline-block' }}>{fltrs}</div></Row>
-    </div>;
 
     let uploadDiv;
     if (this.state.uploadProgress.length > 0) {
@@ -262,7 +258,7 @@ export class ContentsPanel extends React.Component<ContentsPanelProps, ContentsP
     }
     return (
       <div>
-        {fltrDiv}
+        <Row align="middle" ><span>Showing : </span><div style={{ display: 'inline-block' }}>{fltrs}</div></Row>
         {vsp}
         {contsdiv}
         {vsp}
@@ -275,7 +271,7 @@ export class ContentsPanel extends React.Component<ContentsPanelProps, ContentsP
   }
 }
 
-interface ShareContentProps { info: Dbt.Content, allTags: Tags.TagSelectOption[], onClose: () => void, toast: IToaster }
+interface ShareContentProps { appState: AppState, info: Dbt.Content, onClose: () => void, toast: IToaster }
 interface ShareContentState { title: string, comment: string, tags: string[], isOpen: boolean, amount: number, stringSchedule: string, isPublic: boolean }
 class ShareContent extends React.Component<ShareContentProps, ShareContentState> {
 
@@ -331,7 +327,7 @@ class ShareContent extends React.Component<ShareContentProps, ShareContentState>
     }
     let info = this.props.info;
     let req: Rpc.ShareContentRequest = { contentId: info.contentId, title, comment, tags, amount, signature: '', paymentSchedule };
-    Chrome.sendMessage({ eventType: "ShareContent", req });
+    Comms.sendShareContent(this.props.appState, req);
     this.close();
   }
 
@@ -361,7 +357,7 @@ class ShareContent extends React.Component<ShareContentProps, ShareContentState>
           <Row align="center">
             <Label span={lspan}>Tags:</Label>
             <Col span={10}>
-              <Tags.TagGroupEditor tags={this.state.tags} creatable={true} allTags={this.props.allTags} onChange={tags => this.changeTags(tags)} />
+              <Tags.TagGroupEditor tags={this.state.tags} creatable={true} allTags={this.props.appState.allTags} onChange={tags => this.changeTags(tags)} />
             </Col>
           </Row>
           {!this.state.isPublic &&

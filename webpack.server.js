@@ -13,6 +13,7 @@ module.exports = function () {
     entry: {
       media: './src/bundles/media.tsx',
       homepage: './src/bundles/homepage.tsx',
+      peoplepage: './src/bundles/peoplepage.tsx',
     },
     output: {
       path: outPath,

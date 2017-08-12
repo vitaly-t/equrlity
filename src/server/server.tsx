@@ -134,6 +134,27 @@ function homePage(isClient: boolean, feeds: Rpc.FeedItem[], allTags: string[]): 
   return body;
 }
 
+function peoplePage(isClient: boolean, people: Rpc.UserInfoItem[], allTags: string[]): string {
+  let props = JSON.stringify({ isClient, people, allTags });
+
+  let body = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <link href="/node_modules/@blueprintjs/core/dist/blueprint.css" rel="stylesheet" />
+  <link href="/node_modules/react-select/dist/react-select.css" rel="stylesheet" />
+  <link href="/node_modules/react-simple-flex-grid/lib/main.css" rel="stylesheet" />
+</head>
+<body>
+  <script type="text/javascript" src="/dist/peoplepage_bndl.js"></script>
+  <div id="app" data-props='${props}' ></div>
+</body>
+</html>  
+`;
+  return body;
+}
+
 const app = websockify(new Koa());
 //const app = new Koa();
 app.keys = ['pseudoqurl'];  //@@GS what does this do again?
@@ -409,7 +430,13 @@ publicRouter.get('/user/:id', async (ctx, next) => {
   }
   */
   let isClient = isValidClient(ctx);
-  let view = <UserLandingPage user={user} isClient={isClient} />;
+  let clientId = isClient ? ctx['userId'].id : null;
+  let isFollowing;
+  if (isClient) {
+    let client = cache.users.get(clientId);
+    isFollowing = client.following.indexOf(user.userId) >= 0;
+  }
+  let view = <UserLandingPage user={user} clientId={clientId} isFollowing={isFollowing} />;
   let ins = ReactDOMServer.renderToStaticMarkup(view);
   let body = htmlPage(ins);
   ctx.body = body;
@@ -428,6 +455,15 @@ publicRouter.get('/about', async (ctx, next) => {
   let view = <AboutPage isClient={isClient} />;
   let ins = ReactDOMServer.renderToStaticMarkup(view);
   let body = htmlPage(ins);
+  ctx.body = body;
+});
+
+publicRouter.get('/qurlers', async (ctx, next) => {
+  let isClient = isValidClient(ctx);
+  let allTags = cache.allTags();
+  let userId = isClient ? ctx['userId'].id : null;
+  let people = await pg.allUserInfos(userId)
+  let body = peoplePage(isClient, people, allTags);
   ctx.body = body;
 });
 
@@ -686,7 +722,7 @@ router.post('/rpc', async function (ctx: any) {
         });
         let newFollows = !usr.following ? following : following.filter(id => usr.following.indexOf(id) < 0);
         usr = { ...usr, userName, email, home_page, info, profile_pic, subscriptions, blacklist, following };
-        let updts = await pg.upsertUser(usr);
+        let updts = await pg.updateUser(usr);
         cache.update(updts);
         if (newFollows.length > 0) pg.sendNewFollowFeeds(userId, newFollows);
         let result: Rpc.ChangeSettingsResponse = { ok: true };
@@ -800,6 +836,15 @@ router.post('/rpc', async function (ctx: any) {
         ctx.body = { id, result };
         break;
       }
+      case "transferCredits": {
+        let req: Rpc.TransferCreditsRequest = params;
+        let { transferTo, amount } = req;
+        let ufrom = cache.users.get(userId);
+        let uto = cache.users.get(transferTo)
+        let result = await pg.transferCredits(ufrom, uto, amount);
+        ctx.body = { id, result };
+        break;
+      }
       default:
         let error: Rpc.Error = { id, error: { code: -32601, message: "Invalid method: " + method } };
         ctx.body = error;
@@ -811,6 +856,36 @@ router.post('/rpc', async function (ctx: any) {
   }
 
 });
+
+router.get('/follow/:userName', async function (ctx, next) {
+  let newFollow = cache.getUserByName(ctx.params.userName).userId;
+  let user = cache.users.get(ctx.userId.id);
+  if (!user.following || user.following.indexOf(newFollow) < 0) {
+    let following = [...user.following, newFollow];
+    user = { ...user, following };
+    let updts = await pg.updateUser(user);
+    cache.update(updts);
+  }
+  ctx.redirect('/user/' + ctx.params.userName);
+});
+
+router.get('/unfollow/:userName', async function (ctx, next) {
+  let noFollow = cache.getUserByName(ctx.params.userName).userId;
+  let user = cache.users.get(ctx.userId.id);
+  if (user.following) {
+    let i = user.following.indexOf(noFollow);
+    if (i >= 0) {
+      let following = user.following.slice()
+      following.splice(i, 1);
+      user = { ...user, following };
+      let updts = await pg.updateUser(user);
+      cache.update(updts);
+    }
+  }
+  ctx.redirect('/user/' + ctx.params.userName);
+});
+
+
 
 /*
 router.get('/auth/facebook', function (ctx, next) {

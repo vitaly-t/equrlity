@@ -30,6 +30,7 @@ export default {
         "audio",
         "image",
         "bookmark",
+        "comment",   // not sure about this one
       ]
     },
     created: {
@@ -143,6 +144,7 @@ export default {
       { name: "peaks", type: "text" },
     ],
     Content: ["contentId", "contentType", "title", "userId", "db_hash", "content", "created", "updated", "isPublic", "tags",
+      { name: "source", type: "userId" },
       { name: "url", type: "urlString" },
       { name: "mime_ext", type: "varchar(8)" },
       { name: "info", type: "json" },

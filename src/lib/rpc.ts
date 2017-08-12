@@ -87,7 +87,7 @@ export type InitializeResponse = {
 }
 
 export type FeedItem = {
-  type: "share" | "comment";
+  type: Dbt.contentType;
   id: string;
   created: Dbt.timestamp;
   source: Dbt.userName;
@@ -177,8 +177,21 @@ export type GetUserLinksRequest = {}
 
 export type UserLinkItem = {
   link: Dbt.Link;
+  type: Dbt.contentType;
   linkDepth: Dbt.integer;
   viewCount: Dbt.integer;
+}
+
+export type UserInfoItem = {
+  userName: Dbt.userName;
+  profile_pic: Dbt.db_hash;
+  tags: Dbt.tag[];
+  posts?: Dbt.integer;
+  bookmarks?: Dbt.integer;
+  images?: Dbt.integer;
+  videos?: Dbt.integer;
+  audios?: Dbt.integer;
+  requrls?: Dbt.integer;
 }
 
 export type GetUserLinksResponse = {
@@ -201,7 +214,7 @@ export type RemoveContentRequest = { contentId: Dbt.contentId; }
 
 export type RemoveContentResponse = { ok: boolean; }
 
-export type TransferCreditsRequest = { transferTo: Dbt.userName; amount: Dbt.integer; }
+export type TransferCreditsRequest = { transferTo: Dbt.userId; amount: Dbt.integer; }
 
 export type TransferCreditsResponse = { ok: boolean; }
 

@@ -16,11 +16,12 @@ import * as Tags from '../lib/tags';
 import { MarkdownEditor } from '../lib/markdownEditor';
 import { YesNoBox } from '../lib/dialogs';
 import { TagGroupEditor, TagSelectOption } from '../lib/tags';
+import { uploadRequest, sendApiRequest } from "../lib/axiosClient";
 
 import { AppState, postDeserialize, userNameFromId, userIdFromName } from "./AppState";
-import { uploadRequest, sendApiRequest } from "../lib/axiosClient";
 import * as Chrome from './chrome';
 import { PanelContext } from './home';
+import { TransferCreditsPanel } from './transferCredits';
 
 interface SettingsPanelProps { appState: AppState, panelContext: PanelContext };
 interface SettingsPanelState { user: Dbt.User };
@@ -167,6 +168,8 @@ export class SettingsPanel extends React.Component<SettingsPanelProps, SettingsP
             </div>
           </div>
         </div>
+        {vsp}
+        <TransferCreditsPanel appState={st} panelContext={this.props.panelContext} />
         {vsp}
         <h4>Current status.</h4>
         <div style={divStyle}>

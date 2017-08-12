@@ -262,8 +262,8 @@ export async function getAllAnonymousMonikers(): Promise<Dbt.userName[]> {
   return await db.task(t => tasks.getAllAnonymousMonikers(t));
 };
 
-export async function upsertUser(usr: Dbt.User): Promise<cache.CacheUpdate[]> {
-  return await db.task(t => tasks.upsertUser(t, usr));
+export async function updateUser(usr: Dbt.User): Promise<cache.CacheUpdate[]> {
+  return await db.task(t => tasks.updateUser(t, usr));
 }
 
 export async function findUserByName(name: string): Promise<Dbt.User | null> {
@@ -471,9 +471,10 @@ async function _getUserLinkItem(t: ITask<any>, linkId: Dbt.linkId): Promise<Rpc.
   let link = cache.links.get(linkId);
   let linkDepth = cache.getLinkDepth(link);
   let viewCount = await tasks.viewCount(t, linkId);
+  let type = cache.contents.get(link.contentId).contentType
   //let promotionsCount = await tasks.promotionsCount(t, linkId);
   //let deliveriesCount = await tasks.deliveriesCount(t, linkId);
-  let rl: Rpc.UserLinkItem = { link, linkDepth, viewCount /*, promotionsCount, deliveriesCount*/ };
+  let rl: Rpc.UserLinkItem = { link, linkDepth, viewCount, type /*, promotionsCount, deliveriesCount*/ };
   return rl;
 }
 
@@ -601,8 +602,9 @@ function _convertLinksToFeeds(feeds: Dbt.Feed[]): Rpc.FeedItem[] {
     let l: Dbt.Link = cache.links.get(f.linkId);
     let { tags, created, comment } = l;
     let source = cache.users.get(l.userId).userName;
+    let type = cache.contents.get(l.contentId).contentType;
     let url = Utils.linkToUrl(l.linkId, l.title);
-    let itm: Rpc.FeedItem = { type: "share", id: l.linkId, source, created, tags, url, comment };
+    let itm: Rpc.FeedItem = { type, id: l.linkId, source, created, tags, url, comment };
     rslt.push(itm);
   };
   return rslt;
@@ -693,7 +695,7 @@ function _linksToFeeds(links: Dbt.Link[]): Rpc.FeedItem[] {
   return links.map(l => {
     let { created, tags, comment } = l;
     let item: Rpc.FeedItem = {
-      type: "share",
+      type: cache.contents.get(l.contentId).contentType,
       created, tags, comment, id: l.linkId,
       source: cache.users.get(l.userId).userName,
       url: Utils.linkToUrl(l.linkId, l.title),
@@ -733,9 +735,6 @@ export async function generateFeeds() {
   }
 }
 
-
-
-
 export async function calcChargeForNextStream(viewerId: Dbt.userId, viewedLinkId: Dbt.linkId): Promise<Dbt.integer> {
   let links = cache.getChainFromLinkId(viewedLinkId);
   let l = links.length - 1;
@@ -774,5 +773,37 @@ export async function getInitialData(user: Dbt.User, last_feed?: Date): Promise<
   let allTags = cache.allTags();
   let result: Rpc.InitializeResponse = { user, userNames: unms, contents, shares, feeds, allTags };
   return result;
+}
+
+export async function transferCredits(fromUser: Dbt.User, toUser: Dbt.User, amount: Dbt.integer): Promise<Rpc.TransferCreditsResponse> {
+  if (fromUser.credits < amount) throw new Error("Insufficient credits for transfer");
+  if (amount < 0) throw new Error("Negative transfers not supported");
+  let credits = fromUser.credits - amount;
+  let u1 = { ...fromUser, credits }
+  let u2 = { ...toUser, credits: toUser.credits + amount };
+  let updts = await db.tx(async t => {
+    let r1 = await tasks.updateRecord(t, "users", u1);
+    let r2 = await tasks.updateRecord(t, "users", u2);
+    let updt1: cache.CacheUpdate = { table: "users", record: r1 }
+    let updt2: cache.CacheUpdate = { table: "users", record: r2 }
+    return [updt1, updt2];
+  });
+  cache.update(updts);
+  return { ok: true };
+}
+
+export async function allUserInfos(userId?: Dbt.userId): Promise<Rpc.UserInfoItem[]> {
+  return await db.tx(async t => {
+    let w = userId ? ` where "userId" != '${userId}'` : ''
+    let users: Dbt.User[] = await t.any(`select * from users` + w);
+    return users.map(u => {
+      let { userName, profile_pic } = u;
+      let i: Rpc.UserInfoItem = {
+        userName, profile_pic,
+        tags: [],
+      }
+      return i;
+    });
+  });
 }
 

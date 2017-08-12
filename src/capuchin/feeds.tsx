@@ -3,14 +3,14 @@ import * as ReactDOM from "react-dom";
 import { Button, Dialog, Intent, Checkbox, Popover, PopoverInteractionKind, Position, IToaster } from "@blueprintjs/core";
 import { Url, format } from 'url';
 import axios, { AxiosResponse, AxiosError } from 'axios';
-import { Row, Col } from 'react-simple-flex-grid';
 
 import * as Dbt from '../lib/datatypes';
 import * as Rpc from '../lib/rpc';
 import * as Utils from '../lib/utils';
 import * as Constants from '../lib/constants';
 import * as OxiDate from '../lib/oxidate';
-import { rowStyle, btnStyle, lhcolStyle } from "../lib/constants";
+import { btnStyle, lhcolStyle } from "../lib/constants";
+import { Row, Col } from '../lib/components';
 import * as Tags from '../lib/tags';
 import { YesNoBox } from '../lib/dialogs';
 import { sendApiRequest } from '../lib/axiosClient';
@@ -41,13 +41,13 @@ export class FeedsPanel extends React.Component<FeedsPanelProps, FeedsPanelState
     let linkdiv = <p>There are no current feed items.</p>
     let filteredLinks: Rpc.FeedItem[] = []
     if (links.length > 0) {
-      let tagfilter = (tags: string[], source: string): boolean => {
+      let tagfilter = (tags: string[], source: string, type: Dbt.contentType): boolean => {
         if (!tags) tags = [];
         let fltrs = panelContext.filters();
-        for (let f of fltrs) if (tags.indexOf(f) < 0 && f !== source) return false;
+        for (let f of fltrs) if (tags.indexOf(f) < 0 && f !== source && f !== type) return false;
         return true;
       }
-      filteredLinks = links.filter(f => tagfilter(f.tags, f.source));
+      filteredLinks = links.filter(f => tagfilter(f.tags, f.source, f.type));
       let linkrows = filteredLinks.map(f => {
         let { url, comment, source, type, created } = f
         let dismiss = () => { Chrome.sendMessage({ eventType: "DismissFeeds", feeds: [f] }); };
@@ -72,7 +72,8 @@ export class FeedsPanel extends React.Component<FeedsPanelProps, FeedsPanelState
             <td>{type}</td>
             <td>{OxiDate.timeAgo(new Date(created))}</td>
             <td><a href="" onClick={onclick} >{url}</a></td>
-            <td><Tags.TagGroup tags={[source]} onClick={(s) => panelContext.addFilter(s)} /></td>
+            <td><Tags.TagGroup tags={[f.type]} onClick={(s) => panelContext.addFilter(s)} /></td>
+            {false && <td><Tags.TagGroup tags={[source]} onClick={(s) => panelContext.addFilter(s)} /></td>}
             <td>{comment}</td>
             <td>{tags}</td>
             <td>{pop}</td>
@@ -83,10 +84,10 @@ export class FeedsPanel extends React.Component<FeedsPanelProps, FeedsPanelState
         <table className="pt-table pt-striped pt-bordered">
           <thead>
             <tr>
-              <th>Type</th>
               <th>Created</th>
-              <th>Link</th>
-              <th>Source</th>
+              <th>URL</th>
+              <th>Type</th>
+              {false && <th>Source</th>}
               <th>Comment</th>
               <th>Tags</th>
               <th>Actions</th>
@@ -117,15 +118,13 @@ export class FeedsPanel extends React.Component<FeedsPanelProps, FeedsPanelState
       fltrDiv = <YesNoBox message={msg} onYes={onYes} onClose={onClose} />
     }
     else {
-      let cols = [];
       let filters = panelContext.filters();
-      cols.push(<Col key="saveAll" ><Button disabled={filteredLinks.length === 0} className="pt-intent-success" style={btnStyle} onClick={saveAll} text="Bookmark All" /></Col>)
-      cols.push(<Col key="dismissAll" ><Button disabled={filteredLinks.length === 0} className="pt-intent-danger" style={btnStyle} onClick={dismissAll} text="Dismiss All" /></Col>)
       let fltrs = <Tags.TagGroupEditor creatable={false} tags={filters} allTags={st.allTags} onChange={filters => panelContext.setFilters(filters)} />;
-      cols.push(<Col key="feedFilters" >
-        <Row align="top" ><span>Showing : </span><div style={{ display: 'inline-block' }}>{fltrs}</div></Row>
-      </Col>);
-      fltrDiv = <Row>{cols}</Row>;
+      fltrDiv = <Row align="middle" >
+        <Button disabled={filteredLinks.length === 0} className="pt-intent-success" style={btnStyle} onClick={saveAll} text="Bookmark All" />
+        <Button disabled={filteredLinks.length === 0} className="pt-intent-danger" style={btnStyle} onClick={dismissAll} text="Dismiss All" />
+        <span>Showing : </span><div style={{ display: 'inline-block' }}>{fltrs}</div>
+      </Row>;
     }
 
     let divStyle = { width: '100%', marginTop: 5, marginLeft: 5, padding: 6 };

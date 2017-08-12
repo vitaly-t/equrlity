@@ -17,6 +17,7 @@ export interface AppState {
   shares: Rpc.UserLinkItem[];
   feeds: Rpc.FeedItem[];
   contents: Dbt.Content[];
+  purchases: Dbt.Content[];
   allTags: TagSelectOption[];
 
   // ephemeral
@@ -31,7 +32,7 @@ export function initState(): AppState {
   console.log("initState called");
   return {
     publicKey: null, privateKey: null, links: Object.create(null), matchedTags: Object.create(null), userNames: [], user: null,
-    activeUrl: null, jwt: '', lastErrorMessage: '', feeds: [], shares: [], contents: [], allTags: []
+    activeUrl: null, jwt: '', lastErrorMessage: '', feeds: [], shares: [], contents: [], purchases: [], allTags: []
   };
 }
 

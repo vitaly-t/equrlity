@@ -4,7 +4,7 @@
 export type authId = string;
 export type authProvider = "publicKey" | "facebook" | "github" | "twitter" | "linkedin" | "chrome";
 export type binary = Buffer;
-export type contentType = "post" | "video" | "audio" | "image" | "bookmark";
+export type contentType = "post" | "video" | "audio" | "image" | "bookmark" | "comment";
 export type created = Date;
 export type date = Date;
 export type db_hash = string;
@@ -91,6 +91,7 @@ export interface Content {
   readonly updated: updated | null,
   readonly isPublic: isPublic | null,
   readonly tags: tags | null,
+  readonly source: userId | null,
   readonly url: urlString | null,
   readonly mime_ext: varchar_8 | null,
   readonly info: json | null

@@ -293,10 +293,6 @@ export async function handleAsyncMessage(event: Message) {
         fn = await AsyncHandlers.bookmarkLink(st, event);
         break;
       }
-      case "ShareContent": {
-        fn = await AsyncHandlers.shareContent(st, event.req);
-        break;
-      }
       case "RemoveContent": {
         fn = await AsyncHandlers.removeContent(st, event.req);
         break;
@@ -312,10 +308,6 @@ export async function handleAsyncMessage(event: Message) {
       case "ActivateTab": {
         let t = await getTab(event.tabId);
         fn = await AsyncHandlers.load(st, t.url);
-        break;
-      }
-      case "TransferCredits": {
-        fn = await AsyncHandlers.transferCredits(st, event.req);
         break;
       }
       case "DismissFeeds": {
@@ -409,6 +401,20 @@ export async function receiveServerMessages(srvmsg: SrvrMsg.ServerMessage) {
         }
         case "Content": {
           let cont: Dbt.Content = msg.message;
+          if (cont.source && cont.source !== st.user.userId) {
+            let purchases = st.purchases
+            let i = purchases.findIndex(c => c.contentId === cont.contentId);
+            if (msg.remove) {
+              if (i < 0) break;
+              purchases.splice(i, 1);
+            }
+            else {
+              if (i < 0) purchases = [cont, ...purchases];
+              else purchases.splice(i, 1, cont);
+            }
+            st = { ...st, purchases };
+            break;
+          }
           let contents = st.contents
           let i = contents.findIndex(c => c.contentId === cont.contentId);
           if (msg.remove) {

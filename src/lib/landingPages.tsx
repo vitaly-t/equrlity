@@ -1,6 +1,8 @@
 import * as React from "react";
 import * as ReactDOM from "react-dom";
 import * as Remarkable from 'remarkable';
+import { Button, Intent } from '@blueprintjs/core';
+
 
 import { Row, Col, NavBar } from '../lib/components';
 import * as Constants from "../lib/constants";
@@ -51,8 +53,8 @@ for that currency).  Were this to eventuate, we envisage that eqURLity micro-tra
 PseudoQoin, and that some exchange facility to and from other crypto-currencies then be provided.  This would of course introduce all sorts of legal issues,
 not to mention the security issues introduced by having to maintain what would effectively a "hot-wallet" facility for PseudoQoins.  For these reasons we would
 prefer to simply defer to other micro-payments platforms if possible, and absolve ourselves of such concerns. In this scenario, a user would be required to 
-only to supply a wallet address for the selected platform, and eqURLity would query that address for balances, and post transactions to this wallet, such that no
-balance information would need to be maintained internally. 
+to supply a wallet address for the selected payments platform, and eqURLity would simple query that address for balances, and post transactions to it, 
+so that no balance information need be maintained internally. 
 
 
 The software is currently in alpha testing, and is not yet generally available. If you are curious about participating in our little experiment,
@@ -177,6 +179,7 @@ export const LandingPage: React.StatelessComponent<LandingPageProps> = props => 
   const pgStyle = { marginLeft: 20, marginRight: 20, marginTop: 70 };
   let { subtitle } = props;
   let btns = [
+    <button key="qurlers" className="pt-button pt-minimal pt-icon-people"><a href={Utils.serverUrl + '/qurlers'}>qURLers</a></button>,
     <button key="how-it-works" className="pt-button pt-minimal pt-icon-info-sign"><a href={Utils.serverUrl + '/how-it-works'}>How It Works</a></button>,
     <button key="about" className="pt-button pt-minimal pt-icon-help"><a href={Utils.serverUrl + '/about'}>About</a></button>,
   ];
@@ -218,25 +221,26 @@ export const ContentLandingPage = (props: ContentLandingPageProps) => {
   );
 };
 
-export interface UserLandingPageProps { user: Dbt.User, isClient: boolean }
+export interface UserLandingPageProps { user: Dbt.User, clientId: Dbt.userId, isFollowing: boolean }
 export const UserLandingPage: React.StatelessComponent<UserLandingPageProps> = props => {
-  let qurlinfo = null;
-  let { user, isClient } = props;
-  let userLink = user.home_page ? <a href={user.home_page} target="_blank">{user.home_page}</a> : "Not provided";
+  let { user, clientId, isFollowing } = props;
+  if (!clientId) return <div>
+    <p>You do not currently have the eqURLity client software installed.</p>
+  </div>;
   let info = null;
+  let sub = isFollowing ? <a href={Utils.serverUrl + "/unfollow/" + user.userName} >Unfollow</a>
+    : <a href={Utils.serverUrl + "/follow/" + user.userName} >Follow</a>
   if (user.info) {
     let h = { __html: md.render(user.info) };
     info = <div dangerouslySetInnerHTML={h} />;
   }
-  if (!isClient) qurlinfo = <div>
-    <p>You do not currently have the eqURLity Chrome extension running.</p>
-  </div>
+  else {
+    info = user.home_page ? <a href={user.home_page} target="_blank">{user.home_page}</a> : "No profile information provided.";
+  }
   return (
-    <LandingPage subtitle={"Creator Info : " + user.userName} >
-      <p>Home page: {userLink}</p>
-      <p>Email: {user.email ? user.email : 'Not provided'}</p>
-      {info}
-      {qurlinfo}
+    <LandingPage subtitle={"qURLer Info : " + user.userName} >
+      <Row>{info}</Row>
+      <Row><Button>{sub}</Button></Row>
     </LandingPage>
   );
 };
