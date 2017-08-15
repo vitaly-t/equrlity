@@ -182,7 +182,7 @@ export type UserLinkItem = {
   viewCount: Dbt.integer;
 }
 
-export type UserInfoItem = {
+export type UserActivityInfo = {
   userName: Dbt.userName;
   profile_pic: Dbt.db_hash;
   tags: Dbt.tag[];

@@ -62,15 +62,20 @@ export const TextAuto: React.StatelessComponent<TextAutoProps> = props => {
   return <EditableText multiline disabled={disabled} value={value} onChange={onChange} />
 }
 
-export interface NavBarProps { buttons: any[], subtitle?: string }
+export interface NavBarProps { buttons: any[], subtitle?: string, leftItems?: any[] }
 export const NavBar: React.StatelessComponent<NavBarProps> = props => {
-  let ttl = <a href={Utils.serverUrl} target="_blank" ><h2 style={{ color: Constants.bannerTextColor }}><b><i>eqURLity</i></b></h2></a>
+  let leftItems = props.leftItems || []
+  let ttl = <div className="pt-navbar-heading">
+    <a href={Utils.serverUrl} target="_blank" ><h2 style={{ color: Constants.bannerTextColor }}><b><i>eqURLity</i></b></h2></a>
+  </div>
+  if (props.subtitle) leftItems.unshift(<div className="pt-navbar-heading">{props.subtitle}</div>);
+  leftItems.unshift(ttl);
+
   return <nav className="pt-navbar pt-dark pt-fixed-top" >
     <div className="pt-navbar-group pt-align-left">
-      <div className="pt-navbar-heading">{ttl}</div>
-      <div className="pt-navbar-heading">{props.subtitle}</div>
+      {leftItems}
     </div>
-    <div className="pt-navbar-group pt-align-right" style={{ color: 'yellow' }}>
+    <div className="pt-navbar-group pt-align-right" >
       {props.buttons}
     </div>
   </nav>

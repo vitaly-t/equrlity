@@ -134,7 +134,7 @@ function homePage(isClient: boolean, feeds: Rpc.FeedItem[], allTags: string[]): 
   return body;
 }
 
-function peoplePage(isClient: boolean, people: Rpc.UserInfoItem[], allTags: string[]): string {
+function peoplePage(isClient: boolean, people: Rpc.UserActivityInfo[], allTags: string[]): string {
   let props = JSON.stringify({ isClient, people, allTags });
 
   let body = `

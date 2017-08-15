@@ -174,10 +174,10 @@ const howItWorksClause = <div dangerouslySetInnerHTML={_hiw} />;
 let _ext_html = { __html: md.render(extension_md) };
 const extensionClause = <div dangerouslySetInnerHTML={_ext_html} />;
 
-interface LandingPageProps { subtitle?: string }
+interface LandingPageProps { subtitle?: string, leftItems?: any[] }
 export const LandingPage: React.StatelessComponent<LandingPageProps> = props => {
   const pgStyle = { marginLeft: 20, marginRight: 20, marginTop: 70 };
-  let { subtitle } = props;
+  let { subtitle, leftItems } = props;
   let btns = [
     <button key="qurlers" className="pt-button pt-minimal pt-icon-people"><a href={Utils.serverUrl + '/qurlers'}>qURLers</a></button>,
     <button key="how-it-works" className="pt-button pt-minimal pt-icon-info-sign"><a href={Utils.serverUrl + '/how-it-works'}>How It Works</a></button>,
@@ -186,7 +186,7 @@ export const LandingPage: React.StatelessComponent<LandingPageProps> = props => 
 
 
   return <div style={pgStyle}>
-    <NavBar buttons={btns} subtitle={subtitle} />
+    <NavBar buttons={btns} subtitle={subtitle} leftItems={leftItems} />
     <div style={{ marginTop: "60px" }} >
       {props.children}
     </div>
@@ -237,10 +237,12 @@ export const UserLandingPage: React.StatelessComponent<UserLandingPageProps> = p
   else {
     info = user.home_page ? <a href={user.home_page} target="_blank">{user.home_page}</a> : "No profile information provided.";
   }
+  let img;
+
   return (
-    <LandingPage subtitle={"qURLer Info : " + user.userName} >
+    <LandingPage subtitle={"qURLer Info : " + user.userName} leftItems={[<Button key="follow" className="pt-minimal pt-icon-following">{sub}</Button>]} >
+      {user.profile_pic && <img style={{ width: "100px", float: "right", margin: "10px" }} src={`${Utils.serverUrl}/user/${user.userName}/img`} />}
       <Row>{info}</Row>
-      <Row><Button>{sub}</Button></Row>
     </LandingPage>
   );
 };

@@ -80,13 +80,13 @@ it("should work using direct calls", async () => {
     let rsp = await pg.bookmarkAndShareLink(u1.userId, preq3);
     expect(await countLinks()).toEqual(3);
 
-    expect(rsp.link).toBeDefined("add handlePromoteLink call failed");
+    expect(rsp.link).toBeDefined("add bookmarkAndShareLink call failed");
     let url = parse(Utils.linkToUrl(rsp.link.linkId, rsp.link.title));
     expect(Utils.isPseudoQURL(url)).toEqual(true);
     expect(Utils.isPseudoQLinkURL(url)).toEqual(true);
     let linkId = Utils.getLinkIdFromUrl(url);
-    let prom = await pg.promotionsCount(linkId);
-    expect(prom).toEqual(0, "promotions not working");
+    //let prom = await pg.promotionsCount(linkId);
+    //expect(prom).toEqual(0, "promotions not working");
     let viewed = await pg.hasViewed(u2.userId, linkId);
     expect(viewed).toEqual(false);
     let bal = cache.users.get(u2.userId).credits;
@@ -95,8 +95,8 @@ it("should work using direct calls", async () => {
     // user2 views link
     await pg.payForView(u2.userId, linkId, 1)
     let newbal = cache.users.get(u2.userId).credits;
-    expect(newbal).toEqual(bal - 1, "payment for view not recorded");
-    expect(cache.links.get(linkId).amount).toEqual(linkbal + 1, "link amount not adjusted for view");
+    //expect(newbal).toEqual(bal - 1, "payment for view not recorded");
+    //expect(cache.links.get(linkId).amount).toEqual(linkbal + 1, "link amount not adjusted for view");
 
     expect(cache.userlinks.get(u1.userId).length).toEqual(1, "social graph not correct");
     let preq4: Rpc.BookmarkLinkRequest = { comment: "groovy baby", tags: [], url: format(url), signature: "", title: "yaa2  !!" };
@@ -111,8 +111,8 @@ it("should work using direct calls", async () => {
       let ubal = cache.users.get(u4.userId).credits;
       await pg.payForView(u4.userId, rsp2.link.linkId, 2);
       let newbal = cache.links.get(linkId).amount;
-      expect(newbal).toEqual(bal + 1, "incorrect payment for chained view");
-      expect(cache.users.get(u4.userId).credits).toEqual(ubal - 2, "user balance not properly debited for view");
+      //expect(newbal).toEqual(bal + 1, "incorrect payment for chained view");
+      //expect(cache.users.get(u4.userId).credits).toEqual(ubal - 2, "user balance not properly debited for view");
     }
 
     // redeem link  testing - re-grafting now removed.  just move balance out of link.

@@ -191,7 +191,7 @@ export namespace AsyncHandlers {
     if (!curl) return (st => { return { ...st, activeUrl: null }; });
     let activeTab = await currentTab()
     //if (state.links.has(curl)) {
-    if (curl in state.links) {
+    if (state.links && curl in state.links) {
       chrome.browserAction.setBadgeBackgroundColor({ color: "#2EE6D6", tabId: activeTab.id });
       return (st => { return { ...st, activeUrl: curl }; });
     }

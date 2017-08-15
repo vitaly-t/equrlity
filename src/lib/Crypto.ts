@@ -27,12 +27,6 @@ export function ecdsaVerify(jwk, signature, data) {
   return verify.verify(key, new Buffer(asn1sig, 'hex'));
 }
 
-export function checkForKeyPair(keys: string[]): boolean {
-  const hasPublicKey: boolean = keys.indexOf('publicKey') >= 0;
-  const hasPrivateKey: boolean = keys.indexOf('privateKey') >= 0;
-  return hasPublicKey && hasPrivateKey;
-}
-
 export async function generateKeyPair(): Promise<CryptoKeyPair> {
   return await window.crypto.subtle.generateKey(
     { name: "ECDSA", namedCurve: "P-256" },

@@ -12,12 +12,12 @@ export function getNodeEnv() {
 export const serverUrl =
   isDev() ? "http://localhost:8080"
     : isStaging() ? "https://pseudoqurl-staging.herokuapp.com"
-      : "https://www.pseudoq.com";
+      : "https://www.equrlity.com";
 
 export const chromeAuthUrl = "https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=";
 
 export function capuchinVersion() {
-  return "0.9.9.5";
+  return "0.9.9.8";
 }
 
 export function sleep(millisecs: number) {

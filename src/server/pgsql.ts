@@ -401,7 +401,7 @@ export async function payForView(viewerId: Dbt.userId, viewedLinkId: Dbt.linkId,
   let viewedLink = links[0];
   if (viewerId !== viewedLink.userId) {
     cache.connectUsers(viewerId, viewedLink.userId);
-    cacheUpdateTx(t => tasks.payForView(t, links, viewerId, amount));
+    await cacheUpdateTx(t => tasks.payForView(t, links, viewerId, amount));
   }
 }
 
@@ -410,7 +410,7 @@ export async function purchaseContent(viewerId: Dbt.userId, viewedLinkId: Dbt.li
   let viewedLink = links[0];
   if (viewerId === viewedLink.userId) return null;
   cache.connectUsers(viewerId, viewedLink.userId);
-  cacheUpdateTx(t => tasks.purchaseContent(t, links, viewerId, amount));
+  await cacheUpdateTx(t => tasks.purchaseContent(t, links, viewerId, amount));
 }
 
 export async function createUser(email?: string): Promise<Dbt.User> {
@@ -580,9 +580,16 @@ export async function saveUserFollowings(userId: Dbt.userId, follows: Dbt.userNa
 function _feedFilter(usr: Dbt.User, l: Dbt.Link): boolean {
   let { subscriptions, blacklist, following } = usr;
   if (l.userId === usr.userId) return false;
-  if (subscriptions && subscriptions.findIndex(t => l.tags && l.tags.indexOf(t) >= 0) >= 0) return true;
-  if (following && following.indexOf(l.userId) >= 0) {
-    return !(blacklist && blacklist.findIndex(t => l.tags && l.tags.indexOf(t) >= 0) >= 0);
+  try {  // debugging kludge
+    if (subscriptions && subscriptions.findIndex(t => l.tags && l.tags.indexOf(t) >= 0) >= 0) return true;
+    if (following && following.indexOf(l.userId) >= 0) {
+      return !(blacklist && blacklist.findIndex(t => l.tags && l.tags.indexOf(t) >= 0) >= 0);
+    }
+  }
+  catch (e) {
+    console.log("Error in _feedFilter : " + e.message);
+    console.log("subscriptions: " + subscriptions);
+    console.log("following: " + following);
   }
   return false;
 }
@@ -792,18 +799,58 @@ export async function transferCredits(fromUser: Dbt.User, toUser: Dbt.User, amou
   return { ok: true };
 }
 
-export async function allUserInfos(userId?: Dbt.userId): Promise<Rpc.UserInfoItem[]> {
-  return await db.tx(async t => {
-    let w = userId ? ` where "userId" != '${userId}'` : ''
-    let users: Dbt.User[] = await t.any(`select * from users` + w);
-    return users.map(u => {
-      let { userName, profile_pic } = u;
-      let i: Rpc.UserInfoItem = {
-        userName, profile_pic,
-        tags: [],
-      }
-      return i;
-    });
-  });
+export async function getUserSharesSince(userId: Dbt.userId, since: Date): Promise<Dbt.Link[]> {
+  let feeds: Dbt.Link[] = await db.any(`select * from links where "userId" = '${userId}' and  created >= $1`, [since]);
+  return feeds;
 }
+
+export async function getUserInfoItem(userId: Dbt.userId, since?: Date): Promise<Rpc.UserActivityInfo> {
+  since = since || OxiDate.addDays(new Date(), -31);
+  let feeds = await getUserSharesSince(userId, since);
+  let user = cache.users.get(userId);
+  let { userName, profile_pic } = user;
+  let tags = new Set<string>();
+  let posts = 0;
+  let images = 0;
+  let videos = 0;
+  let audios = 0;
+  let bookmarks = 0;
+  let requrls = 0;
+  feeds.forEach(l => {
+    let cont = cache.contents.get(l.contentId);
+    if (cont.source && cont.source !== userId) requrls++;
+    else {
+      let typ = cache.contents.get(l.contentId).contentType;
+      switch (typ) {
+        case "post":
+          posts++;
+          break;
+        case "audio":
+          audios++;
+          break;
+        case "video":
+          videos++;
+          break;
+        case "image":
+          images++;
+          break;
+        case "bookmark":
+          bookmarks++;
+          break;
+      }
+    }
+    if (l.tags) l.tags.forEach(t => tags.add(t));
+  })
+  let i: Rpc.UserActivityInfo = { userName, profile_pic, posts, audios, videos, images, bookmarks, requrls, tags: Array.from(tags) }
+  return i;
+}
+
+export async function allUserInfos(userId?: Dbt.userId): Promise<Rpc.UserActivityInfo[]> {
+  let w = userId ? ` where "userId" != '${userId}'` : ''
+  let users: Dbt.User[] = await db.any(`select * from users` + w);
+  let rslt: Rpc.UserActivityInfo[] = [];
+  for (const u of users) rslt.push(await getUserInfoItem(u.userId));
+  return rslt;
+}
+
 

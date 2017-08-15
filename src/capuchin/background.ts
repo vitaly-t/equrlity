@@ -29,24 +29,39 @@ async function __init() {
   chrome.browserAction.getBadgeBackgroundColor({}, c => { defaultBadgeColor = c; });
   let st = currentState();
   if (!st.jwt) {
+    let userInfo;
+    { //migration ...
+      localForage.config({ name: process.env.CAPUCHIN_NAME });
+      const keys: string[] = await localForage.keys();
+      if (keys.indexOf('appState') >= 0) {
+        let newst = await localForage.getItem<AppState>('appState');
+        let matchedTags = Object.create(null);
+        let links = Object.create(null);
+        // allows for possible evolution (eg new properties) of appState structure in code.
+        st = { ...st, ...newst, matchedTags, links };
+        await localForage.removeItem('appState');
+      }
+    }
+    if (Utils.isProduction()) userInfo = await getProfile();
+    else {
+      let id = process.env.CAPUCHIN_USERID;
+      if (id) {
+        let email = process.env.CAPUCHIN_USEREMAIL || "";
+        userInfo = { id, email };
+      }
+      else userInfo = await getProfile();
+    }
     //console.log("no jwt found");
-    localForage.config({ name: process.env.CAPUCHIN_NAME });
+    localForage.config({ name: process.env.CAPUCHIN_NAME, storeName: userInfo.id });
     console.log("Using localForage name: " + process.env.CAPUCHIN_NAME);
+    console.log("Using localForage storeName: " + userInfo.id);
     const keys: string[] = await localForage.keys();
     if (keys.indexOf('appState') >= 0) {
       let newst = await localForage.getItem<AppState>('appState');
       let matchedTags = Object.create(null);
       let links = Object.create(null);
-      if (!newst.user) {
-        // migrate legacy (pre 0.9.9)
-        let t: any = newst;
-        let { credits, profile_pic, last_feed, email } = t;
-        let user = OxiGen.emptyRec<Dbt.User>("users");
-        user = { ...user, email, credits, profile_pic, last_feed, userName: t.moniker, home_page: t.homePage };
-        st = { ...st, user, matchedTags, links };
-      }
       // allows for possible evolution (eg new properties) of appState structure in code.
-      else st = { ...st, ...newst, matchedTags, links };
+      st = { ...st, ...newst, matchedTags, links };
     }
     if (st.jwt) handleMessage({ eventType: "Thunk", fn: (_ => st) });
     else {
@@ -55,11 +70,10 @@ async function __init() {
       const privateKey = await localForage.getItem<JsonWebKey>('privateKey');
       let jwt;
       if (Utils.isProduction()) {
-        const userInfo = await getProfile();
         const chromeToken = await getChromeAccessToken();
         jwt = await AsyncHandlers.authenticate("chrome", userInfo, chromeToken, publicKey);
       }
-      else jwt = await AsyncHandlers.authenticate("publicKey", { email: '', id: '' }, '', publicKey);
+      else jwt = await AsyncHandlers.authenticate("publicKey", userInfo, '', publicKey);
       if (!jwt) throw new Error("Unable to authenticate");
       handleMessage({ eventType: "Thunk", fn: ((st: AppState) => { return { ...st, publicKey, privateKey, jwt } }) });
     }
@@ -96,8 +110,16 @@ async function initialize() {
   }
 }
 
+
+function checkForKeyPair(keys: string[]): boolean {
+  const hasPublicKey: boolean = keys.indexOf('publicKey') >= 0;
+  const hasPrivateKey: boolean = keys.indexOf('privateKey') >= 0;
+  return hasPublicKey && hasPrivateKey;
+}
+
+
 async function createKeyPairIf(keys: string[]): Promise<void> {
-  if (!Crypto.checkForKeyPair(keys)) {
+  if (!checkForKeyPair(keys)) {
     console.log("creating key pair");
     const keyPair: CryptoKeyPair = await Crypto.generateKeyPair();
     const publicKey: JsonWebKey = await Crypto.getPublicKeyJWK(keyPair);

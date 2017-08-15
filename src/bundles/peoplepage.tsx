@@ -7,7 +7,7 @@ import * as Tags from "../lib/tags";
 import { LandingPage } from '../lib/landingPages';
 import { PeoplePanel } from "../lib/people";
 
-export interface PeoplePageProps { isClient: boolean, people: Rpc.UserInfoItem[], allTags: Tags.TagSelectOption[] }
+export interface PeoplePageProps { isClient: boolean, people: Rpc.UserActivityInfo[], allTags: Tags.TagSelectOption[] }
 export const PeoplePage: React.StatelessComponent<PeoplePageProps> = props => {
   let { isClient, people, allTags } = props;
   return (
