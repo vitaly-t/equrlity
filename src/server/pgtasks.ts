@@ -166,13 +166,12 @@ export function emptyLink(): Dbt.Link {
 
 export async function getLinksForContentId(t: ITask<any>, id: Dbt.contentId): Promise<Dbt.Link[]> {
   let url = Utils.contentToUrl(id);
-  return await t.any(`select * from links where url = '${url}'`);
+  return await t.any('select * from links where url = $1', url);
 }
 
 export async function getLinksForUrl(t: ITask<any>, url: Dbt.urlString): Promise<Dbt.Link[]> {
-  let conts = await t.any(`select "contentId" from contents where url = '${url}'`)
-  let ids = conts.map(c => "'" + c.contentId + "'").join(",");
-  return await t.any(`select * from links where "contentId" in (${ids}) `);
+  let ids = await t.map('select "contentId" from contents where url = $1', url, c => c.contentId);
+  return await t.any('select * from links where "contentId" in ($1:csv)', [ids]);
 }
 
 export async function isPromoted(t: ITask<any>, userId: Dbt.userId, linkId: Dbt.linkId): Promise<boolean> {
